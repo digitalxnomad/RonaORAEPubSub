@@ -803,28 +803,44 @@ class Program
                 polledStoreInt = storeId;
             }
 
+            // Get current date/time for polling and creation timestamps
+            DateTime now = DateTime.Now;
+            int pollCen = GetCentury(now);
+            int pollDate = GetDateAsInt(now);
+            int createCen = pollCen;
+            int createDate = pollDate;
+            int createTime = GetTimeAsInt(now);
+
             var recordSet = new RecordSet
             {
                 OrderRecord = new OrderRecord
                 {
                     // Required Fields
                     TransType = mappedTransactionTypeSLFTTP,
-                    LineType = "01", // Regular Sales line type
+                    LineType = mappedTransactionTypeSLFLNT,
                     TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                     TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
 
                     // Transaction Identification
-                    TransNumber = retailEvent.EventId?.PadLeft(5).Substring(0, 5),
+                    TransNumber = PadOrTruncate(retailEvent.EventId, 5),
                     TransSeq = "00001", // First sequence
-                    RegisterID = retailEvent.BusinessContext?.Workstation?.RegisterId?.PadLeft(3).Substring(0, 3),
+                    RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                     // Store Information
                     PolledStore = polledStoreInt,
+                    PollCen = pollCen,
+                    PollDate = pollDate,
+                    CreateCen = createCen,
+                    CreateDate = createDate,
+                    CreateTime = createTime,
 
                     // Will be populated from first item below
                     SKUNumber = null,
                     Quantity = null,
-                    OriginalPrice = null
+                    OriginalPrice = null,
+
+                    // Status - default to active
+                    Status = "A"
                 },
                 TenderRecord = new TenderRecord
                 {
@@ -834,16 +850,24 @@ class Program
 
                     // Transaction Identification
                     TransactionType = mappedTransactionTypeSLFTTP,
-                    TransactionNumber = retailEvent.EventId?.PadLeft(5).Substring(0, 5),
+                    TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
                     TransactionSeq = "00001", // First sequence
-                    RegisterID = retailEvent.BusinessContext?.Workstation?.RegisterId?.PadLeft(3).Substring(0, 3),
+                    RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                     // Store Information
                     PolledStore = polledStoreInt,
+                    PollCen = pollCen,
+                    PollDate = pollDate,
+                    CreateCen = createCen,
+                    CreateDate = createDate,
+                    CreateTime = createTime,
 
                     // Will be populated from first tender below
                     FundCode = null,
-                    Amount = null
+                    Amount = null,
+
+                    // Status - default to active
+                    Status = "A"
                 }
             };
 
@@ -852,31 +876,112 @@ class Program
             {
                 var firstItem = retailEvent.Transaction.Items[0];
 
-                // SKU and Description
-                recordSet.OrderRecord.SKUNumber = firstItem.Item?.Sku?.PadLeft(9).Substring(0, 9);
+                // SKU Number - pad/truncate to 9 characters
+                recordSet.OrderRecord.SKUNumber = PadOrTruncate(firstItem.Item?.Sku, 9);
 
-                // Quantity - format decimal to 9 characters
+                // Quantity - format decimal to 9 characters, handle negative for returns
                 if (firstItem.Quantity != null)
                 {
-                    string qtyStr = ((int)(firstItem.Quantity.Value * 100)).ToString().PadLeft(9, '0');
-                    recordSet.OrderRecord.Quantity = qtyStr;
+                    decimal qtyValue = firstItem.Quantity.Value;
+                    bool isNegative = qtyValue < 0;
+                    int qtyCents = (int)(Math.Abs(qtyValue) * 100);
+
+                    recordSet.OrderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
+                    recordSet.OrderRecord.QuantityNegativeSign = isNegative ? "-" : " ";
                 }
 
-                // Pricing
+                // Original Price
                 if (firstItem.Pricing?.OriginalUnitPrice?.Value != null)
                 {
-                    recordSet.OrderRecord.OriginalPrice = FormatCurrency(firstItem.Pricing.OriginalUnitPrice.Value);
+                    var (amount, sign) = FormatCurrencyWithSign(firstItem.Pricing.OriginalUnitPrice.Value, 9);
+                    recordSet.OrderRecord.OriginalPrice = amount;
+                    recordSet.OrderRecord.OriginalPriceNegativeSign = sign;
                 }
 
+                // Sell Price (unit price after discounts)
                 if (firstItem.Pricing?.UnitPrice?.Value != null)
                 {
-                    recordSet.OrderRecord.ItemSellPrice = FormatCurrency(firstItem.Pricing.UnitPrice.Value);
+                    var (amount, sign) = FormatCurrencyWithSign(firstItem.Pricing.UnitPrice.Value, 9);
+                    recordSet.OrderRecord.ItemSellPrice = amount;
+                    recordSet.OrderRecord.SellPriceNegativeSign = sign;
                 }
 
+                // Extended Value (total line amount)
                 if (firstItem.Pricing?.ExtendedPrice?.Value != null)
                 {
-                    recordSet.OrderRecord.ExtendedValue = FormatCurrency(firstItem.Pricing.ExtendedPrice.Value, 11);
+                    var (amount, sign) = FormatCurrencyWithSign(firstItem.Pricing.ExtendedPrice.Value, 11);
+                    recordSet.OrderRecord.ExtendedValue = amount;
+                    recordSet.OrderRecord.ExtendedValueNegativeSign = sign;
                 }
+
+                // Calculate discount if unit price differs from original
+                if (firstItem.Pricing?.OriginalUnitPrice?.Value != null &&
+                    firstItem.Pricing?.UnitPrice?.Value != null &&
+                    decimal.TryParse(firstItem.Pricing.OriginalUnitPrice.Value, out decimal origPrice) &&
+                    decimal.TryParse(firstItem.Pricing.UnitPrice.Value, out decimal unitPrice))
+                {
+                    decimal discountAmount = origPrice - unitPrice;
+                    if (discountAmount != 0)
+                    {
+                        var (amount, sign) = FormatCurrencyWithSign(discountAmount.ToString("F2"), 9);
+                        recordSet.OrderRecord.DiscountAmount = amount;
+                        recordSet.OrderRecord.DiscountAmountNegativeSign = sign;
+                        recordSet.OrderRecord.DiscountType = discountAmount > 0 ? "01" : "00"; // 01=discount, 00=markup
+                    }
+                }
+
+                // Item Scanned flag - assume scanned if UOM is "EA" (each), otherwise manual entry
+                recordSet.OrderRecord.ItemScanned = firstItem.Quantity?.Uom == "EA" ? "Y" : "N";
+
+                // Reference for line ID
+                if (!string.IsNullOrEmpty(firstItem.LineId))
+                {
+                    recordSet.OrderRecord.ReferenceCode = "L";
+                    recordSet.OrderRecord.ReferenceDesc = PadOrTruncate(firstItem.LineId, 16);
+                }
+            }
+
+            // Map discount from totals if available
+            if (retailEvent.Transaction?.Totals?.Discounts?.Value != null)
+            {
+                var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Discounts.Value, 9);
+                if (recordSet.OrderRecord.DiscountAmount == null)
+                {
+                    recordSet.OrderRecord.DiscountAmount = amount;
+                    recordSet.OrderRecord.DiscountAmountNegativeSign = sign;
+                }
+            }
+
+            // Map tax information if available
+            if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
+                decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
+                taxAmount > 0)
+            {
+                // Set tax flags - default to tax1 charged
+                recordSet.OrderRecord.ChargedTax1 = "Y";
+                recordSet.OrderRecord.ChargedTax2 = "N";
+                recordSet.OrderRecord.ChargedTax3 = "N";
+                recordSet.OrderRecord.ChargedTax4 = "N";
+
+                // Tax authority and rate code from store's tax area
+                if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
+                {
+                    recordSet.OrderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                    recordSet.OrderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                }
+            }
+
+            // Map reference transaction if this is a return or void
+            if (retailEvent.References?.SourceTransactionId != null &&
+                (retailEvent.Transaction?.TransactionType == "RETURN" ||
+                 retailEvent.Transaction?.TransactionType == "VOID"))
+            {
+                // Parse source transaction ID to extract original transaction details
+                string sourceId = retailEvent.References.SourceTransactionId;
+                recordSet.OrderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5);
+                recordSet.OrderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
+                recordSet.OrderRecord.OriginalTxDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd");
+                recordSet.OrderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
             }
 
             // Map first tender if exists
@@ -887,16 +992,27 @@ class Program
                 // Map tender method to fund code
                 recordSet.TenderRecord.FundCode = MapTenderMethodToFundCode(firstTender.Method);
 
-                // Tender amount
+                // Tender amount with sign
                 if (firstTender.Amount?.Value != null)
                 {
-                    recordSet.TenderRecord.Amount = FormatCurrency(firstTender.Amount.Value, 11);
+                    var (amount, sign) = FormatCurrencyWithSign(firstTender.Amount.Value, 11);
+                    recordSet.TenderRecord.Amount = amount;
+                    recordSet.TenderRecord.AmountNegativeSign = sign;
+                }
+
+                // Tender reference - use tender ID
+                if (!string.IsNullOrEmpty(firstTender.TenderId))
+                {
+                    recordSet.TenderRecord.ReferenceCode = "T";
+                    recordSet.TenderRecord.ReferenceDesc = PadOrTruncate(firstTender.TenderId, 16);
                 }
             }
             else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
             {
                 // Fallback to net total if no tenders array
-                recordSet.TenderRecord.Amount = FormatCurrency(retailEvent.Transaction.Totals.Net.Value, 11);
+                var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
+                recordSet.TenderRecord.Amount = amount;
+                recordSet.TenderRecord.AmountNegativeSign = sign;
                 recordSet.TenderRecord.FundCode = "01"; // Default cash
             }
 
@@ -916,6 +1032,61 @@ class Program
             }
 
             return new string('0', length);
+        }
+
+        // Helper method to format currency with separate sign field
+        private (string amount, string sign) FormatCurrencyWithSign(string? value, int length = 9)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return (new string('0', length), " ");
+            }
+
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                bool isNegative = amount < 0;
+                int cents = (int)(Math.Abs(amount) * 100);
+                string formattedAmount = cents.ToString().PadLeft(length, '0');
+                string sign = isNegative ? "-" : " ";
+                return (formattedAmount, sign);
+            }
+
+            return (new string('0', length), " ");
+        }
+
+        // Helper method to pad or truncate string to exact length
+        private string? PadOrTruncate(string? value, int length)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return new string(' ', length);
+            }
+
+            if (value.Length > length)
+            {
+                return value.Substring(0, length);
+            }
+
+            return value.PadLeft(length, '0');
+        }
+
+        // Get century digit (0-9) from date
+        private int GetCentury(DateTime date)
+        {
+            int year = date.Year;
+            return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
+        }
+
+        // Get date as integer in YYMMDD format
+        private int GetDateAsInt(DateTime date)
+        {
+            return int.Parse(date.ToString("yyMMdd"));
+        }
+
+        // Get time as integer in HHMMSS format
+        private int GetTimeAsInt(DateTime date)
+        {
+            return int.Parse(date.ToString("HHmmss"));
         }
 
         // Map tender method to fund code
