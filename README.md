@@ -128,11 +128,29 @@ Log entries include:
 
 ## Transaction Type Mapping
 
-| Input Type | SLFTTP/SLFLNT Code |
-|------------|-------------------|
-| SALE       | 01                |
-| RETURN     | 11                |
-| VOID       | 87                |
+### SLFTTP (Transaction Type) Codes
+| Input Type | Code | Description      |
+|------------|------|------------------|
+| SALE       | 01   | Sales            |
+| RETURN     | 04   | Return           |
+| VOID       | 11   | Void             |
+| OPEN       | 87   | Open             |
+| CLOSE      | 88   | Close            |
+
+### SLFLNT (Line Type) Codes
+| Input Type        | Code | Description         |
+|-------------------|------|---------------------|
+| SALE              | 01   | Regular Sales       |
+| RETURN            | 02   | Regular Trade       |
+| AR_PAYMENT        | 43   | AR Payment          |
+| LAYAWAY_PAYMENT   | 45   | Layaway Payment     |
+| LAYAWAY_SALE      | 50   | Layaway Sale        |
+| LAYAWAY_PICKUP    | 51   | Layaway Pickup      |
+| LAYAWAY_DELETE    | 52   | Layaway Delete      |
+| LAYAWAY_FORFEIT   | 53   | Layaway Forfeit     |
+| SPECIAL_ORDER     | 69   | Special Order       |
+| NO_SALE           | 98   | No Sale             |
+| PAID_OUT          | 90   | Paid Out            |
 
 ## Version
 
