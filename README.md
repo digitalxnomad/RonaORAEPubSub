@@ -49,8 +49,45 @@ Retail transaction event from Google Cloud Pub/Sub containing:
 
 ### Output: RecordSet
 Structured format for database insertion:
-- **OrderRecord (SDISLF)** - Line item details
-- **TenderRecord (SDITNF)** - Payment/tender information
+
+#### OrderRecord (SDISLF)
+Line item details with 70+ fields including:
+- Transaction information (type, date, time, register)
+- Product details (SKU, quantity, pricing)
+- Discounts and promotions
+- Tax information (4 tax levels, exemptions)
+- Customer information
+- Sales person tracking
+- Original transaction references
+
+**Required Fields:**
+- `SLFTTP` (Transaction Type) - 2 chars
+- `SLFLNT` (Line Type) - 2 chars
+- `SLFTDT` (Transaction Date) - YYMMDD format (6 chars)
+- `SLFTTM` (Transaction Time) - HHMMSS format (6 chars)
+
+#### TenderRecord (SDITNF)
+Payment/tender information with 30+ fields including:
+- Transaction identification
+- Payment method details (fund code)
+- Credit/debit card information (masked card number, auth number)
+- Gift card tracking
+- Employee sale identification
+- Customer/member information
+- eReceipt email capture
+- Payment hash for security
+- Poll and create timestamps
+
+**Required Fields:**
+- `TNFTDT` (Transaction Date) - YYMMDD format (6 chars)
+- `TNFTTM` (Transaction Time) - HHMMSS format (6 chars)
+
+### Schema Validation
+All fields include:
+- **StringLength validation** for fixed-length fields
+- **Range validation** for numeric fields
+- **JsonPropertyName** attributes for proper serialization
+- **Nullable types** for optional fields
 
 ## Configuration
 
