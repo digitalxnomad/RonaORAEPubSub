@@ -703,47 +703,175 @@ public class RetailEvent
 
         public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
         {
+            string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ? MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType) : null;
+            string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ? MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType) : null;
+
+            // Parse storeId as integer for PolledStore fields
+            int? polledStoreInt = null;
+            if (int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out int storeId))
+            {
+                polledStoreInt = storeId;
+            }
+
             var recordSet = new RecordSet
             {
                 OrderRecord = new OrderRecord
                 {
-                    TransDate = retailEvent.BusinessContext.BusinessDay.ToString("yyyyMMdd"),
+                    // Required Fields
+                    TransType = mappedTransactionTypeSLFTTP,
+                    LineType = "01", // Regular Sales line type
+                    TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                     TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                    TransNumber = retailEvent.EventId,
-                    RegisterID = retailEvent.BusinessContext.Workstation.RegisterId,
-                    TransType = retailEvent.Transaction.TransactionType,
-                    LineType = "ITEM",
-                    TransSeq = "1"
+
+                    // Transaction Identification
+                    TransNumber = retailEvent.EventId?.PadLeft(5).Substring(0, 5),
+                    TransSeq = "00001", // First sequence
+                    RegisterID = retailEvent.BusinessContext?.Workstation?.RegisterId?.PadLeft(3).Substring(0, 3),
+
+                    // Store Information
+                    PolledStore = polledStoreInt,
+
+                    // Will be populated from first item below
+                    SKUNumber = null,
+                    Quantity = null,
+                    OriginalPrice = null
                 },
                 TenderRecord = new TenderRecord
                 {
-                    TransactionDate = retailEvent.BusinessContext.BusinessDay.ToString("yyyyMMdd"),
+                    // Required Fields
+                    TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                     TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                    TransactionNumber = retailEvent.EventId,
-                    RegisterID = retailEvent.BusinessContext.Workstation.RegisterId,
-                    TransactionType = retailEvent.Transaction.TransactionType,
-                    Amount = retailEvent.Transaction.Totals.Net.Value,
-                    PolledStore = retailEvent.BusinessContext.Store.StoreId,
-                    TransactionSeq = "1"
+
+                    // Transaction Identification
+                    TransactionType = mappedTransactionTypeSLFTTP,
+                    TransactionNumber = retailEvent.EventId?.PadLeft(5).Substring(0, 5),
+                    TransactionSeq = "00001", // First sequence
+                    RegisterID = retailEvent.BusinessContext?.Workstation?.RegisterId?.PadLeft(3).Substring(0, 3),
+
+                    // Store Information
+                    PolledStore = polledStoreInt,
+
+                    // Will be populated from first tender below
+                    FundCode = null,
+                    Amount = null
                 }
             };
 
             // Map first item if exists
-            if (retailEvent.Transaction.Items != null && retailEvent.Transaction.Items.Count > 0)
+            if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
             {
                 var firstItem = retailEvent.Transaction.Items[0];
-                recordSet.OrderRecord.SKUNumber = firstItem.Item.Sku;
-                recordSet.OrderRecord.OriginalPrice = firstItem.Pricing.OriginalUnitPrice.Value;
-                recordSet.OrderRecord.Quantity = firstItem.Quantity.Value.ToString();
 
-                // Try to parse storeId as int if possible
-                if (int.TryParse(retailEvent.BusinessContext.Store.StoreId, out int storeId))
+                // SKU and Description
+                recordSet.OrderRecord.SKUNumber = firstItem.Item?.Sku?.PadLeft(9).Substring(0, 9);
+
+                // Quantity - format decimal to 9 characters
+                if (firstItem.Quantity != null)
                 {
-                    recordSet.OrderRecord.PolledStore = storeId;
+                    string qtyStr = ((int)(firstItem.Quantity.Value * 100)).ToString().PadLeft(9, '0');
+                    recordSet.OrderRecord.Quantity = qtyStr;
+                }
+
+                // Pricing
+                if (firstItem.Pricing?.OriginalUnitPrice?.Value != null)
+                {
+                    recordSet.OrderRecord.OriginalPrice = FormatCurrency(firstItem.Pricing.OriginalUnitPrice.Value);
+                }
+
+                if (firstItem.Pricing?.UnitPrice?.Value != null)
+                {
+                    recordSet.OrderRecord.ItemSellPrice = FormatCurrency(firstItem.Pricing.UnitPrice.Value);
+                }
+
+                if (firstItem.Pricing?.ExtendedPrice?.Value != null)
+                {
+                    recordSet.OrderRecord.ExtendedValue = FormatCurrency(firstItem.Pricing.ExtendedPrice.Value, 11);
                 }
             }
 
+            // Map first tender if exists
+            if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
+            {
+                var firstTender = retailEvent.Transaction.Tenders[0];
+
+                // Map tender method to fund code
+                recordSet.TenderRecord.FundCode = MapTenderMethodToFundCode(firstTender.Method);
+
+                // Tender amount
+                if (firstTender.Amount?.Value != null)
+                {
+                    recordSet.TenderRecord.Amount = FormatCurrency(firstTender.Amount.Value, 11);
+                }
+            }
+            else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
+            {
+                // Fallback to net total if no tenders array
+                recordSet.TenderRecord.Amount = FormatCurrency(retailEvent.Transaction.Totals.Net.Value, 11);
+                recordSet.TenderRecord.FundCode = "01"; // Default cash
+            }
+
             return recordSet;
+        }
+
+        // Helper method to format currency values to fixed-length strings
+        private string FormatCurrency(string? value, int length = 9)
+        {
+            if (string.IsNullOrEmpty(value)) return new string('0', length);
+
+            // Parse and convert to cents (remove decimal point)
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                int cents = (int)(amount * 100);
+                return cents.ToString().PadLeft(length, '0');
+            }
+
+            return new string('0', length);
+        }
+
+        // Map tender method to fund code
+        private string MapTenderMethodToFundCode(string? method)
+        {
+            return method?.ToUpper() switch
+            {
+                "CASH" => "01",
+                "CREDIT" or "CREDIT_CARD" => "02",
+                "DEBIT" or "DEBIT_CARD" => "03",
+                "CHECK" => "04",
+                "GIFT_CARD" => "05",
+                _ => "01" // Default to cash
+            };
+        }
+
+        private string MapTransTypeSLFTTP(string input)
+        {
+            return input switch
+            {
+                "SALE" => "01",
+                "RETURN" => "04",
+                "VOID" => "11",
+                "OPEN" => "87",
+                "CLOSE" => "88",
+                _ => "Unknown: " + input
+            };
+        }
+
+        private string MapTransTypeSLFLNT(string input)
+        {
+            return input switch
+            {
+                "SALE" => "01",
+                "RETURN" => "02",
+                "AR_PAYMENT" => "43",
+                "LAYAWAY_PAYMENT" => "45",
+                "LAYAWAY_SALE" => "50",
+                "LAYAWAY_PICKUP" => "51",
+                "LAYAWAY_DELETE" => "52",
+                "LAYAWAY_FORFEIT" => "53",
+                "SPECIAL_ORDER" => "69",
+                "NO_SALE" => "98",
+                "PAID_OUT" => "90",
+                _ => "01" // Default to regular sale
+            };
         }
 
         public static RetailEvent ReadRecordSetFromFile(string filePath)
