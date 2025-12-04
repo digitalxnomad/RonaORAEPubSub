@@ -43,9 +43,32 @@ RonaORAEPubSub/
 
 ### Input: RetailEvent
 Retail transaction event from Google Cloud Pub/Sub containing:
-- Business context (store, workstation, business day)
-- Transaction details (type, items, totals)
-- Event metadata (eventId, timestamps)
+
+**Event Metadata:**
+- schemaVersion (e.g., "2.0.0")
+- messageType (e.g., "RetailEvent")
+- eventType (e.g., "ORIGINAL")
+- eventCategory (e.g., "TRANSACTION")
+- eventSubType (e.g., "transactionSale")
+- eventId (unique transaction identifier)
+- occurredAt (transaction timestamp)
+- ingestedAt (ingestion timestamp)
+
+**Business Context:**
+- businessDay (business date)
+- store (storeId, timeZone, currency, taxArea)
+- workstation (registerId, type, sequenceNumber)
+- channel (e.g., "STORE")
+- fulfillment (e.g., "CARRYOUT")
+
+**Transaction Details:**
+- transactionType (SALE, RETURN, VOID, etc.)
+- items[] (line items with SKU, quantity, pricing)
+  - Quantity supports random weight items (randomWeight, tareWeight)
+  - Pricing includes unitPrice and extendedPrice
+- tenders[] (payment methods: CASH, CARD, etc.)
+  - tenderId, method, amount
+- totals (gross, discounts, tax, net, tendered, changeDue)
 
 ### Output: RecordSet
 Structured format for database insertion:

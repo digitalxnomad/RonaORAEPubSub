@@ -633,11 +633,14 @@ class Program
 
     public class Store
     {
-        [JsonPropertyName("currency")]
-        public string? Currency { get; set; }
-
         [JsonPropertyName("storeId")]
         public string? StoreId { get; set; }
+
+        [JsonPropertyName("timeZone")]
+        public string? TimeZone { get; set; }
+
+        [JsonPropertyName("currency")]
+        public string? Currency { get; set; }
 
         [JsonPropertyName("taxArea")]
         public string? TaxArea { get; set; }
@@ -650,6 +653,9 @@ class Program
 
         [JsonPropertyName("type")]
         public string? Type { get; set; }
+
+        [JsonPropertyName("sequenceNumber")]
+        public int? SequenceNumber { get; set; }
     }
 
     public class References
@@ -660,14 +666,29 @@ class Program
 
     public class Transaction
     {
+        [JsonPropertyName("transactionType")]
+        public string? TransactionType { get; set; }
+
         [JsonPropertyName("items")]
         public List<TransactionItem> Items { get; set; }
 
+        [JsonPropertyName("tenders")]
+        public List<Tender>? Tenders { get; set; }
+
         [JsonPropertyName("totals")]
         public Totals Totals { get; set; }
+    }
 
-        [JsonPropertyName("transactionType")]
-        public string? TransactionType { get; set; }
+    public class Tender
+    {
+        [JsonPropertyName("tenderId")]
+        public string? TenderId { get; set; }
+
+        [JsonPropertyName("method")]
+        public string? Method { get; set; }
+
+        [JsonPropertyName("amount")]
+        public CurrencyAmount? Amount { get; set; }
     }
 
     public class TransactionItem
@@ -708,26 +729,38 @@ class Program
 
     public class Quantity
     {
+        [JsonPropertyName("value")]
+        public decimal Value { get; set; }
+
         [JsonPropertyName("uom")]
         public string? Uom { get; set; }
 
-        [JsonPropertyName("value")]
-        public int Value { get; set; }
+        [JsonPropertyName("randomWeight")]
+        public bool? RandomWeight { get; set; }
+
+        [JsonPropertyName("tareWeight")]
+        public decimal? TareWeight { get; set; }
     }
 
     public class Totals
     {
+        [JsonPropertyName("gross")]
+        public CurrencyAmount? Gross { get; set; }
+
         [JsonPropertyName("discounts")]
         public CurrencyAmount? Discounts { get; set; }
 
-        [JsonPropertyName("gross")]
-        public CurrencyAmount? Gross { get; set; }
+        [JsonPropertyName("tax")]
+        public CurrencyAmount? Tax { get; set; }
 
         [JsonPropertyName("net")]
         public CurrencyAmount? Net { get; set; }
 
-        [JsonPropertyName("tax")]
-        public CurrencyAmount? Tax { get; set; }
+        [JsonPropertyName("tendered")]
+        public CurrencyAmount? Tendered { get; set; }
+
+        [JsonPropertyName("changeDue")]
+        public CurrencyAmount? ChangeDue { get; set; }
     }
 
     public class CurrencyAmount
