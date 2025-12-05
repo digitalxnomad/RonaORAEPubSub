@@ -817,7 +817,7 @@ class Program
                     RegisterID = retailEvent.BusinessContext?.Workstation?.RegisterId,
                     TransactionType = mappedTransactionTypeSLFTTP,
                     Amount = retailEvent.Transaction?.Totals?.Net?.Value,
-                    PolledStore = retailEvent.BusinessContext?.Store?.StoreId,
+                    PolledStore = int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out var polledStore) ? polledStore : (int?)null,
                     TransactionSeq = "1"
                 }
             };
