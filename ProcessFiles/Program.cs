@@ -703,47 +703,235 @@ public class RetailEvent
 
         public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
         {
+            string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ? MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType) : null;
+            string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ? MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType) : null;
+
+            // Parse storeId as integer for PolledStore fields
+            int? polledStoreInt = null;
+            if (int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out int storeId))
+            {
+                polledStoreInt = storeId;
+            }
+
+            // Get current date/time for polling and creation timestamps
+            DateTime now = DateTime.Now;
+
             var recordSet = new RecordSet
             {
                 OrderRecord = new OrderRecord
                 {
-                    TransDate = retailEvent.BusinessContext.BusinessDay.ToString("yyyyMMdd"),
-                    TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                    TransNumber = retailEvent.EventId,
-                    RegisterID = retailEvent.BusinessContext.Workstation.RegisterId,
-                    TransType = retailEvent.Transaction.TransactionType,
-                    LineType = "ITEM",
-                    TransSeq = "1"
+                    // Required Fields - per CSV specs
+                    TransType = mappedTransactionTypeSLFTTP,
+                    LineType = mappedTransactionTypeSLFLNT,
+                    TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"), // YYMMDD (6 digits)
+                    TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // HHMMSS (6 digits)
+
+                    // Transaction Identification - with proper padding
+                    TransNumber = PadLeft(retailEvent.EventId, 5, '0'), // 5-digits with leading zeros
+                    TransSeq = "00001", // 5-digits starting from 00001
+                    RegisterID = PadLeft(retailEvent.BusinessContext?.Workstation?.RegisterId, 3, '0'), // 3-digits with leading zeros
+
+                    // Store Information
+                    PolledStore = polledStoreInt,
+                    PollCen = 1,
+                    PollDate = int.Parse(now.ToString("yyMMdd")),
+                    CreateCen = 1,
+                    CreateDate = int.Parse(now.ToString("yyMMdd")),
+                    CreateTime = int.Parse(now.ToString("HHmmss")),
+
+                    // Status - blank for active, 'D' for voided
+                    Status = " "
                 },
                 TenderRecord = new TenderRecord
                 {
-                    TransactionDate = retailEvent.BusinessContext.BusinessDay.ToString("yyyyMMdd"),
-                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                    TransactionNumber = retailEvent.EventId,
-                    RegisterID = retailEvent.BusinessContext.Workstation.RegisterId,
-                    TransactionType = retailEvent.Transaction.TransactionType,
-                    Amount = retailEvent.Transaction.Totals.Net.Value,
-                    PolledStore = retailEvent.BusinessContext.Store.StoreId,
-                    TransactionSeq = "1"
+                    // Required Fields - per CSV specs
+                    TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"), // YYMMDD (6 digits)
+                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // HHMMSS (6 digits)
+
+                    // Transaction Identification - with proper padding
+                    TransactionType = mappedTransactionTypeSLFTTP,
+                    TransactionNumber = PadLeft(retailEvent.EventId, 5, '0'), // 5-digits with leading zeros
+                    TransactionSeq = "00001", // 5-digits starting from 00001
+                    RegisterID = PadLeft(retailEvent.BusinessContext?.Workstation?.RegisterId, 3, '0'), // 3-digits with leading zeros
+
+                    // Store Information
+                    PolledStore = polledStoreInt,
+                    PollCen = 1,
+                    PollDate = int.Parse(now.ToString("yyMMdd")),
+                    CreateCen = 1,
+                    CreateDate = int.Parse(now.ToString("yyMMdd")),
+                    CreateTime = int.Parse(now.ToString("HHmmss")),
+
+                    // Status - blank for active
+                    Status = " "
                 }
             };
 
             // Map first item if exists
-            if (retailEvent.Transaction.Items != null && retailEvent.Transaction.Items.Count > 0)
+            if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
             {
                 var firstItem = retailEvent.Transaction.Items[0];
-                recordSet.OrderRecord.SKUNumber = firstItem.Item.Sku;
-                recordSet.OrderRecord.OriginalPrice = firstItem.Pricing.OriginalUnitPrice.Value;
-                recordSet.OrderRecord.Quantity = firstItem.Quantity.Value.ToString();
 
-                // Try to parse storeId as int if possible
-                if (int.TryParse(retailEvent.BusinessContext.Store.StoreId, out int storeId))
+                // SKU Number - 9-digits with leading zeros
+                recordSet.OrderRecord.SKUNumber = PadLeft(firstItem.Item?.Sku, 9, '0');
+
+                // Quantity - 9-digits without decimal (multiply by 100)
+                // e.g., quantity = 1 is written as '000000100'
+                if (firstItem.Quantity != null)
                 {
-                    recordSet.OrderRecord.PolledStore = storeId;
+                    decimal qtyValue = firstItem.Quantity.Value;
+                    bool isNegative = qtyValue < 0;
+                    int qtyCents = (int)(Math.Abs(qtyValue) * 100);
+
+                    recordSet.OrderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
+                    recordSet.OrderRecord.QuantityNegativeSign = isNegative ? "-" : " ";
+                }
+
+                // Original Price - 9-digits without decimal (multiply by 100)
+                // e.g., $14.18 is written as '000001418'
+                if (firstItem.Pricing?.OriginalUnitPrice?.Value != null)
+                {
+                    var (amount, sign) = FormatCurrency(firstItem.Pricing.OriginalUnitPrice.Value, 9);
+                    recordSet.OrderRecord.OriginalPrice = amount;
+                    recordSet.OrderRecord.OriginalPriceNegativeSign = sign;
+                    recordSet.OrderRecord.OriginalRetail = amount; // SLFORT same as SLFORG
+                    recordSet.OrderRecord.OriginalRetailNegativeSign = sign;
+                }
+
+                // Item Sell Price (net price) - 9-digits without decimal
+                if (firstItem.Pricing?.UnitPrice?.Value != null)
+                {
+                    var (amount, sign) = FormatCurrency(firstItem.Pricing.UnitPrice.Value, 9);
+                    recordSet.OrderRecord.ItemSellPrice = amount;
+                    recordSet.OrderRecord.SellPriceNegativeSign = sign;
+                }
+
+                // Extended Value (Quantity * Net Price) - 11-digits without decimal
+                if (firstItem.Pricing?.ExtendedPrice?.Value != null)
+                {
+                    var (amount, sign) = FormatCurrency(firstItem.Pricing.ExtendedPrice.Value, 11);
+                    recordSet.OrderRecord.ExtendedValue = amount;
+                    recordSet.OrderRecord.ExtendedValueNegativeSign = sign;
+                }
+
+                // Item Scanned Y/N
+                recordSet.OrderRecord.ItemScanned = "Y"; // Default to scanned
+
+                // Tax flags - default to N
+                recordSet.OrderRecord.ChargedTax1 = "N";
+                recordSet.OrderRecord.ChargedTax2 = "N";
+                recordSet.OrderRecord.ChargedTax3 = "N";
+                recordSet.OrderRecord.ChargedTax4 = "N";
+
+                // Set tax flags if tax amount exists
+                if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
+                    decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
+                    taxAmount > 0)
+                {
+                    // Default to GST (Tax2)
+                    recordSet.OrderRecord.ChargedTax2 = "Y";
                 }
             }
 
+            // Map tender amount
+            if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
+            {
+                var firstTender = retailEvent.Transaction.Tenders[0];
+                if (firstTender.Amount?.Value != null)
+                {
+                    var (amount, sign) = FormatCurrency(firstTender.Amount.Value, 11);
+                    recordSet.TenderRecord.Amount = amount;
+                    recordSet.TenderRecord.AmountNegativeSign = sign;
+                }
+            }
+            else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
+            {
+                // Fallback to net total
+                var (amount, sign) = FormatCurrency(retailEvent.Transaction.Totals.Net.Value, 11);
+                recordSet.TenderRecord.Amount = amount;
+                recordSet.TenderRecord.AmountNegativeSign = sign;
+            }
+
+            // Handle return transactions - map original transaction details
+            if (retailEvent.References?.SourceTransactionId != null &&
+                retailEvent.Transaction?.TransactionType == "RETURN")
+            {
+                recordSet.OrderRecord.OriginalTxStore = PadLeft(retailEvent.BusinessContext?.Store?.StoreId, 5, '0');
+                recordSet.OrderRecord.OriginalTxDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd");
+                recordSet.OrderRecord.OriginalTxRegister = PadLeft(retailEvent.BusinessContext?.Workstation?.RegisterId, 3, '0');
+                recordSet.OrderRecord.OriginalTxNumber = PadLeft(retailEvent.References.SourceTransactionId, 5, '0');
+            }
+
             return recordSet;
+        }
+
+        // Helper method to pad left or truncate to exact length
+        private string PadLeft(string? value, int length, char paddingChar)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return new string(paddingChar, length);
+            }
+
+            if (value.Length > length)
+            {
+                return value.Substring(value.Length - length, length);
+            }
+
+            return value.PadLeft(length, paddingChar);
+        }
+
+        // Helper method to format currency with sign field
+        // Returns (amount, sign) where amount is padded and sign is ' ' or '-'
+        private (string amount, string sign) FormatCurrency(string? value, int length)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return (new string('0', length), " ");
+            }
+
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                bool isNegative = amount < 0;
+                int cents = (int)(Math.Abs(amount) * 100);
+                string formattedAmount = cents.ToString().PadLeft(length, '0');
+                string sign = isNegative ? "-" : " ";
+                return (formattedAmount, sign);
+            }
+
+            return (new string('0', length), " ");
+        }
+
+        private string MapTransTypeSLFTTP(string input)
+        {
+            return input switch
+            {
+                "SALE" => "01",
+                "RETURN" => "04",
+                "VOID" => "11",
+                "OPEN" => "87",
+                "CLOSE" => "88",
+                _ => "Unknown: " + input
+            };
+        }
+
+        private string MapTransTypeSLFLNT(string input)
+        {
+            return input switch
+            {
+                "SALE" => "01",
+                "RETURN" => "02",
+                "AR_PAYMENT" => "43",
+                "LAYAWAY_PAYMENT" => "45",
+                "LAYAWAY_SALE" => "50",
+                "LAYAWAY_PICKUP" => "51",
+                "LAYAWAY_DELETE" => "52",
+                "LAYAWAY_FORFEIT" => "53",
+                "SPECIAL_ORDER" => "69",
+                "NO_SALE" => "98",
+                "PAID_OUT" => "90",
+                _ => "01" // Default to regular sale
+            };
         }
 
         public static RetailEvent ReadRecordSetFromFile(string filePath)
