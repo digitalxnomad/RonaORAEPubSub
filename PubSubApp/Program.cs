@@ -23,7 +23,6 @@ class Program
             if (args.Length < 2)
             {
                 Console.WriteLine("Usage: dotnet run --test <json-file-path>");
-                Console.WriteLine("Example: dotnet run --test example/test_retailevent.json");
                 return;
             }
 
@@ -58,10 +57,10 @@ class Program
         Console.WriteLine("✓ Publisher and Subscriber initialized\n");
         Console.WriteLine("ProjectId: " + projectId);
         Console.WriteLine("TopicId: " + topicId + "\n");
-        Console.WriteLine("Listening for messages...\n");        
+        Console.WriteLine("Listening for messages...\n");
         SimpleLogger.LogInfo(Version);
         SimpleLogger.LogInfo("ProjectId: " + projectId);
-        SimpleLogger.LogInfo("TopicId: " + topicId);    
+        SimpleLogger.LogInfo("TopicId: " + topicId);
         SimpleLogger.LogInfo("✓ Publisher and Subscriber initialized");
         SimpleLogger.LogInfo("Listening for messages...");
 
@@ -78,9 +77,9 @@ class Program
                 SimpleLogger.LogInfo($"Data: {data}");
 
                 MainClass mainClass = new MainClass();
-                
+
                 RetailEvent retailEvent = mainClass.ReadRecordSetFromString(data);
-                
+
                 // Map to RecordSet
                 RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
 
@@ -120,31 +119,32 @@ class Program
         await publisher.ShutdownAsync(TimeSpan.FromSeconds(15));
     }
 
-    // Test mode: Process JSON file and output RecordSet
     static async Task TestJsonFile(string jsonPath)
     {
         try
         {
-            Console.WriteLine($"=== JSON Test Mode ===");
-            Console.WriteLine($"Reading JSON file: {jsonPath}\n");
+            Console.WriteLine($"\n=== Test Mode ===");
+            Console.WriteLine($"Reading: {jsonPath}\n");
 
             if (!File.Exists(jsonPath))
             {
-                Console.WriteLine($"ERROR: File not found: {jsonPath}");
+                Console.WriteLine($"✗ Error: File not found: {jsonPath}");
                 return;
             }
 
-            // Read JSON content
             string jsonContent = File.ReadAllText(jsonPath);
-            Console.WriteLine("✓ JSON file loaded successfully\n");
+            Console.WriteLine($"✓ File read successfully ({jsonContent.Length} bytes)\n");
 
-            // Parse as RetailEvent
-            Console.WriteLine("Parsing as RetailEvent and mapping to RecordSet...\n");
             MainClass mainClass = new MainClass();
-            RetailEvent retailEvent = mainClass.ReadRecordSetFromString(jsonContent);
-            RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
 
-            // Output RecordSet as JSON
+            Console.WriteLine("Parsing RetailEvent...");
+            RetailEvent retailEvent = mainClass.ReadRecordSetFromString(jsonContent);
+            Console.WriteLine($"✓ RetailEvent parsed successfully\n");
+
+            Console.WriteLine("Mapping to RecordSet...");
+            RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
+            Console.WriteLine($"✓ RecordSet mapped successfully\n");
+
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -153,190 +153,116 @@ class Program
 
             string jsonOutput = JsonSerializer.Serialize(recordSet, options);
 
-            Console.WriteLine("=== RecordSet Output (JSON) ===");
+            Console.WriteLine("=== Output JSON ===");
             Console.WriteLine(jsonOutput);
             Console.WriteLine();
 
-            // Validate RecordSet
-            Console.WriteLine("=== Validation Results ===");
+            Console.WriteLine("=== Validation ===");
             ValidateRecordSet(recordSet);
 
-            // Save output to file
-            string outputPath = jsonPath.Replace(".json", "_output.json");
+            // Write output to file
+            string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
             File.WriteAllText(outputPath, jsonOutput);
-            Console.WriteLine($"\n✓ Output saved to: {outputPath}");
+            Console.WriteLine($"\n✓ Output written to: {outputPath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ERROR: {ex.Message}");
+            Console.WriteLine($"\n✗ Error: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
-
-        await Task.CompletedTask;
     }
 
-    // Validate RecordSet fields per CSV specifications
     static void ValidateRecordSet(RecordSet recordSet)
     {
-        int errorCount = 0;
-        int warningCount = 0;
-
-        Console.WriteLine("Validating OrderRecord (SDISLF):");
-        if (recordSet.OrderRecord != null)
+        if (recordSet == null)
         {
-            // Check required fields
-            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransType))
-            {
-                Console.WriteLine("  ERROR: TransType (SLFTTP) is required");
-                errorCount++;
-            }
-            else if (recordSet.OrderRecord.TransType.Length != 2)
-            {
-                Console.WriteLine($"  WARNING: TransType length is {recordSet.OrderRecord.TransType.Length}, expected 2");
-                warningCount++;
-            }
+            Console.WriteLine("✗ RecordSet is null");
+            return;
+        }
 
-            if (string.IsNullOrEmpty(recordSet.OrderRecord.LineType))
-            {
-                Console.WriteLine("  ERROR: LineType (SLFLNT) is required");
-                errorCount++;
-            }
-            else if (recordSet.OrderRecord.LineType.Length != 2)
-            {
-                Console.WriteLine($"  WARNING: LineType length is {recordSet.OrderRecord.LineType.Length}, expected 2");
-                warningCount++;
-            }
+        // Validate OrderRecords
+        if (recordSet.OrderRecords != null && recordSet.OrderRecords.Count > 0)
+        {
+            Console.WriteLine($"✓ Found {recordSet.OrderRecords.Count} OrderRecord(s) in SDISLF");
 
-            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransDate))
+            for (int i = 0; i < recordSet.OrderRecords.Count; i++)
             {
-                Console.WriteLine("  ERROR: TransDate (SLFTDT) is required");
-                errorCount++;
-            }
-            else if (recordSet.OrderRecord.TransDate.Length != 6)
-            {
-                Console.WriteLine($"  WARNING: TransDate length is {recordSet.OrderRecord.TransDate.Length}, expected 6 (YYMMDD)");
-                warningCount++;
-            }
+                var orderRecord = recordSet.OrderRecords[i];
+                Console.WriteLine($"\n  OrderRecord #{i + 1}:");
 
-            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransTime))
-            {
-                Console.WriteLine("  ERROR: TransTime (SLFTTM) is required");
-                errorCount++;
-            }
-            else if (recordSet.OrderRecord.TransTime.Length != 6)
-            {
-                Console.WriteLine($"  WARNING: TransTime length is {recordSet.OrderRecord.TransTime.Length}, expected 6 (HHMMSS)");
-                warningCount++;
-            }
+                // Required fields
+                if (string.IsNullOrEmpty(orderRecord.TransType))
+                    Console.WriteLine($"    ✗ TransType (SLFTTP) is required");
+                else
+                    Console.WriteLine($"    ✓ TransType: {orderRecord.TransType}");
 
-            // Check field lengths (per CSV spec)
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.RegisterID) && recordSet.OrderRecord.RegisterID.Length != 3)
-            {
-                Console.WriteLine($"  WARNING: RegisterID length is {recordSet.OrderRecord.RegisterID.Length}, expected 3");
-                warningCount++;
-            }
+                if (string.IsNullOrEmpty(orderRecord.LineType))
+                    Console.WriteLine($"    ✗ LineType (SLFLNT) is required");
+                else
+                    Console.WriteLine($"    ✓ LineType: {orderRecord.LineType}");
 
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.TransNumber) && recordSet.OrderRecord.TransNumber.Length != 5)
-            {
-                Console.WriteLine($"  WARNING: TransNumber length is {recordSet.OrderRecord.TransNumber.Length}, expected 5");
-                warningCount++;
-            }
+                if (string.IsNullOrEmpty(orderRecord.TransDate))
+                    Console.WriteLine($"    ✗ TransDate (SLFTDT) is required");
+                else
+                    Console.WriteLine($"    ✓ TransDate: {orderRecord.TransDate} (length: {orderRecord.TransDate.Length})");
 
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.TransSeq) && recordSet.OrderRecord.TransSeq.Length != 5)
-            {
-                Console.WriteLine($"  WARNING: TransSeq length is {recordSet.OrderRecord.TransSeq.Length}, expected 5");
-                warningCount++;
-            }
+                if (string.IsNullOrEmpty(orderRecord.TransTime))
+                    Console.WriteLine($"    ✗ TransTime (SLFTTM) is required");
+                else
+                    Console.WriteLine($"    ✓ TransTime: {orderRecord.TransTime} (length: {orderRecord.TransTime.Length})");
 
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.SKUNumber) && recordSet.OrderRecord.SKUNumber.Length != 9)
-            {
-                Console.WriteLine($"  WARNING: SKUNumber length is {recordSet.OrderRecord.SKUNumber.Length}, expected 9");
-                warningCount++;
-            }
+                if (!string.IsNullOrEmpty(orderRecord.SKUNumber))
+                    Console.WriteLine($"    ✓ SKU: {orderRecord.SKUNumber}");
 
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.Quantity) && recordSet.OrderRecord.Quantity.Length != 9)
-            {
-                Console.WriteLine($"  WARNING: Quantity length is {recordSet.OrderRecord.Quantity.Length}, expected 9");
-                warningCount++;
-            }
+                if (!string.IsNullOrEmpty(orderRecord.Quantity))
+                    Console.WriteLine($"    ✓ Quantity: {orderRecord.Quantity} (sign: '{orderRecord.QuantityNegativeSign}')");
 
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.OriginalPrice) && recordSet.OrderRecord.OriginalPrice.Length != 9)
-            {
-                Console.WriteLine($"  WARNING: OriginalPrice length is {recordSet.OrderRecord.OriginalPrice.Length}, expected 9");
-                warningCount++;
-            }
+                if (!string.IsNullOrEmpty(orderRecord.ExtendedValue))
+                    Console.WriteLine($"    ✓ ExtendedValue: {orderRecord.ExtendedValue} (sign: '{orderRecord.ExtendedValueNegativeSign}')");
 
-            if (!string.IsNullOrEmpty(recordSet.OrderRecord.ExtendedValue) && recordSet.OrderRecord.ExtendedValue.Length != 11)
-            {
-                Console.WriteLine($"  WARNING: ExtendedValue length is {recordSet.OrderRecord.ExtendedValue.Length}, expected 11");
-                warningCount++;
+                if (!string.IsNullOrEmpty(orderRecord.TransSeq))
+                    Console.WriteLine($"    ✓ TransSeq: {orderRecord.TransSeq}");
             }
         }
         else
         {
-            Console.WriteLine("  ERROR: OrderRecord is null");
-            errorCount++;
+            Console.WriteLine("⚠ No OrderRecords found in SDISLF");
         }
 
-        Console.WriteLine("\nValidating TenderRecord (SDITNF):");
-        if (recordSet.TenderRecord != null)
+        // Validate TenderRecords
+        if (recordSet.TenderRecords != null && recordSet.TenderRecords.Count > 0)
         {
-            if (string.IsNullOrEmpty(recordSet.TenderRecord.TransactionDate))
-            {
-                Console.WriteLine("  ERROR: TransactionDate (TNFTDT) is required");
-                errorCount++;
-            }
-            else if (recordSet.TenderRecord.TransactionDate.Length != 6)
-            {
-                Console.WriteLine($"  WARNING: TransactionDate length is {recordSet.TenderRecord.TransactionDate.Length}, expected 6");
-                warningCount++;
-            }
+            Console.WriteLine($"\n✓ Found {recordSet.TenderRecords.Count} TenderRecord(s) in SDITNF");
 
-            if (string.IsNullOrEmpty(recordSet.TenderRecord.TransactionTime))
+            for (int i = 0; i < recordSet.TenderRecords.Count; i++)
             {
-                Console.WriteLine("  ERROR: TransactionTime (TNFTTM) is required");
-                errorCount++;
-            }
-            else if (recordSet.TenderRecord.TransactionTime.Length != 6)
-            {
-                Console.WriteLine($"  WARNING: TransactionTime length is {recordSet.TenderRecord.TransactionTime.Length}, expected 6");
-                warningCount++;
-            }
+                var tenderRecord = recordSet.TenderRecords[i];
+                Console.WriteLine($"\n  TenderRecord #{i + 1}:");
 
-            if (!string.IsNullOrEmpty(recordSet.TenderRecord.Amount) && recordSet.TenderRecord.Amount.Length != 11)
-            {
-                Console.WriteLine($"  WARNING: Amount length is {recordSet.TenderRecord.Amount.Length}, expected 11");
-                warningCount++;
-            }
+                // Required fields
+                if (string.IsNullOrEmpty(tenderRecord.TransactionDate))
+                    Console.WriteLine($"    ✗ TransactionDate (TNFTDT) is required");
+                else
+                    Console.WriteLine($"    ✓ TransactionDate: {tenderRecord.TransactionDate} (length: {tenderRecord.TransactionDate.Length})");
 
-            if (!string.IsNullOrEmpty(recordSet.TenderRecord.TransactionNumber) && recordSet.TenderRecord.TransactionNumber.Length != 5)
-            {
-                Console.WriteLine($"  WARNING: TransactionNumber length is {recordSet.TenderRecord.TransactionNumber.Length}, expected 5");
-                warningCount++;
+                if (string.IsNullOrEmpty(tenderRecord.TransactionTime))
+                    Console.WriteLine($"    ✗ TransactionTime (TNFTTM) is required");
+                else
+                    Console.WriteLine($"    ✓ TransactionTime: {tenderRecord.TransactionTime} (length: {tenderRecord.TransactionTime.Length})");
+
+                if (!string.IsNullOrEmpty(tenderRecord.FundCode))
+                    Console.WriteLine($"    ✓ FundCode: {tenderRecord.FundCode}");
+
+                if (!string.IsNullOrEmpty(tenderRecord.Amount))
+                    Console.WriteLine($"    ✓ Amount: {tenderRecord.Amount} (sign: '{tenderRecord.AmountNegativeSign}')");
+
+                if (!string.IsNullOrEmpty(tenderRecord.TransactionSeq))
+                    Console.WriteLine($"    ✓ TransactionSeq: {tenderRecord.TransactionSeq}");
             }
         }
         else
         {
-            Console.WriteLine("  ERROR: TenderRecord is null");
-            errorCount++;
-        }
-
-        // Summary
-        Console.WriteLine($"\n=== Validation Summary ===");
-        Console.WriteLine($"Errors: {errorCount}");
-        Console.WriteLine($"Warnings: {warningCount}");
-
-        if (errorCount == 0 && warningCount == 0)
-        {
-            Console.WriteLine("✓ All validations passed!");
-        }
-        else if (errorCount == 0)
-        {
-            Console.WriteLine("✓ No errors, but warnings exist. Review field lengths.");
-        }
-        else
-        {
-            Console.WriteLine("✗ Validation failed with errors. Please fix required fields.");
+            Console.WriteLine("\n⚠ No TenderRecords found in SDITNF");
         }
     }
 }
@@ -800,16 +726,16 @@ class Program
         public string? ProjectNumber { get; set; }
     }
 
-    // A RecordSet is an OrderRecord and TenderRecord that refer to the same transaction
+    // A RecordSet contains multiple OrderRecords and TenderRecords for a transaction
     public class RecordSet
     {
         [JsonPropertyName("SDISLF")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public OrderRecord? OrderRecord { get; set; }
+        public List<OrderRecord>? OrderRecords { get; set; }
 
         [JsonPropertyName("SDITNF")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public TenderRecord? TenderRecord { get; set; }
+        public List<TenderRecord>? TenderRecords { get; set; }
     }
 
     public class RetailEvent
@@ -1048,210 +974,258 @@ class Program
 
             var recordSet = new RecordSet
             {
-                OrderRecord = new OrderRecord
-                {
-                    // Required Fields
-                    TransType = mappedTransactionTypeSLFTTP,
-                    LineType = mappedTransactionTypeSLFLNT,
-                    TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                    TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
-
-                    // Transaction Identification
-                    TransNumber = PadOrTruncate(retailEvent.EventId, 5),
-                    TransSeq = "00001", // First sequence
-                    RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-
-                    // Store Information
-                    PolledStore = polledStoreInt,
-                    PollCen = pollCen,
-                    PollDate = pollDate,
-                    CreateCen = createCen,
-                    CreateDate = createDate,
-                    CreateTime = createTime,
-
-                    // Will be populated from first item below
-                    SKUNumber = null,
-                    Quantity = null,
-                    OriginalPrice = null,
-
-                    // Status - default to active
-                    Status = "A"
-                },
-                TenderRecord = new TenderRecord
-                {
-                    // Required Fields
-                    TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
-
-                    // Transaction Identification
-                    TransactionType = mappedTransactionTypeSLFTTP,
-                    TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
-                    TransactionSeq = "00001", // First sequence
-                    RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-
-                    // Store Information
-                    PolledStore = polledStoreInt,
-                    PollCen = pollCen,
-                    PollDate = pollDate,
-                    CreateCen = createCen,
-                    CreateDate = createDate,
-                    CreateTime = createTime,
-
-                    // Will be populated from first tender below
-                    FundCode = null,
-                    Amount = null,
-
-                    // Status - default to active
-                    Status = "A"
-                }
+                OrderRecords = new List<OrderRecord>(),
+                TenderRecords = new List<TenderRecord>()
             };
 
-            // Map first item if exists
+            // Map ALL items (not just first one) - create one OrderRecord per item
             if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
             {
-                var firstItem = retailEvent.Transaction.Items[0];
-
-                // SKU Number - pad/truncate to 9 characters
-                recordSet.OrderRecord.SKUNumber = PadOrTruncate(firstItem.Item?.Sku, 9);
-
-                // Quantity - format decimal to 9 characters, handle negative for returns
-                if (firstItem.Quantity != null)
+                int sequence = 1;
+                foreach (var item in retailEvent.Transaction.Items)
                 {
-                    decimal qtyValue = firstItem.Quantity.Value;
-                    bool isNegative = qtyValue < 0;
-                    int qtyCents = (int)(Math.Abs(qtyValue) * 100);
-
-                    recordSet.OrderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
-                    recordSet.OrderRecord.QuantityNegativeSign = isNegative ? "-" : " ";
-                }
-
-                // Original Price
-                if (firstItem.Pricing?.OriginalUnitPrice?.Value != null)
-                {
-                    var (amount, sign) = FormatCurrencyWithSign(firstItem.Pricing.OriginalUnitPrice.Value, 9);
-                    recordSet.OrderRecord.OriginalPrice = amount;
-                    recordSet.OrderRecord.OriginalPriceNegativeSign = sign;
-                }
-
-                // Sell Price (unit price after discounts)
-                if (firstItem.Pricing?.UnitPrice?.Value != null)
-                {
-                    var (amount, sign) = FormatCurrencyWithSign(firstItem.Pricing.UnitPrice.Value, 9);
-                    recordSet.OrderRecord.ItemSellPrice = amount;
-                    recordSet.OrderRecord.SellPriceNegativeSign = sign;
-                }
-
-                // Extended Value (total line amount)
-                if (firstItem.Pricing?.ExtendedPrice?.Value != null)
-                {
-                    var (amount, sign) = FormatCurrencyWithSign(firstItem.Pricing.ExtendedPrice.Value, 11);
-                    recordSet.OrderRecord.ExtendedValue = amount;
-                    recordSet.OrderRecord.ExtendedValueNegativeSign = sign;
-                }
-
-                // Calculate discount if unit price differs from original
-                if (firstItem.Pricing?.OriginalUnitPrice?.Value != null &&
-                    firstItem.Pricing?.UnitPrice?.Value != null &&
-                    decimal.TryParse(firstItem.Pricing.OriginalUnitPrice.Value, out decimal origPrice) &&
-                    decimal.TryParse(firstItem.Pricing.UnitPrice.Value, out decimal unitPrice))
-                {
-                    decimal discountAmount = origPrice - unitPrice;
-                    if (discountAmount != 0)
+                    var orderRecord = new OrderRecord
                     {
-                        var (amount, sign) = FormatCurrencyWithSign(discountAmount.ToString("F2"), 9);
-                        recordSet.OrderRecord.DiscountAmount = amount;
-                        recordSet.OrderRecord.DiscountAmountNegativeSign = sign;
-                        recordSet.OrderRecord.DiscountType = discountAmount > 0 ? "01" : "00"; // 01=discount, 00=markup
+                        // Required Fields - per CSV specs
+                        TransType = mappedTransactionTypeSLFTTP,
+                        LineType = mappedTransactionTypeSLFLNT,
+                        TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
+
+                        // Transaction Identification - with proper padding
+                        TransNumber = PadOrTruncate(retailEvent.EventId, 5),
+                        TransSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each item
+                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+
+                        // Store Information
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+
+                        // Status - default to active
+                        Status = " "
+                    };
+
+                    // SKU Number - 9-digits with leading zeros
+                    orderRecord.SKUNumber = PadOrTruncate(item.Item?.Sku, 9);
+
+                    // Quantity - 9-digits without decimal (multiply by 100)
+                    if (item.Quantity != null)
+                    {
+                        decimal qtyValue = item.Quantity.Value;
+                        bool isNegative = qtyValue < 0;
+                        int qtyCents = (int)(Math.Abs(qtyValue) * 100);
+
+                        orderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
+                        orderRecord.QuantityNegativeSign = isNegative ? "-" : " ";
                     }
-                }
 
-                // Item Scanned flag - assume scanned if UOM is "EA" (each), otherwise manual entry
-                recordSet.OrderRecord.ItemScanned = firstItem.Quantity?.Uom == "EA" ? "Y" : "N";
+                    // Original Price - 9-digits without decimal
+                    if (item.Pricing?.OriginalUnitPrice?.Value != null)
+                    {
+                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.OriginalUnitPrice.Value, 9);
+                        orderRecord.OriginalPrice = amount;
+                        orderRecord.OriginalPriceNegativeSign = sign;
+                        orderRecord.OriginalRetail = amount; // SLFORT same as SLFORG
+                        orderRecord.OriginalRetailNegativeSign = sign;
+                    }
 
-                // Reference for line ID
-                if (!string.IsNullOrEmpty(firstItem.LineId))
-                {
-                    recordSet.OrderRecord.ReferenceCode = "L";
-                    recordSet.OrderRecord.ReferenceDesc = PadOrTruncate(firstItem.LineId, 16);
+                    // Sell Price (unit price after discounts) - 9-digits without decimal
+                    if (item.Pricing?.UnitPrice?.Value != null)
+                    {
+                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
+                        orderRecord.ItemSellPrice = amount;
+                        orderRecord.SellPriceNegativeSign = sign;
+                    }
+
+                    // Extended Value (Quantity * Net Price) - 11-digits without decimal
+                    if (item.Pricing?.ExtendedPrice?.Value != null)
+                    {
+                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 11);
+                        orderRecord.ExtendedValue = amount;
+                        orderRecord.ExtendedValueNegativeSign = sign;
+                    }
+
+                    // Calculate discount if unit price differs from original
+                    if (item.Pricing?.OriginalUnitPrice?.Value != null &&
+                        item.Pricing?.UnitPrice?.Value != null &&
+                        decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPrice) &&
+                        decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPrice))
+                    {
+                        decimal discountAmount = origPrice - unitPrice;
+                        if (discountAmount != 0)
+                        {
+                            var (amount, sign) = FormatCurrencyWithSign(discountAmount.ToString("F2"), 9);
+                            orderRecord.DiscountAmount = amount;
+                            orderRecord.DiscountAmountNegativeSign = sign;
+                            orderRecord.DiscountType = discountAmount > 0 ? "01" : "00";
+                        }
+                    }
+
+                    // Item Scanned Y/N
+                    orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
+
+                    // Tax flags - default to N
+                    orderRecord.ChargedTax1 = "N";
+                    orderRecord.ChargedTax2 = "N";
+                    orderRecord.ChargedTax3 = "N";
+                    orderRecord.ChargedTax4 = "N";
+
+                    // Set tax flags if tax amount exists
+                    if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
+                        decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
+                        taxAmount > 0)
+                    {
+                        orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
+
+                        // Tax authority and rate code from store's tax area
+                        if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
+                        {
+                            orderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                            orderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                        }
+                    }
+
+                    // Reference for line ID
+                    if (!string.IsNullOrEmpty(item.LineId))
+                    {
+                        orderRecord.ReferenceCode = "L";
+                        orderRecord.ReferenceDesc = PadOrTruncate(item.LineId, 16);
+                    }
+
+                    // Map reference transaction if this is a return or void
+                    if (retailEvent.References?.SourceTransactionId != null &&
+                        (retailEvent.Transaction?.TransactionType == "RETURN" ||
+                         retailEvent.Transaction?.TransactionType == "VOID"))
+                    {
+                        string sourceId = retailEvent.References.SourceTransactionId;
+                        orderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5);
+                        orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
+                        orderRecord.OriginalTxDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd");
+                        orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
+                    }
+
+                    // Add this OrderRecord to the list
+                    recordSet.OrderRecords.Add(orderRecord);
+                    sequence++;
                 }
             }
 
-            // Map discount from totals if available
-            if (retailEvent.Transaction?.Totals?.Discounts?.Value != null)
-            {
-                var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Discounts.Value, 9);
-                if (recordSet.OrderRecord.DiscountAmount == null)
-                {
-                    recordSet.OrderRecord.DiscountAmount = amount;
-                    recordSet.OrderRecord.DiscountAmountNegativeSign = sign;
-                }
-            }
-
-            // Map tax information if available
-            if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
-                decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
-                taxAmount > 0)
-            {
-                // Set tax flags - default to tax1 charged
-                recordSet.OrderRecord.ChargedTax1 = "Y";
-                recordSet.OrderRecord.ChargedTax2 = "N";
-                recordSet.OrderRecord.ChargedTax3 = "N";
-                recordSet.OrderRecord.ChargedTax4 = "N";
-
-                // Tax authority and rate code from store's tax area
-                if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
-                {
-                    recordSet.OrderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                    recordSet.OrderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                }
-            }
-
-            // Map reference transaction if this is a return or void
-            if (retailEvent.References?.SourceTransactionId != null &&
-                (retailEvent.Transaction?.TransactionType == "RETURN" ||
-                 retailEvent.Transaction?.TransactionType == "VOID"))
-            {
-                // Parse source transaction ID to extract original transaction details
-                string sourceId = retailEvent.References.SourceTransactionId;
-                recordSet.OrderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5);
-                recordSet.OrderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
-                recordSet.OrderRecord.OriginalTxDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd");
-                recordSet.OrderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
-            }
-
-            // Map first tender if exists
+            // Map ALL tenders (not just first one) - create one TenderRecord per tender
             if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
             {
-                var firstTender = retailEvent.Transaction.Tenders[0];
-
-                // Map tender method to fund code
-                recordSet.TenderRecord.FundCode = MapTenderMethodToFundCode(firstTender.Method);
-
-                // Tender amount with sign
-                if (firstTender.Amount?.Value != null)
+                int sequence = 1;
+                foreach (var tender in retailEvent.Transaction.Tenders)
                 {
-                    var (amount, sign) = FormatCurrencyWithSign(firstTender.Amount.Value, 11);
-                    recordSet.TenderRecord.Amount = amount;
-                    recordSet.TenderRecord.AmountNegativeSign = sign;
-                }
+                    var tenderRecord = new TenderRecord
+                    {
+                        // Required Fields - per CSV specs
+                        TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                        TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
 
-                // Tender reference - use tender ID
-                if (!string.IsNullOrEmpty(firstTender.TenderId))
-                {
-                    recordSet.TenderRecord.ReferenceCode = "T";
-                    recordSet.TenderRecord.ReferenceDesc = PadOrTruncate(firstTender.TenderId, 16);
+                        // Transaction Identification - with proper padding
+                        TransactionType = mappedTransactionTypeSLFTTP,
+                        TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
+                        TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
+                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+
+                        // Store Information
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+
+                        // Status - blank for active
+                        Status = " "
+                    };
+
+                    // Map tender method to fund code
+                    tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+
+                    // Tender amount with sign
+                    if (tender.Amount?.Value != null)
+                    {
+                        var (amount, sign) = FormatCurrencyWithSign(tender.Amount.Value, 11);
+                        tenderRecord.Amount = amount;
+                        tenderRecord.AmountNegativeSign = sign;
+                    }
+
+                    // Tender reference - use tender ID
+                    if (!string.IsNullOrEmpty(tender.TenderId))
+                    {
+                        tenderRecord.ReferenceCode = "T";
+                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
+                    }
+
+                    // Add this TenderRecord to the list
+                    recordSet.TenderRecords.Add(tenderRecord);
+                    sequence++;
                 }
             }
             else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
             {
-                // Fallback to net total if no tenders array
+                // Fallback: create one tender record with net total if no tenders array
+                var tenderRecord = new TenderRecord
+                {
+                    TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                    TransactionType = mappedTransactionTypeSLFTTP,
+                    TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
+                    TransactionSeq = "00001",
+                    RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                    PolledStore = polledStoreInt,
+                    PollCen = pollCen,
+                    PollDate = pollDate,
+                    CreateCen = createCen,
+                    CreateDate = createDate,
+                    CreateTime = createTime,
+                    FundCode = "01", // Default cash
+                    Status = " "
+                };
+
                 var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
-                recordSet.TenderRecord.Amount = amount;
-                recordSet.TenderRecord.AmountNegativeSign = sign;
-                recordSet.TenderRecord.FundCode = "01"; // Default cash
+                tenderRecord.Amount = amount;
+                tenderRecord.AmountNegativeSign = sign;
+
+                recordSet.TenderRecords.Add(tenderRecord);
             }
-            SimpleLogger.LogInfo($"Outgoing DataSet: {recordSet.ToString()}");
-        return recordSet;
+
+        // Get century digit (0-9) from date
+        private int GetCentury(DateTime date)
+        {
+            int year = date.Year;
+            return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
+        }
+
+        // Get date as integer in YYMMDD format
+        private int GetDateAsInt(DateTime date)
+        {
+            return int.Parse(date.ToString("yyMMdd"));
+        }
+
+        // Get time as integer in HHMMSS format
+        private int GetTimeAsInt(DateTime date)
+        {
+            return int.Parse(date.ToString("HHmmss"));
+        }
+
+        // Map tender method to fund code
+        private string MapTenderMethodToFundCode(string? method)
+        {
+            return method?.ToUpper() switch
+            {
+                "CASH" => "01",
+                "CREDIT" or "CREDIT_CARD" => "02",
+                "DEBIT" or "DEBIT_CARD" => "03",
+                "CHECK" => "04",
+                "GIFT_CARD" => "05",
+                _ => "01" // Default to cash
+            };
         }
 
         // Helper method to format currency values to fixed-length strings

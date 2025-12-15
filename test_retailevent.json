@@ -1,0 +1,150 @@
+{
+  "businessContext": {
+    "businessDay": "2025-12-15T00:00:00Z",
+    "channel": "POS",
+    "fulfillment": "IN_STORE",
+    "store": {
+      "storeId": "12345",
+      "timeZone": "America/Toronto",
+      "currency": "CAD",
+      "taxArea": "ON001"
+    },
+    "workstation": {
+      "registerId": "001",
+      "type": "POS",
+      "sequenceNumber": 1234
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventId": "TX123",
+  "eventSubType": "COMPLETED",
+  "eventType": "SALE",
+  "ingestedAt": "2025-12-15T14:30:00Z",
+  "messageType": "RETAIL_EVENT",
+  "occurredAt": "2025-12-15T14:25:00Z",
+  "schemaVersion": "2.0.0",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "lineId": "LINE001",
+        "item": {
+          "sku": "123456789",
+          "description": "Hammer"
+        },
+        "quantity": {
+          "value": 2.0,
+          "uom": "EA"
+        },
+        "pricing": {
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "29.99"
+          },
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "25.99"
+          },
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "51.98"
+          }
+        }
+      },
+      {
+        "lineId": "LINE002",
+        "item": {
+          "sku": "987654321",
+          "description": "Nails Box"
+        },
+        "quantity": {
+          "value": 1.0,
+          "uom": "EA"
+        },
+        "pricing": {
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "15.50"
+          },
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "15.50"
+          },
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "15.50"
+          }
+        }
+      },
+      {
+        "lineId": "LINE003",
+        "item": {
+          "sku": "456789123",
+          "description": "Paint Brush"
+        },
+        "quantity": {
+          "value": 3.0,
+          "uom": "EA"
+        },
+        "pricing": {
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "8.99"
+          },
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "7.99"
+          },
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "23.97"
+          }
+        }
+      }
+    ],
+    "tenders": [
+      {
+        "tenderId": "TENDER001",
+        "method": "CREDIT",
+        "amount": {
+          "currency": "CAD",
+          "value": "50.00"
+        }
+      },
+      {
+        "tenderId": "TENDER002",
+        "method": "CASH",
+        "amount": {
+          "currency": "CAD",
+          "value": "41.45"
+        }
+      }
+    ],
+    "totals": {
+      "gross": {
+        "currency": "CAD",
+        "value": "91.45"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "7.00"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "10.65"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "91.45"
+      },
+      "tendered": {
+        "currency": "CAD",
+        "value": "91.45"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      }
+    }
+  }
+}
