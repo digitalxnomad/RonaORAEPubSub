@@ -9,13 +9,29 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using System.Xml.Linq;
 
 class Program
 {
     static string Version = "PubSubApp 12/03/25 v1.0.1";
 
-    static async Task Main()
+    static async Task Main(string[] args)
     {
+        // Check for test mode
+        if (args.Length > 0 && args[0] == "--test")
+        {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: dotnet run --test <xml-file-path>");
+                Console.WriteLine("Example: dotnet run --test example/test.xml");
+                return;
+            }
+
+            string xmlPath = args[1];
+            await TestXmlFile(xmlPath);
+            return;
+        }
+
         // Load configuration from appsettings.json
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -102,6 +118,253 @@ class Program
 
         await subscriber.StopAsync(CancellationToken.None);
         await publisher.ShutdownAsync(TimeSpan.FromSeconds(15));
+    }
+
+    // Test mode: Process XML file and output RecordSet
+    static async Task TestXmlFile(string xmlPath)
+    {
+        try
+        {
+            Console.WriteLine($"=== XML Test Mode ===");
+            Console.WriteLine($"Reading XML file: {xmlPath}\n");
+
+            if (!File.Exists(xmlPath))
+            {
+                Console.WriteLine($"ERROR: File not found: {xmlPath}");
+                return;
+            }
+
+            // Load XML document
+            XDocument xmlDoc = XDocument.Load(xmlPath);
+            Console.WriteLine("✓ XML file loaded successfully\n");
+
+            // Check if it's a RetailEvent JSON or XML RecordSet
+            string xmlContent = File.ReadAllText(xmlPath);
+
+            RecordSet? recordSet = null;
+            MainClass mainClass = new MainClass();
+
+            if (xmlContent.TrimStart().StartsWith("{"))
+            {
+                // It's JSON - treat as RetailEvent
+                Console.WriteLine("Detected JSON format (RetailEvent)");
+                Console.WriteLine("Parsing as RetailEvent and mapping to RecordSet...\n");
+
+                RetailEvent retailEvent = mainClass.ReadRecordSetFromString(xmlContent);
+                recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
+            }
+            else if (xmlContent.TrimStart().StartsWith("<"))
+            {
+                // It's XML
+                Console.WriteLine("Detected XML format");
+                Console.WriteLine("Parsing XML to RecordSet...\n");
+
+                recordSet = ParseXmlToRecordSet(xmlDoc);
+            }
+            else
+            {
+                Console.WriteLine("ERROR: Unknown file format. Expected JSON or XML.");
+                return;
+            }
+
+            if (recordSet == null)
+            {
+                Console.WriteLine("ERROR: Failed to parse file to RecordSet");
+                return;
+            }
+
+            // Output RecordSet as JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            string jsonOutput = JsonSerializer.Serialize(recordSet, options);
+
+            Console.WriteLine("=== RecordSet Output (JSON) ===");
+            Console.WriteLine(jsonOutput);
+            Console.WriteLine();
+
+            // Validate RecordSet
+            Console.WriteLine("=== Validation Results ===");
+            ValidateRecordSet(recordSet);
+
+            // Save output to file
+            string outputPath = xmlPath.Replace(".xml", "_output.json").Replace(".json", "_output.json");
+            File.WriteAllText(outputPath, jsonOutput);
+            Console.WriteLine($"\n✓ Output saved to: {outputPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    // Parse XML document to RecordSet
+    static RecordSet ParseXmlToRecordSet(XDocument xmlDoc)
+    {
+        var recordSet = new RecordSet();
+
+        // Try to parse SDISLF (OrderRecord)
+        var orderElement = xmlDoc.Descendants("SDISLF").FirstOrDefault();
+        if (orderElement != null)
+        {
+            recordSet.OrderRecord = new OrderRecord
+            {
+                TransType = orderElement.Element("SLFTTP")?.Value,
+                LineType = orderElement.Element("SLFLNT")?.Value,
+                TransDate = orderElement.Element("SLFTDT")?.Value,
+                TransTime = orderElement.Element("SLFTTM")?.Value,
+                Clerk = orderElement.Element("SLFCLK")?.Value,
+                RegisterID = orderElement.Element("SLFREG")?.Value,
+                TransNumber = orderElement.Element("SLFTTX")?.Value,
+                TransSeq = orderElement.Element("SLFTSQ")?.Value,
+                SKUNumber = orderElement.Element("SLFSKU")?.Value,
+                Quantity = orderElement.Element("SLFQTY")?.Value,
+                QuantityNegativeSign = orderElement.Element("SLFQTN")?.Value,
+                OriginalPrice = orderElement.Element("SLFORG")?.Value,
+                OriginalPriceNegativeSign = orderElement.Element("SLFORN")?.Value,
+                // Add more fields as needed
+                Status = orderElement.Element("SLFSTS")?.Value
+            };
+
+            // Parse PolledStore as int
+            if (int.TryParse(orderElement.Element("SLFPLC")?.Value, out int polledStore))
+            {
+                recordSet.OrderRecord.PolledStore = polledStore;
+            }
+        }
+
+        // Try to parse SDITNF (TenderRecord)
+        var tenderElement = xmlDoc.Descendants("SDITNF").FirstOrDefault();
+        if (tenderElement != null)
+        {
+            recordSet.TenderRecord = new TenderRecord
+            {
+                TransactionType = tenderElement.Element("TNFTTP")?.Value,
+                TransactionDate = tenderElement.Element("TNFTDT")?.Value,
+                TransactionTime = tenderElement.Element("TNFTTM")?.Value,
+                Clerk = tenderElement.Element("TNFCLK")?.Value,
+                RegisterID = tenderElement.Element("TNFREG")?.Value,
+                TransactionNumber = tenderElement.Element("TNFTTX")?.Value,
+                TransactionSeq = tenderElement.Element("TNFTSQ")?.Value,
+                FundCode = tenderElement.Element("TNFFCD")?.Value,
+                Amount = tenderElement.Element("TNFAMT")?.Value,
+                AmountNegativeSign = tenderElement.Element("TNFAMN")?.Value,
+                Status = tenderElement.Element("TNFSTS")?.Value
+            };
+
+            // Parse PolledStore as int
+            if (int.TryParse(tenderElement.Element("TNFPLC")?.Value, out int polledStore))
+            {
+                recordSet.TenderRecord.PolledStore = polledStore;
+            }
+        }
+
+        return recordSet;
+    }
+
+    // Validate RecordSet fields
+    static void ValidateRecordSet(RecordSet recordSet)
+    {
+        int errorCount = 0;
+        int warningCount = 0;
+
+        Console.WriteLine("Validating OrderRecord (SDISLF):");
+        if (recordSet.OrderRecord != null)
+        {
+            // Check required fields
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransType))
+            {
+                Console.WriteLine("  ERROR: TransType (SLFTTP) is required");
+                errorCount++;
+            }
+            else if (recordSet.OrderRecord.TransType.Length != 2)
+            {
+                Console.WriteLine($"  WARNING: TransType length is {recordSet.OrderRecord.TransType.Length}, expected 2");
+                warningCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.LineType))
+            {
+                Console.WriteLine("  ERROR: LineType (SLFLNT) is required");
+                errorCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransDate))
+            {
+                Console.WriteLine("  ERROR: TransDate (SLFTDT) is required");
+                errorCount++;
+            }
+            else if (recordSet.OrderRecord.TransDate.Length != 6)
+            {
+                Console.WriteLine($"  WARNING: TransDate length is {recordSet.OrderRecord.TransDate.Length}, expected 6 (YYMMDD)");
+                warningCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransTime))
+            {
+                Console.WriteLine("  ERROR: TransTime (SLFTTM) is required");
+                errorCount++;
+            }
+
+            // Check field lengths
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.SKUNumber) && recordSet.OrderRecord.SKUNumber.Length != 9)
+            {
+                Console.WriteLine($"  WARNING: SKUNumber length is {recordSet.OrderRecord.SKUNumber.Length}, expected 9");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.Quantity) && recordSet.OrderRecord.Quantity.Length != 9)
+            {
+                Console.WriteLine($"  WARNING: Quantity length is {recordSet.OrderRecord.Quantity.Length}, expected 9");
+                warningCount++;
+            }
+        }
+        else
+        {
+            Console.WriteLine("  ERROR: OrderRecord is null");
+            errorCount++;
+        }
+
+        Console.WriteLine("\nValidating TenderRecord (SDITNF):");
+        if (recordSet.TenderRecord != null)
+        {
+            if (string.IsNullOrEmpty(recordSet.TenderRecord.TransactionDate))
+            {
+                Console.WriteLine("  ERROR: TransactionDate (TNFTDT) is required");
+                errorCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.TenderRecord.TransactionTime))
+            {
+                Console.WriteLine("  ERROR: TransactionTime (TNFTTM) is required");
+                errorCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.TenderRecord.Amount) && recordSet.TenderRecord.Amount.Length != 11)
+            {
+                Console.WriteLine($"  WARNING: Amount length is {recordSet.TenderRecord.Amount.Length}, expected 11");
+                warningCount++;
+            }
+        }
+        else
+        {
+            Console.WriteLine("  ERROR: TenderRecord is null");
+            errorCount++;
+        }
+
+        // Summary
+        Console.WriteLine($"\n=== Validation Summary ===");
+        Console.WriteLine($"Errors: {errorCount}");
+        Console.WriteLine($"Warnings: {warningCount}");
+
+        if (errorCount == 0 && warningCount == 0)
+        {
+            Console.WriteLine("✓ All validations passed!");
+        }
     }
 }
 
