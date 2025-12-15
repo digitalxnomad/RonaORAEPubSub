@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using System.Xml.Linq;
 
 class Program
 {
@@ -1103,6 +1104,9 @@ class Program
 
                     // Status - default to active
                     Status = "A"
+                    Amount = retailEvent.Transaction?.Totals?.Net?.Value,
+                    PolledStore = int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out var polledStore) ? polledStore : (int?)null,
+                    TransactionSeq = "1"
                 }
             };
 
