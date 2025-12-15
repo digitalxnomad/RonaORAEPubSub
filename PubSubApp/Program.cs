@@ -576,7 +576,6 @@ class Program
         public TenderRecord? TenderRecord { get; set; }
     }
 
-
     public class RetailEvent
     {
         [JsonPropertyName("businessContext")]
@@ -868,9 +867,6 @@ class Program
 
                     // Status - default to active
                     Status = "A"
-                    Amount = retailEvent.Transaction?.Totals?.Net?.Value,
-                    PolledStore = int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out var polledStore) ? polledStore : (int?)null,
-                    TransactionSeq = "1"
                 }
             };
 
@@ -1018,8 +1014,8 @@ class Program
                 recordSet.TenderRecord.AmountNegativeSign = sign;
                 recordSet.TenderRecord.FundCode = "01"; // Default cash
             }
-
-            return recordSet;
+            SimpleLogger.LogInfo($"Outgoing DataSet: {recordSet.ToString()}");
+        return recordSet;
         }
 
         // Helper method to format currency values to fixed-length strings
