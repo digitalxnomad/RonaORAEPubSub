@@ -1,0 +1,89 @@
+{
+  "businessContext": {
+    "businessDay": "2025-12-15T00:00:00Z",
+    "channel": "POS",
+    "fulfillment": "STORE",
+    "store": {
+      "storeId": "100",
+      "timeZone": "America/New_York",
+      "currency": "USD",
+      "taxArea": "NY001"
+    },
+    "workstation": {
+      "registerId": "5",
+      "type": "POS",
+      "sequenceNumber": 1
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventId": "1",
+  "eventSubType": "SALE",
+  "eventType": "RETAIL_TRANSACTION",
+  "ingestedAt": "2025-12-15T14:30:00Z",
+  "messageType": "RETAIL_EVENT",
+  "occurredAt": "2025-12-15T14:30:00Z",
+  "schemaVersion": "2.0.0",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "lineId": "1",
+        "item": {
+          "sku": "123456",
+          "description": "Test Product"
+        },
+        "quantity": {
+          "value": 1.0,
+          "uom": "EA",
+          "randomWeight": false
+        },
+        "pricing": {
+          "originalUnitPrice": {
+            "currency": "USD",
+            "value": "14.18"
+          },
+          "unitPrice": {
+            "currency": "USD",
+            "value": "14.18"
+          },
+          "extendedPrice": {
+            "currency": "USD",
+            "value": "14.18"
+          }
+        }
+      }
+    ],
+    "tenders": [
+      {
+        "tenderId": "1",
+        "method": "CASH",
+        "amount": {
+          "currency": "USD",
+          "value": "14.18"
+        }
+      }
+    ],
+    "totals": {
+      "gross": {
+        "currency": "USD",
+        "value": "14.18"
+      },
+      "tax": {
+        "currency": "USD",
+        "value": "0.00"
+      },
+      "net": {
+        "currency": "USD",
+        "value": "14.18"
+      },
+      "tendered": {
+        "currency": "USD",
+        "value": "14.18"
+      },
+      "changeDue": {
+        "currency": "USD",
+        "value": "0.00"
+      }
+    }
+  }
+}
