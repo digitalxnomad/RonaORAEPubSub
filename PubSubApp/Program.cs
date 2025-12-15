@@ -14,8 +14,23 @@ class Program
 {
     static string Version = "PubSubApp 12/03/25 v1.0.1";
 
-    static async Task Main()
+    static async Task Main(string[] args)
     {
+        // Check for test mode
+        if (args.Length > 0 && args[0] == "--test")
+        {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: dotnet run --test <json-file-path>");
+                Console.WriteLine("Example: dotnet run --test example/test_retailevent.json");
+                return;
+            }
+
+            string jsonPath = args[1];
+            await TestJsonFile(jsonPath);
+            return;
+        }
+
         // Load configuration from appsettings.json
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -102,6 +117,226 @@ class Program
 
         await subscriber.StopAsync(CancellationToken.None);
         await publisher.ShutdownAsync(TimeSpan.FromSeconds(15));
+    }
+
+    // Test mode: Process JSON file and output RecordSet
+    static async Task TestJsonFile(string jsonPath)
+    {
+        try
+        {
+            Console.WriteLine($"=== JSON Test Mode ===");
+            Console.WriteLine($"Reading JSON file: {jsonPath}\n");
+
+            if (!File.Exists(jsonPath))
+            {
+                Console.WriteLine($"ERROR: File not found: {jsonPath}");
+                return;
+            }
+
+            // Read JSON content
+            string jsonContent = File.ReadAllText(jsonPath);
+            Console.WriteLine("✓ JSON file loaded successfully\n");
+
+            // Parse as RetailEvent
+            Console.WriteLine("Parsing as RetailEvent and mapping to RecordSet...\n");
+            MainClass mainClass = new MainClass();
+            RetailEvent retailEvent = mainClass.ReadRecordSetFromString(jsonContent);
+            RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
+
+            // Output RecordSet as JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            string jsonOutput = JsonSerializer.Serialize(recordSet, options);
+
+            Console.WriteLine("=== RecordSet Output (JSON) ===");
+            Console.WriteLine(jsonOutput);
+            Console.WriteLine();
+
+            // Validate RecordSet
+            Console.WriteLine("=== Validation Results ===");
+            ValidateRecordSet(recordSet);
+
+            // Save output to file
+            string outputPath = jsonPath.Replace(".json", "_output.json");
+            File.WriteAllText(outputPath, jsonOutput);
+            Console.WriteLine($"\n✓ Output saved to: {outputPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    // Validate RecordSet fields per CSV specifications
+    static void ValidateRecordSet(RecordSet recordSet)
+    {
+        int errorCount = 0;
+        int warningCount = 0;
+
+        Console.WriteLine("Validating OrderRecord (SDISLF):");
+        if (recordSet.OrderRecord != null)
+        {
+            // Check required fields
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransType))
+            {
+                Console.WriteLine("  ERROR: TransType (SLFTTP) is required");
+                errorCount++;
+            }
+            else if (recordSet.OrderRecord.TransType.Length != 2)
+            {
+                Console.WriteLine($"  WARNING: TransType length is {recordSet.OrderRecord.TransType.Length}, expected 2");
+                warningCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.LineType))
+            {
+                Console.WriteLine("  ERROR: LineType (SLFLNT) is required");
+                errorCount++;
+            }
+            else if (recordSet.OrderRecord.LineType.Length != 2)
+            {
+                Console.WriteLine($"  WARNING: LineType length is {recordSet.OrderRecord.LineType.Length}, expected 2");
+                warningCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransDate))
+            {
+                Console.WriteLine("  ERROR: TransDate (SLFTDT) is required");
+                errorCount++;
+            }
+            else if (recordSet.OrderRecord.TransDate.Length != 6)
+            {
+                Console.WriteLine($"  WARNING: TransDate length is {recordSet.OrderRecord.TransDate.Length}, expected 6 (YYMMDD)");
+                warningCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.OrderRecord.TransTime))
+            {
+                Console.WriteLine("  ERROR: TransTime (SLFTTM) is required");
+                errorCount++;
+            }
+            else if (recordSet.OrderRecord.TransTime.Length != 6)
+            {
+                Console.WriteLine($"  WARNING: TransTime length is {recordSet.OrderRecord.TransTime.Length}, expected 6 (HHMMSS)");
+                warningCount++;
+            }
+
+            // Check field lengths (per CSV spec)
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.RegisterID) && recordSet.OrderRecord.RegisterID.Length != 3)
+            {
+                Console.WriteLine($"  WARNING: RegisterID length is {recordSet.OrderRecord.RegisterID.Length}, expected 3");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.TransNumber) && recordSet.OrderRecord.TransNumber.Length != 5)
+            {
+                Console.WriteLine($"  WARNING: TransNumber length is {recordSet.OrderRecord.TransNumber.Length}, expected 5");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.TransSeq) && recordSet.OrderRecord.TransSeq.Length != 5)
+            {
+                Console.WriteLine($"  WARNING: TransSeq length is {recordSet.OrderRecord.TransSeq.Length}, expected 5");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.SKUNumber) && recordSet.OrderRecord.SKUNumber.Length != 9)
+            {
+                Console.WriteLine($"  WARNING: SKUNumber length is {recordSet.OrderRecord.SKUNumber.Length}, expected 9");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.Quantity) && recordSet.OrderRecord.Quantity.Length != 9)
+            {
+                Console.WriteLine($"  WARNING: Quantity length is {recordSet.OrderRecord.Quantity.Length}, expected 9");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.OriginalPrice) && recordSet.OrderRecord.OriginalPrice.Length != 9)
+            {
+                Console.WriteLine($"  WARNING: OriginalPrice length is {recordSet.OrderRecord.OriginalPrice.Length}, expected 9");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.OrderRecord.ExtendedValue) && recordSet.OrderRecord.ExtendedValue.Length != 11)
+            {
+                Console.WriteLine($"  WARNING: ExtendedValue length is {recordSet.OrderRecord.ExtendedValue.Length}, expected 11");
+                warningCount++;
+            }
+        }
+        else
+        {
+            Console.WriteLine("  ERROR: OrderRecord is null");
+            errorCount++;
+        }
+
+        Console.WriteLine("\nValidating TenderRecord (SDITNF):");
+        if (recordSet.TenderRecord != null)
+        {
+            if (string.IsNullOrEmpty(recordSet.TenderRecord.TransactionDate))
+            {
+                Console.WriteLine("  ERROR: TransactionDate (TNFTDT) is required");
+                errorCount++;
+            }
+            else if (recordSet.TenderRecord.TransactionDate.Length != 6)
+            {
+                Console.WriteLine($"  WARNING: TransactionDate length is {recordSet.TenderRecord.TransactionDate.Length}, expected 6");
+                warningCount++;
+            }
+
+            if (string.IsNullOrEmpty(recordSet.TenderRecord.TransactionTime))
+            {
+                Console.WriteLine("  ERROR: TransactionTime (TNFTTM) is required");
+                errorCount++;
+            }
+            else if (recordSet.TenderRecord.TransactionTime.Length != 6)
+            {
+                Console.WriteLine($"  WARNING: TransactionTime length is {recordSet.TenderRecord.TransactionTime.Length}, expected 6");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.TenderRecord.Amount) && recordSet.TenderRecord.Amount.Length != 11)
+            {
+                Console.WriteLine($"  WARNING: Amount length is {recordSet.TenderRecord.Amount.Length}, expected 11");
+                warningCount++;
+            }
+
+            if (!string.IsNullOrEmpty(recordSet.TenderRecord.TransactionNumber) && recordSet.TenderRecord.TransactionNumber.Length != 5)
+            {
+                Console.WriteLine($"  WARNING: TransactionNumber length is {recordSet.TenderRecord.TransactionNumber.Length}, expected 5");
+                warningCount++;
+            }
+        }
+        else
+        {
+            Console.WriteLine("  ERROR: TenderRecord is null");
+            errorCount++;
+        }
+
+        // Summary
+        Console.WriteLine($"\n=== Validation Summary ===");
+        Console.WriteLine($"Errors: {errorCount}");
+        Console.WriteLine($"Warnings: {warningCount}");
+
+        if (errorCount == 0 && warningCount == 0)
+        {
+            Console.WriteLine("✓ All validations passed!");
+        }
+        else if (errorCount == 0)
+        {
+            Console.WriteLine("✓ No errors, but warnings exist. Review field lengths.");
+        }
+        else
+        {
+            Console.WriteLine("✗ Validation failed with errors. Please fix required fields.");
+        }
     }
 }
 
