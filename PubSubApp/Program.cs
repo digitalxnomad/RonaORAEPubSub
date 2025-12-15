@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using System.Xml.Linq;
 
 class Program
 {
@@ -737,7 +738,6 @@ class Program
         public List<TenderRecord>? TenderRecords { get; set; }
     }
 
-
     public class RetailEvent
     {
         [JsonPropertyName("businessContext")]
@@ -1195,7 +1195,37 @@ class Program
                 recordSet.TenderRecords.Add(tenderRecord);
             }
 
-            return recordSet;
+        // Get century digit (0-9) from date
+        private int GetCentury(DateTime date)
+        {
+            int year = date.Year;
+            return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
+        }
+
+        // Get date as integer in YYMMDD format
+        private int GetDateAsInt(DateTime date)
+        {
+            return int.Parse(date.ToString("yyMMdd"));
+        }
+
+        // Get time as integer in HHMMSS format
+        private int GetTimeAsInt(DateTime date)
+        {
+            return int.Parse(date.ToString("HHmmss"));
+        }
+
+        // Map tender method to fund code
+        private string MapTenderMethodToFundCode(string? method)
+        {
+            return method?.ToUpper() switch
+            {
+                "CASH" => "01",
+                "CREDIT" or "CREDIT_CARD" => "02",
+                "DEBIT" or "DEBIT_CARD" => "03",
+                "CHECK" => "04",
+                "GIFT_CARD" => "05",
+                _ => "01" // Default to cash
+            };
         }
 
         // Helper method to format currency values to fixed-length strings
