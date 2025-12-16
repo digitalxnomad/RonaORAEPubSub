@@ -5,10 +5,12 @@ using PubSubApp;
 public class PubSubSubscriber : IPubSubSubscriber
 {
     private readonly SubscriberClient _subscriber;
+    private readonly PubSubConfiguration _config;
     private Func<PubsubMessage, CancellationToken, Task>? _messageHandler;
 
     public PubSubSubscriber(PubSubConfiguration config)
     {
+        _config = config;
         var subscriptionName = SubscriptionName.FromProjectSubscription(config.ProjectId, config.SubscriptionId);
 
         var builder = new SubscriberClientBuilder
@@ -37,8 +39,14 @@ public class PubSubSubscriber : IPubSubSubscriber
             {
                 string data = msg.Data.ToStringUtf8();
 
-                // Save to file (keep your existing logic)
-                File.WriteAllText("c:\\temp11\\PubSubMessage_" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".json", data);
+                // Save to file using configured path
+                if (!string.IsNullOrEmpty(_config.MessageSavePath))
+                {
+                    // Ensure directory exists
+                    Directory.CreateDirectory(_config.MessageSavePath);
+                    string filePath = Path.Combine(_config.MessageSavePath, $"PubSubMessage_{DateTime.Now:yyyyMMddHHmmss}.json");
+                    File.WriteAllText(filePath, data);
+                }
                 Console.WriteLine($"Received: {msg.MessageId}");
 
                 // Call custom handler if set
