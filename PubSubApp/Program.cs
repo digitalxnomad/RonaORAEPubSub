@@ -51,7 +51,7 @@ class Program
         var publisher = await PublisherClient.CreateAsync(topicName);
         var subscriber = await SubscriberClient.CreateAsync(subscriptionName);
 
-        SimpleLogger.SetLogPath("c:\\opt\\transactiontree\\pubsub\\log\\pubsub.log", projectId);
+        SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
         Console.WriteLine(Version);
         Console.WriteLine("✓ Publisher and Subscriber initialized\n");
