@@ -6,4 +6,5 @@ public class PubSubConfiguration
     public string TopicId { get; set; } = string.Empty;
     public string SubscriptionId { get; set; } = string.Empty;
     public string MessageSavePath { get; set; } = string.Empty;
+    public string LogPath { get; set; } = string.Empty;
 }
