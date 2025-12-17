@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using System.Xml.Linq;
 
-class Program
+partial class Program
 {
     static string Version = "PubSubApp 12/17/25 v1.0.3";
 
