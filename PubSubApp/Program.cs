@@ -135,6 +135,11 @@ class Program
             string jsonContent = File.ReadAllText(jsonPath);
             Console.WriteLine($"✓ File read successfully ({jsonContent.Length} bytes)\n");
 
+
+            Console.WriteLine("=== Input JSON ===");
+            Console.WriteLine(jsonContent);
+            Console.WriteLine();
+
             MainClass mainClass = new MainClass();
 
             Console.WriteLine("Parsing RetailEvent...");
@@ -1236,29 +1241,53 @@ class Program
                 }
             }
             else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
+        // Map ALL tenders (not just first one) - create one TenderRecord per tender
+        if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
+        {
+            int sequence = 1;
+            foreach (var tender in retailEvent.Transaction.Tenders)
             {
-                // Fallback: create one tender record with net total if no tenders array
                 var tenderRecord = new TenderRecord
                 {
+                    // Required Fields - per CSV specs
                     TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                     TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+
+                    // Transaction Identification - with proper padding
                     TransactionType = mappedTransactionTypeSLFTTP,
                     TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
-                    TransactionSeq = "00001",
+                    TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
                     RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+
+                    // Store Information
                     PolledStore = polledStoreInt,
                     PollCen = pollCen,
                     PollDate = pollDate,
                     CreateCen = createCen,
                     CreateDate = createDate,
                     CreateTime = createTime,
-                    FundCode = "01", // Default cash
+
+                    // Status - blank for active
                     Status = " "
                 };
 
-                var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
-                tenderRecord.Amount = amount;
-                tenderRecord.AmountNegativeSign = sign;
+                // Map tender method to fund code
+                tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+
+                // Tender amount with sign
+                if (tender.Amount?.Value != null)
+                {
+                    var (amount, sign) = FormatCurrencyWithSign(tender.Amount.Value, 11);
+                    tenderRecord.Amount = amount;
+                    tenderRecord.AmountNegativeSign = sign;
+                }
+
+                // Tender reference - use tender ID
+                if (!string.IsNullOrEmpty(tender.TenderId))
+                {
+                    tenderRecord.ReferenceCode = "T";
+                    tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
+                }
 
                 // === CSV-specified fallback tender field mappings ===
                 tenderRecord.CreditCardNumber = new string('0', 19);
@@ -1278,7 +1307,9 @@ class Program
                 tenderRecord.OrderNumber = new string(' ', 8);
                 tenderRecord.ProjectNumber = new string(' ', 5);
 
+                // Add this TenderRecord to the list
                 recordSet.TenderRecords.Add(tenderRecord);
+                sequence++;
             }
 
             return recordSet;
@@ -1286,12 +1317,38 @@ class Program
 
         // Get century digit (0-9) from date
         private int GetCentury(DateTime date)
-        {
-            int year = date.Year;
-            return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
         }
+        else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
+        {
+            // Fallback: create one tender record with net total if no tenders array
+            var tenderRecord = new TenderRecord
+            {
+                TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                TransactionType = mappedTransactionTypeSLFTTP,
+                TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
+                TransactionSeq = "00001",
+                RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                PolledStore = polledStoreInt,
+                PollCen = pollCen,
+                PollDate = pollDate,
+                CreateCen = createCen,
+                CreateDate = createDate,
+                CreateTime = createTime,
+                FundCode = "01", // Default cash
+                Status = " "
+            };
 
-        // Get date as integer in YYMMDD format
+            var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
+            tenderRecord.Amount = amount;
+            tenderRecord.AmountNegativeSign = sign;
+
+            recordSet.TenderRecords.Add(tenderRecord);
+        }
+        return recordSet;
+     }
+
+       // Get date as integer in YYMMDD format
         private int GetDateAsInt(DateTime date)
         {
             return int.Parse(date.ToString("yyMMdd"));
@@ -1374,33 +1431,7 @@ class Program
             int year = date.Year;
             return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
         }
-
-        // Get date as integer in YYMMDD format
-        private int GetDateAsInt(DateTime date)
-        {
-            return int.Parse(date.ToString("yyMMdd"));
-        }
-
-        // Get time as integer in HHMMSS format
-        private int GetTimeAsInt(DateTime date)
-        {
-            return int.Parse(date.ToString("HHmmss"));
-        }
-
-        // Map tender method to fund code
-        private string MapTenderMethodToFundCode(string? method)
-        {
-            return method?.ToUpper() switch
-            {
-                "CASH" => "01",
-                "CREDIT" or "CREDIT_CARD" => "02",
-                "DEBIT" or "DEBIT_CARD" => "03",
-                "CHECK" => "04",
-                "GIFT_CARD" => "05",
-                _ => "01" // Default to cash
-            };
-        }
-    
+ 
         private string MapTransTypeSLFTTP(string input)
         {
             return input switch
