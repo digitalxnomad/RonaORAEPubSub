@@ -1113,12 +1113,134 @@ class Program
                         orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
                     }
 
+                    // === CSV-specified field mappings ===
+
+                    // Customer fields - per CSV rules
+                    orderRecord.CustomerName = new string(' ', 35); // SLFCNM - Always blank
+                    orderRecord.CustomerNumber = new string('0', 10); // SLFNUM - All '0'
+                    orderRecord.ZipCode = new string('0', 10); // SLFZIP - Default, will be set by EPP logic if needed
+
+                    // Till/Clerk - SLFCLK (from till number)
+                    orderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
+
+                    // Employee fields - per CSV rules
+                    orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
+
+                    // UPC Code - SLFUPC (SKU UPC if scanned, otherwise all '0')
+                    orderRecord.UPCCode = new string('0', 13); // Default to all '0', TODO: detect if scanned
+
+                    // Email - SLFEML (for ereceipt)
+                    orderRecord.EReceiptEmail = new string(' ', 60); // Default blank, TODO: populate if ereceipt scenario
+
+                    // Reason codes - SLFRSN (return/price override/post voided - left justified)
+                    orderRecord.ReasonCode = new string(' ', 16); // Default blank, TODO: populate based on transaction type
+
+                    // Discount reasons - per CSV rules
+                    orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
+                    orderRecord.RegDiscReason = "00"; // SLFRDR - Default '00', TODO: set to 'I2' when price vehicle code = MAN
+
+                    // Blank fields - per CSV rules
+                    orderRecord.OrderNumber = new string(' ', 8); // SLFORD - Always blank
+                    orderRecord.ProjectNumber = new string(' ', 5); // ASFPRO - Always blank
+                    orderRecord.SalesStore = 0; // ASFSST - Always blank (0)
+                    orderRecord.InvStore = 0; // ASFIST - Always blank (0)
+
                     // Add this OrderRecord to the list
                     recordSet.OrderRecords.Add(orderRecord);
                     sequence++;
                 }
             }
 
+            // Map ALL tenders (not just first one) - create one TenderRecord per tender
+            if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
+            {
+                int sequence = 1;
+                foreach (var tender in retailEvent.Transaction.Tenders)
+                {
+                    var tenderRecord = new TenderRecord
+                    {
+                        // Required Fields - per CSV specs
+                        TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                        TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+
+                        // Transaction Identification - with proper padding
+                        TransactionType = mappedTransactionTypeSLFTTP,
+                        TransactionNumber = PadOrTruncate(retailEvent.EventId, 5),
+                        TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
+                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+
+                        // Store Information
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+
+                        // Status - blank for active
+                        Status = " "
+                    };
+
+                    // Map tender method to fund code
+                    tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+
+                    // Tender amount with sign
+                    if (tender.Amount?.Value != null)
+                    {
+                        var (amount, sign) = FormatCurrencyWithSign(tender.Amount.Value, 11);
+                        tenderRecord.Amount = amount;
+                        tenderRecord.AmountNegativeSign = sign;
+                    }
+
+                    // Tender reference - use tender ID
+                    if (!string.IsNullOrEmpty(tender.TenderId))
+                    {
+                        tenderRecord.ReferenceCode = "T";
+                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
+                    }
+
+                    // === CSV-specified tender field mappings ===
+
+                    // Card/Payment fields - per CSV rules
+                    tenderRecord.CreditCardNumber = new string('0', 19); // TNFCCD - TODO: populate masked card number
+                    tenderRecord.CardExpirationDate = new string('0', 4); // TNFESI - All '0'
+                    tenderRecord.AuthNumber = new string(' ', 6); // TNFAUT - TODO: populate authorization number
+                    tenderRecord.MagStripeFlag = " "; // TNFMSR - TODO: populate based on card processing type
+                    tenderRecord.PaymentHashValue = new string(' ', 64); // TNFHSH - TODO: populate from bank
+
+                    // Customer/Clerk fields - per CSV rules
+                    tenderRecord.CustomerMember = new string('0', 8); // TNFMBR - All '0'
+                    tenderRecord.PostalCode = new string(' ', 10); // TNFZIP - Always blank
+                    tenderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number
+
+                    // Employee sale ID - TNFESI
+                    // Set to '#####' for employee sales where TNFTTP = '04', otherwise blank
+                    if (mappedTransactionTypeSLFTTP == "04")
+                    {
+                        tenderRecord.EmployeeSaleId = "#####";
+                    }
+                    else
+                    {
+                        tenderRecord.EmployeeSaleId = new string(' ', 5);
+                    }
+
+                    // Email - TNFEML (for ereceipt)
+                    tenderRecord.EReceiptEmail = new string(' ', 60); // Default blank, TODO: populate if ereceipt scenario
+
+                    // Blank fields - per CSV rules
+                    tenderRecord.SalesStore = 0; // ATFSST - Always blank
+                    tenderRecord.InvStore = 0; // ATFIST - Always blank
+                    tenderRecord.OriginalTransNumber = new string(' ', 5); // ATFOTX - Always blank
+                    tenderRecord.CustomerType = " "; // ATFMBT - Always blank
+                    tenderRecord.OrderNumber = new string(' ', 8); // ATFORD - Always blank
+                    tenderRecord.ProjectNumber = new string(' ', 5); // ATFPRO - Always blank
+
+                    // Add this TenderRecord to the list
+                    recordSet.TenderRecords.Add(tenderRecord);
+                    sequence++;
+                }
+            }
+            else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
         // Map ALL tenders (not just first one) - create one TenderRecord per tender
         if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
         {
@@ -1167,10 +1289,34 @@ class Program
                     tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
                 }
 
+                // === CSV-specified fallback tender field mappings ===
+                tenderRecord.CreditCardNumber = new string('0', 19);
+                tenderRecord.CardExpirationDate = new string('0', 4);
+                tenderRecord.AuthNumber = new string(' ', 6);
+                tenderRecord.MagStripeFlag = " ";
+                tenderRecord.PaymentHashValue = new string(' ', 64);
+                tenderRecord.CustomerMember = new string('0', 8);
+                tenderRecord.PostalCode = new string(' ', 10);
+                tenderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
+                tenderRecord.EmployeeSaleId = mappedTransactionTypeSLFTTP == "04" ? "#####" : new string(' ', 5);
+                tenderRecord.EReceiptEmail = new string(' ', 60);
+                tenderRecord.SalesStore = 0;
+                tenderRecord.InvStore = 0;
+                tenderRecord.OriginalTransNumber = new string(' ', 5);
+                tenderRecord.CustomerType = " ";
+                tenderRecord.OrderNumber = new string(' ', 8);
+                tenderRecord.ProjectNumber = new string(' ', 5);
+
                 // Add this TenderRecord to the list
                 recordSet.TenderRecords.Add(tenderRecord);
                 sequence++;
             }
+
+            return recordSet;
+        }
+
+        // Get century digit (0-9) from date
+        private int GetCentury(DateTime date)
         }
         else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
         {
