@@ -1,4 +1,4 @@
-﻿using Google.Cloud.PubSub.V1;
+﻿ using Google.Cloud.PubSub.V1;
 using Google.Protobuf;
 using PubSubApp;
 using System;
@@ -13,10 +13,19 @@ using System.Xml.Linq;
 
 class Program
 {
-    static string Version = "PubSubApp 12/03/25 v1.0.1";
+    static string Version = "PubSubApp 12/16/25 v1.0.2";
 
     static async Task Main(string[] args)
     {
+        // Load configuration from appsettings.json
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
+
+        var pubSubConfig = new PubSubConfiguration();
+        configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
+
         // Check for test mode
         if (args.Length > 0 && args[0] == "--test")
         {
@@ -31,14 +40,8 @@ class Program
             return;
         }
 
-        // Load configuration from appsettings.json
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
-
-        var pubSubConfig = new PubSubConfiguration();
-        configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
+  
+        
 
         string projectId = pubSubConfig.ProjectId;
         string topicId = pubSubConfig.TopicId;

@@ -1,8 +1,7 @@
 {
   "profiles": {
     "PubSubApp": {
-      "commandName": "Project",
-      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\PubSubProject\\Retail-Audit-Events-main (3)\\Retail-Audit-Events-main\\examples\\01JAX0A0R00000000000001001.json\""
+      "commandName": "Project"
     }
   }
 }
