@@ -1260,7 +1260,7 @@ partial class Program
                 CreateCen = createCen,
                 CreateDate = createDate,
                 CreateTime = createTime,
-                FundCode = "01", // Default cash
+                FundCode = "CA", // Default cash (TNFFCD)
                 Status = " "
             };
 
@@ -1285,17 +1285,27 @@ partial class Program
             return int.Parse(date.ToString("HHmmss"));
         }
 
-        // Map tender method to fund code
+        // Map tender method to fund code (TNFFCD) - 2-letter alpha codes
         private string MapTenderMethodToFundCode(string? method)
         {
             return method?.ToUpper() switch
             {
-                "CASH" => "01",
-                "CREDIT" or "CREDIT_CARD" => "02",
-                "DEBIT" or "DEBIT_CARD" => "03",
-                "CHECK" => "04",
-                "GIFT_CARD" => "05",
-                _ => "01" // Default to cash
+                "CASH" => "CA",
+                "CHECK" or "CHEQUE" => "CH",
+                "DEBIT" or "DEBIT_CARD" => "DC",
+                "CREDIT" or "CREDIT_CARD" => "VI", // TODO: Detect actual card type (VI/MA/AX)
+                "VISA" => "VI",
+                "MASTERCARD" or "MASTER_CARD" => "MA",
+                "AMEX" or "AMERICAN_EXPRESS" => "AX",
+                "GIFT_CARD" => "PG", // TODO: Distinguish between PC/PG/PP/PX based on transaction
+                "COUPON" => "CP",
+                "TRAVELLERS_CHEQUE" or "TRAVELERS_CHECK" => "TC",
+                "US_CASH" => "US",
+                "FLEXITI" => "FX",
+                "WEB_SALE" => "PL",
+                "PENNY_ROUNDING" => "PR",
+                "CHANGE" => "ZZ",
+                _ => "CA" // Default to cash
             };
         }
 
