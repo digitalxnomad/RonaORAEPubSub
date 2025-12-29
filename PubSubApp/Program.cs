@@ -13,7 +13,7 @@ using System.Xml.Linq;
 
 partial class Program
 {
-    static string Version = "PubSubApp 12/17/25 v1.0.3";
+    static string Version = "PubSubApp 12/17/25 v1.0.4";
 
     static async Task Main(string[] args)
     {

@@ -1,7 +1,8 @@
 {
   "profiles": {
     "PubSubApp": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "--test "
     }
   }
 }
