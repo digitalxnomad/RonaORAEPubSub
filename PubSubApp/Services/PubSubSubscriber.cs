@@ -1,6 +1,7 @@
 
 using Google.Cloud.PubSub.V1;
 using PubSubApp;
+using System.Text.Json;
 
 public class PubSubSubscriber : IPubSubSubscriber
 {
@@ -39,13 +40,28 @@ public class PubSubSubscriber : IPubSubSubscriber
             {
                 string data = msg.Data.ToStringUtf8();
 
-                // Save to file using configured path
+                // Save to file using configured path with all message attributes
                 if (!string.IsNullOrEmpty(_config.MessageSavePath))
                 {
                     // Ensure directory exists
                     Directory.CreateDirectory(_config.MessageSavePath);
-                    string filePath = Path.Combine(_config.MessageSavePath, $"PubSubMessage_{DateTime.Now:yyyyMMddHHmmss}.json");
-                    File.WriteAllText(filePath, data);
+
+                    // Create a complete message envelope with all attributes
+                    var messageEnvelope = new
+                    {
+                        MessageId = msg.MessageId,
+                        PublishTime = msg.PublishTime.ToDateTime(),
+                        OrderingKey = msg.OrderingKey,
+                        Attributes = msg.Attributes,
+                        Data = JsonSerializer.Deserialize<object>(data) // Parse the JSON data
+                    };
+
+                    string filePath = Path.Combine(_config.MessageSavePath, $"PubSubMessage_{DateTime.Now:yyyyMMddHHmmss}_{msg.MessageId}.json");
+                    string jsonOutput = JsonSerializer.Serialize(messageEnvelope, new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+                    File.WriteAllText(filePath, jsonOutput);
                 }
                 Console.WriteLine($"Received: {msg.MessageId}");
 
