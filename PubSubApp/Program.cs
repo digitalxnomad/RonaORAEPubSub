@@ -126,32 +126,52 @@ partial class Program
     {
         try
         {
+            // Load configuration for logging
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            var pubSubConfig = new PubSubConfiguration();
+            configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
+
+            // Initialize logger
+            SimpleLogger.SetLogPath(pubSubConfig.LogPath, pubSubConfig.ProjectId);
+
             Console.WriteLine($"\n=== Test Mode ===");
+            SimpleLogger.LogInfo("=== Test Mode ===");
             Console.WriteLine($"Reading: {jsonPath}\n");
+            SimpleLogger.LogInfo($"Reading: {jsonPath}");
 
             if (!File.Exists(jsonPath))
             {
                 Console.WriteLine($"✗ Error: File not found: {jsonPath}");
+                SimpleLogger.LogError($"✗ Error: File not found: {jsonPath}");
                 return;
             }
 
             string jsonContent = File.ReadAllText(jsonPath);
             Console.WriteLine($"✓ File read successfully ({jsonContent.Length} bytes)\n");
-
+            SimpleLogger.LogInfo($"✓ File read successfully ({jsonContent.Length} bytes)");
 
             Console.WriteLine("=== Input JSON ===");
             Console.WriteLine(jsonContent);
             Console.WriteLine();
+            SimpleLogger.LogInfo($"Input JSON: {jsonContent}");
 
             MainClass mainClass = new MainClass();
 
             Console.WriteLine("Parsing RetailEvent...");
+            SimpleLogger.LogInfo("Parsing RetailEvent...");
             RetailEvent retailEvent = mainClass.ReadRecordSetFromString(jsonContent);
             Console.WriteLine($"✓ RetailEvent parsed successfully\n");
+            SimpleLogger.LogInfo("✓ RetailEvent parsed successfully");
 
             Console.WriteLine("Mapping to RecordSet...");
+            SimpleLogger.LogInfo("Mapping to RecordSet...");
             RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
             Console.WriteLine($"✓ RecordSet mapped successfully\n");
+            SimpleLogger.LogInfo("✓ RecordSet mapped successfully");
 
             var options = new JsonSerializerOptions
             {
@@ -164,19 +184,24 @@ partial class Program
             Console.WriteLine("=== Output JSON ===");
             Console.WriteLine(jsonOutput);
             Console.WriteLine();
+            SimpleLogger.LogInfo($"Output JSON: {jsonOutput}");
 
             Console.WriteLine("=== Validation ===");
+            SimpleLogger.LogInfo("=== Validation ===");
             ValidateRecordSet(recordSet);
 
             // Write output to file
             string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
             File.WriteAllText(outputPath, jsonOutput);
             Console.WriteLine($"\n✓ Output written to: {outputPath}");
+            SimpleLogger.LogInfo($"✓ Output written to: {outputPath}");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"\n✗ Error: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            SimpleLogger.LogError($"✗ Error: {ex.Message}");
+            SimpleLogger.LogError($"Stack trace: {ex.StackTrace}");
         }
     }
 
