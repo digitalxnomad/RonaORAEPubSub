@@ -90,17 +90,27 @@ partial class Program
                 };
 
                 string jsonString = JsonSerializer.Serialize(recordSet, options);
-                SimpleLogger.LogInfo($"✓ Published response: {jsonString}");
-                // Publish response
+                SimpleLogger.LogInfo($"✓ Mapped to RecordSet: {jsonString}");
+
+                // Publish response with attributes
                 var responseMessage = new PubsubMessage
                 {
                     Data = ByteString.CopyFromUtf8(jsonString)
                 };
-                responseMessage.Attributes.Add("responseFor", message.MessageId);
 
-                string publishedId = await publisher.PublishAsync(jsonString);
+                // Forward all original message attributes
+                foreach (var attr in message.Attributes)
+                {
+                    responseMessage.Attributes[attr.Key] = attr.Value;
+                }
+
+                // Add response-specific attributes
+                responseMessage.Attributes["responseFor"] = message.MessageId;
+                responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
+
+                string publishedId = await publisher.PublishAsync(responseMessage);
                 Console.WriteLine($"✓ Published response: {publishedId}");
-                SimpleLogger.LogInfo($"✓ Published response: {publishedId}");
+                SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
 
                 return SubscriberClient.Reply.Ack;
             }
