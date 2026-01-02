@@ -859,7 +859,7 @@ partial class Program
         public string? Type { get; set; }
 
         [JsonPropertyName("sequenceNumber")]
-        public int? SequenceNumber { get; set; }
+        public long? SequenceNumber { get; set; }
     }
 
     public class References
