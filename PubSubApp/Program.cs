@@ -1036,7 +1036,7 @@ partial class Program
                         TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
 
                         // Transaction Identification - with proper padding
-                        TransNumber = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransNumber = retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(),
                         TransSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each item
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1203,7 +1203,7 @@ partial class Program
 
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
-                        TransactionNumber = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransactionNumber = retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(),
                         TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1286,7 +1286,7 @@ partial class Program
                 TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                 TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
                 TransactionType = mappedTransactionTypeSLFTTP,
-                TransactionNumber = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                TransactionNumber = retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(),
                 TransactionSeq = "00001",
                 RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
                 PolledStore = polledStoreInt,
