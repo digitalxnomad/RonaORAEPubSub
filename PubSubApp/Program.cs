@@ -11,11 +11,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using System.Xml.Linq;
 
-partial class Program
+public partial class Program
 {
     static string Version = "PubSubApp 01/02/26 v1.0.6";
 
-    static async Task Main(string[] args)
+    public static async Task Main(string[] args)
     {
         // Load configuration from appsettings.json
         var configuration = new ConfigurationBuilder()
