@@ -226,7 +226,7 @@ partial class Program
         // Validate OrderRecords
         if (recordSet.OrderRecords != null && recordSet.OrderRecords.Count > 0)
         {
-            Console.WriteLine($"✓ Found {recordSet.OrderRecords.Count} OrderRecord(s) in SDISLF");
+            Console.WriteLine($"✓ Found {recordSet.OrderRecords.Count} OrderRecord(s) in RIMSLF");
 
             for (int i = 0; i < recordSet.OrderRecords.Count; i++)
             {
@@ -269,13 +269,13 @@ partial class Program
         }
         else
         {
-            Console.WriteLine("⚠ No OrderRecords found in SDISLF");
+            Console.WriteLine("⚠ No OrderRecords found in RIMSLF");
         }
 
         // Validate TenderRecords
         if (recordSet.TenderRecords != null && recordSet.TenderRecords.Count > 0)
         {
-            Console.WriteLine($"\n✓ Found {recordSet.TenderRecords.Count} TenderRecord(s) in SDITNF");
+            Console.WriteLine($"\n✓ Found {recordSet.TenderRecords.Count} TenderRecord(s) in RIMTNF");
 
             for (int i = 0; i < recordSet.TenderRecords.Count; i++)
             {
@@ -305,13 +305,13 @@ partial class Program
         }
         else
         {
-            Console.WriteLine("\n⚠ No TenderRecords found in SDITNF");
+            Console.WriteLine("\n⚠ No TenderRecords found in RIMTNF");
         }
     }
 }
 
 
-    // An OrderRecord is an object meant for direct translation to a SQL command against the SDISLF table in MMS
+    // An OrderRecord is an object meant for direct translation to a SQL command against the RIMSLF table in MMS
     public class OrderRecord
     {
         [JsonPropertyName("SLFTTP")]
@@ -627,7 +627,7 @@ partial class Program
         public long? EmployeeCardNumber { get; set; }
     }
 
-    // A TenderRecord is an object meant for direct translation to a SQL command against the SDITNF table in MMS
+    // A TenderRecord is an object meant for direct translation to a SQL command against the RIMTNF table in MMS
     public class TenderRecord
     {
         [JsonPropertyName("TNFTTP")]
@@ -772,11 +772,11 @@ partial class Program
     // A RecordSet contains multiple OrderRecords and TenderRecords for a transaction
     public class RecordSet
     {
-        [JsonPropertyName("SDISLF")]
+        [JsonPropertyName("RIMSLF")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<OrderRecord>? OrderRecords { get; set; }
 
-        [JsonPropertyName("SDITNF")]
+        [JsonPropertyName("RIMTNF")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<TenderRecord>? TenderRecords { get; set; }
     }
