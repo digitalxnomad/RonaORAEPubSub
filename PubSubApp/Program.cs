@@ -1049,7 +1049,7 @@ public partial class Program
                         CreateTime = createTime,
 
                         // Status - default to active
-                        Status = " "
+                        Status = ""
                     };
 
                     // SKU Number - 9-digits with leading zeros
@@ -1154,9 +1154,9 @@ public partial class Program
                     // === CSV-specified field mappings ===
 
                     // Customer fields - per CSV rules
-                    orderRecord.CustomerName = new string(' ', 35); // SLFCNM - Always blank
-                    orderRecord.CustomerNumber = new string('0', 10); // SLFNUM - All '0'
-                    orderRecord.ZipCode = new string('0', 10); // SLFZIP - Default, will be set by EPP logic if needed
+                    orderRecord.CustomerName = ""; // SLFCNM - Always blank
+                    orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
+                    orderRecord.ZipCode = ""; // SLFZIP - Default blank, will be set by EPP logic if needed
 
                     // Till/Clerk - SLFCLK (from till number)
                     orderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
@@ -1164,22 +1164,22 @@ public partial class Program
                     // Employee fields - per CSV rules
                     orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
 
-                    // UPC Code - SLFUPC (SKU UPC if scanned, otherwise all '0')
-                    orderRecord.UPCCode = new string('0', 13); // Default to all '0', TODO: detect if scanned
+                    // UPC Code - SLFUPC (SKU UPC if scanned, otherwise blank)
+                    orderRecord.UPCCode = ""; // Default blank, TODO: detect if scanned
 
                     // Email - SLFEML (for ereceipt)
-                    orderRecord.EReceiptEmail = new string(' ', 60); // Default blank, TODO: populate if ereceipt scenario
+                    orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
 
                     // Reason codes - SLFRSN (return/price override/post voided - left justified)
-                    orderRecord.ReasonCode = new string(' ', 16); // Default blank, TODO: populate based on transaction type
+                    orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
 
                     // Discount reasons - per CSV rules
                     orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
                     orderRecord.RegDiscReason = "00"; // SLFRDR - Default '00', TODO: set to 'I2' when price vehicle code = MAN
 
                     // Blank fields - per CSV rules
-                    orderRecord.OrderNumber = new string(' ', 8); // SLFORD - Always blank
-                    orderRecord.ProjectNumber = new string(' ', 5); // ASFPRO - Always blank
+                    orderRecord.OrderNumber = ""; // SLFORD - Always blank
+                    orderRecord.ProjectNumber = ""; // ASFPRO - Always blank
                     orderRecord.SalesStore = 0; // ASFSST - Always blank (0)
                     orderRecord.InvStore = 0; // ASFIST - Always blank (0)
 
@@ -1216,7 +1216,7 @@ public partial class Program
                         CreateTime = createTime,
 
                         // Status - blank for active
-                        Status = " "
+                        Status = ""
                     };
 
                     // Map tender method to fund code
@@ -1240,15 +1240,15 @@ public partial class Program
                     // === CSV-specified tender field mappings ===
 
                     // Card/Payment fields - per CSV rules
-                    tenderRecord.CreditCardNumber = new string('0', 19); // TNFCCD - TODO: populate masked card number
-                    tenderRecord.CardExpirationDate = new string('0', 4); // TNFESI - All '0'
-                    tenderRecord.AuthNumber = new string(' ', 6); // TNFAUT - TODO: populate authorization number
-                    tenderRecord.MagStripeFlag = " "; // TNFMSR - TODO: populate based on card processing type
-                    tenderRecord.PaymentHashValue = new string(' ', 64); // TNFHSH - TODO: populate from bank
+                    tenderRecord.CreditCardNumber = ""; // TNFCCD - TODO: populate masked card number
+                    tenderRecord.CardExpirationDate = ""; // TNFESI - Default blank
+                    tenderRecord.AuthNumber = ""; // TNFAUT - TODO: populate authorization number
+                    tenderRecord.MagStripeFlag = ""; // TNFMSR - TODO: populate based on card processing type
+                    tenderRecord.PaymentHashValue = ""; // TNFHSH - TODO: populate from bank
 
                     // Customer/Clerk fields - per CSV rules
-                    tenderRecord.CustomerMember = new string('0', 8); // TNFMBR - All '0'
-                    tenderRecord.PostalCode = new string(' ', 10); // TNFZIP - Always blank
+                    tenderRecord.CustomerMember = ""; // TNFMBR - Default blank
+                    tenderRecord.PostalCode = ""; // TNFZIP - Always blank
                     tenderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number
 
                     // Employee sale ID - TNFESI
@@ -1259,19 +1259,19 @@ public partial class Program
                     }
                     else
                     {
-                        tenderRecord.EmployeeSaleId = new string(' ', 5);
+                        tenderRecord.EmployeeSaleId = "";
                     }
 
                     // Email - TNFEML (for ereceipt)
-                    tenderRecord.EReceiptEmail = new string(' ', 60); // Default blank, TODO: populate if ereceipt scenario
+                    tenderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
 
                     // Blank fields - per CSV rules
                     tenderRecord.SalesStore = 0; // ATFSST - Always blank
                     tenderRecord.InvStore = 0; // ATFIST - Always blank
-                    tenderRecord.OriginalTransNumber = new string(' ', 5); // ATFOTX - Always blank
-                    tenderRecord.CustomerType = " "; // ATFMBT - Always blank
-                    tenderRecord.OrderNumber = new string(' ', 8); // ATFORD - Always blank
-                    tenderRecord.ProjectNumber = new string(' ', 5); // ATFPRO - Always blank
+                    tenderRecord.OriginalTransNumber = ""; // ATFOTX - Always blank
+                    tenderRecord.CustomerType = ""; // ATFMBT - Always blank
+                    tenderRecord.OrderNumber = ""; // ATFORD - Always blank
+                    tenderRecord.ProjectNumber = ""; // ATFPRO - Always blank
 
                     // Add this TenderRecord to the list
                     recordSet.TenderRecords.Add(tenderRecord);
@@ -1296,7 +1296,7 @@ public partial class Program
                 CreateDate = createDate,
                 CreateTime = createTime,
                 FundCode = "CA", // Default cash (TNFFCD)
-                Status = " "
+                Status = ""
             };
 
             var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
@@ -1347,7 +1347,7 @@ public partial class Program
         // Helper method to format currency values to fixed-length strings
         private string FormatCurrency(string? value, int length = 9)
         {
-            if (string.IsNullOrEmpty(value)) return new string('0', length);
+            if (string.IsNullOrEmpty(value)) return "";
 
             // Parse and convert to cents (remove decimal point)
             if (decimal.TryParse(value, out decimal amount))
@@ -1356,7 +1356,7 @@ public partial class Program
                 return cents.ToString().PadLeft(length, '0');
             }
 
-            return new string('0', length);
+            return "";
         }
 
         // Helper method to format currency with separate sign field
@@ -1364,7 +1364,7 @@ public partial class Program
         {
             if (string.IsNullOrEmpty(value))
             {
-                return (new string('0', length), " ");
+                return ("", "");
             }
 
             if (decimal.TryParse(value, out decimal amount))
@@ -1372,19 +1372,19 @@ public partial class Program
                 bool isNegative = amount < 0;
                 int cents = (int)(Math.Abs(amount) * 100);
                 string formattedAmount = cents.ToString().PadLeft(length, '0');
-                string sign = isNegative ? "-" : " ";
+                string sign = isNegative ? "-" : "";
                 return (formattedAmount, sign);
             }
 
-            return (new string('0', length), " ");
+            return ("", "");
         }
 
-        // Helper method to pad or truncate string to exact length
+        // Helper method to truncate string if exceeds max length
         private string? PadOrTruncate(string? value, int length)
         {
             if (string.IsNullOrEmpty(value))
             {
-                return new string(' ', length);
+                return "";
             }
 
             if (value.Length > length)
@@ -1392,7 +1392,7 @@ public partial class Program
                 return value.Substring(0, length);
             }
 
-            return value.PadLeft(length, '0');
+            return value;
         }
 
         // Get century digit (0-9) from date
