@@ -121,6 +121,17 @@ public partial class Program
                 string jsonString = JsonSerializer.Serialize(recordSet, options);
                 SimpleLogger.LogInfo($"✓ Mapped to RecordSet: {jsonString}");
 
+                // Save output RecordSet to file
+                if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
+                {
+                    Directory.CreateDirectory(pubSubConfig.OutputSavePath);
+                    string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
+                        $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
+                    File.WriteAllText(outputFilePath, jsonString);
+                    Console.WriteLine($"✓ Saved output to: {outputFilePath}");
+                    SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath}");
+                }
+
                 // Publish response with attributes
                 var responseMessage = new PubsubMessage
                 {
@@ -255,11 +266,24 @@ public partial class Program
             SimpleLogger.LogInfo("=== Validation ===");
             ValidateRecordSet(recordSet);
 
-            // Write output to file
-            string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
-            File.WriteAllText(outputPath, jsonOutput);
-            Console.WriteLine($"\n✓ Output written to: {outputPath}");
-            SimpleLogger.LogInfo($"✓ Output written to: {outputPath}");
+            // Write output to file using configured path if available
+            if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
+            {
+                Directory.CreateDirectory(pubSubConfig.OutputSavePath);
+                string outputPath = Path.Combine(pubSubConfig.OutputSavePath,
+                    $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_test.json");
+                File.WriteAllText(outputPath, jsonOutput);
+                Console.WriteLine($"\n✓ Output written to: {outputPath}");
+                SimpleLogger.LogInfo($"✓ Output written to: {outputPath}");
+            }
+            else
+            {
+                // Fallback to local directory if not configured
+                string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
+                File.WriteAllText(outputPath, jsonOutput);
+                Console.WriteLine($"\n✓ Output written to: {outputPath}");
+                SimpleLogger.LogInfo($"✓ Output written to: {outputPath}");
+            }
         }
         catch (Exception ex)
         {
