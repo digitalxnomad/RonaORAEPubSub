@@ -83,6 +83,19 @@ public partial class Program
 
                 RetailEvent retailEvent = mainClass.ReadRecordSetFromString(data);
 
+                // Validate ORAE v2.0.0 compliance
+                var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
+                if (validationErrors.Count > 0)
+                {
+                    string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
+                                        string.Join("\n", validationErrors);
+                    Console.WriteLine($"✗ {errorMessage}");
+                    SimpleLogger.LogError(errorMessage);
+                    throw new Exception(errorMessage);
+                }
+                Console.WriteLine("✓ ORAE v2.0.0 validation passed");
+                SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
+
                 // Map to RecordSet
                 RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
 
@@ -176,6 +189,20 @@ public partial class Program
             RetailEvent retailEvent = mainClass.ReadRecordSetFromString(jsonContent);
             Console.WriteLine($"✓ RetailEvent parsed successfully\n");
             SimpleLogger.LogInfo("✓ RetailEvent parsed successfully");
+
+            Console.WriteLine("Validating ORAE v2.0.0 compliance...");
+            SimpleLogger.LogInfo("Validating ORAE v2.0.0 compliance...");
+            var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
+            if (validationErrors.Count > 0)
+            {
+                string errorMessage = $"✗ ORAE validation failed with {validationErrors.Count} error(s):\n" +
+                                    string.Join("\n  - ", validationErrors.Prepend(""));
+                Console.WriteLine(errorMessage);
+                SimpleLogger.LogError(errorMessage);
+                return;
+            }
+            Console.WriteLine("✓ ORAE v2.0.0 validation passed\n");
+            SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
 
             Console.WriteLine("Mapping to RecordSet...");
             SimpleLogger.LogInfo("Mapping to RecordSet...");
@@ -1475,6 +1502,163 @@ public partial class Program
                 throw;
             }
         }
+
+    // ORAE v2.0.0 Compliance Validation
+    public static List<string> ValidateOraeCompliance(RetailEvent retailEvent)
+    {
+        var errors = new List<string>();
+
+        // Required root fields
+        if (string.IsNullOrEmpty(retailEvent.SchemaVersion))
+            errors.Add("Missing required field: schemaVersion");
+        else if (retailEvent.SchemaVersion != "2.0.0")
+            errors.Add($"Invalid schemaVersion: {retailEvent.SchemaVersion}. Expected '2.0.0'");
+
+        if (string.IsNullOrEmpty(retailEvent.MessageType))
+            errors.Add("Missing required field: messageType");
+        else if (retailEvent.MessageType != "RetailEvent")
+            errors.Add($"Invalid messageType: {retailEvent.MessageType}. Expected 'RetailEvent'");
+
+        if (string.IsNullOrEmpty(retailEvent.EventType))
+            errors.Add("Missing required field: eventType");
+        else if (!IsValidEnum(retailEvent.EventType, new[] { "ORIGINAL", "CORRECTION", "CANCELLATION", "SNAPSHOT" }))
+            errors.Add($"Invalid eventType: {retailEvent.EventType}");
+
+        if (string.IsNullOrEmpty(retailEvent.EventCategory))
+            errors.Add("Missing required field: eventCategory");
+        else if (!IsValidEnum(retailEvent.EventCategory, new[] {
+            "TRANSACTION", "TILL", "STORE", "SESSION", "BANKING", "ORDER",
+            "INVENTORY", "MAINTENANCE", "CALIBRATION", "AUDIT", "STATUS",
+            "LOYALTY", "TOPUP", "PROMOTION", "OTHER" }))
+            errors.Add($"Invalid eventCategory: {retailEvent.EventCategory}");
+
+        if (string.IsNullOrEmpty(retailEvent.EventId))
+            errors.Add("Missing required field: eventId");
+
+        if (retailEvent.OccurredAt == default(DateTime))
+            errors.Add("Missing required field: occurredAt");
+
+        if (retailEvent.IngestedAt == default(DateTime))
+            errors.Add("Missing required field: ingestedAt");
+
+        // BusinessContext validation
+        if (retailEvent.BusinessContext == null)
+        {
+            errors.Add("Missing required object: businessContext");
+        }
+        else
+        {
+            if (retailEvent.BusinessContext.BusinessDay == default(DateTime))
+                errors.Add("Missing required field: businessContext.businessDay");
+
+            if (retailEvent.BusinessContext.Store == null)
+                errors.Add("Missing required object: businessContext.store");
+            else if (string.IsNullOrEmpty(retailEvent.BusinessContext.Store.StoreId))
+                errors.Add("Missing required field: businessContext.store.storeId");
+
+            if (retailEvent.BusinessContext.Workstation == null)
+                errors.Add("Missing required object: businessContext.workstation");
+            else if (string.IsNullOrEmpty(retailEvent.BusinessContext.Workstation.RegisterId))
+                errors.Add("Missing required field: businessContext.workstation.registerId");
+
+            if (string.IsNullOrEmpty(retailEvent.BusinessContext.Channel))
+                errors.Add("Missing required field: businessContext.channel");
+        }
+
+        // Category-specific payload validation
+        if (retailEvent.EventCategory == "TRANSACTION" && retailEvent.Transaction == null)
+            errors.Add("eventCategory 'TRANSACTION' requires transaction object");
+
+        // Transaction validation
+        if (retailEvent.Transaction != null)
+        {
+            if (string.IsNullOrEmpty(retailEvent.Transaction.TransactionType))
+                errors.Add("Missing required field: transaction.transactionType");
+            else if (!IsValidEnum(retailEvent.Transaction.TransactionType, new[] {
+                "SALE", "RETURN", "EXCHANGE", "VOID", "CANCEL", "ADJUSTMENT", "NONMERCH", "SERVICE" }))
+                errors.Add($"Invalid transaction.transactionType: {retailEvent.Transaction.TransactionType}");
+
+            if (retailEvent.Transaction.Totals == null)
+                errors.Add("Missing required object: transaction.totals");
+            else
+            {
+                if (retailEvent.Transaction.Totals.Gross == null)
+                    errors.Add("Missing required field: transaction.totals.gross");
+                if (retailEvent.Transaction.Totals.Discounts == null)
+                    errors.Add("Missing required field: transaction.totals.discounts");
+                if (retailEvent.Transaction.Totals.Tax == null)
+                    errors.Add("Missing required field: transaction.totals.tax");
+                if (retailEvent.Transaction.Totals.Net == null)
+                    errors.Add("Missing required field: transaction.totals.net");
+            }
+
+            // Items validation (must have at least 1 unless CANCEL/VOID)
+            if (retailEvent.Transaction.TransactionType != "CANCEL" &&
+                retailEvent.Transaction.TransactionType != "VOID" &&
+                (retailEvent.Transaction.Items == null || retailEvent.Transaction.Items.Count == 0))
+            {
+                errors.Add("transaction.items[] must have at least one item for non-CANCEL/VOID transactions");
+            }
+
+            // Line item validation
+            if (retailEvent.Transaction.Items != null)
+            {
+                for (int i = 0; i < retailEvent.Transaction.Items.Count; i++)
+                {
+                    var item = retailEvent.Transaction.Items[i];
+                    if (string.IsNullOrEmpty(item.LineId))
+                        errors.Add($"Missing required field: transaction.items[{i}].lineId");
+                    if (item.Item == null)
+                        errors.Add($"Missing required object: transaction.items[{i}].item");
+                    else
+                    {
+                        if (string.IsNullOrEmpty(item.Item.Sku))
+                            errors.Add($"Missing required field: transaction.items[{i}].item.sku");
+                        if (string.IsNullOrEmpty(item.Item.Description))
+                            errors.Add($"Missing required field: transaction.items[{i}].item.description");
+                    }
+                    if (item.Quantity == null)
+                        errors.Add($"Missing required object: transaction.items[{i}].quantity");
+                    else
+                    {
+                        if (string.IsNullOrEmpty(item.Quantity.Uom))
+                            errors.Add($"Missing required field: transaction.items[{i}].quantity.uom");
+                    }
+                    if (item.Pricing == null)
+                        errors.Add($"Missing required object: transaction.items[{i}].pricing");
+                    else
+                    {
+                        if (item.Pricing.UnitPrice == null)
+                            errors.Add($"Missing required field: transaction.items[{i}].pricing.unitPrice");
+                        if (item.Pricing.ExtendedPrice == null)
+                            errors.Add($"Missing required field: transaction.items[{i}].pricing.extendedPrice");
+                    }
+                }
+            }
+
+            // Tender validation
+            if (retailEvent.Transaction.Tenders != null)
+            {
+                for (int i = 0; i < retailEvent.Transaction.Tenders.Count; i++)
+                {
+                    var tender = retailEvent.Transaction.Tenders[i];
+                    if (string.IsNullOrEmpty(tender.TenderId))
+                        errors.Add($"Missing required field: transaction.tenders[{i}].tenderId");
+                    if (string.IsNullOrEmpty(tender.Method))
+                        errors.Add($"Missing required field: transaction.tenders[{i}].method");
+                    if (tender.Amount == null)
+                        errors.Add($"Missing required field: transaction.tenders[{i}].amount");
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private static bool IsValidEnum(string value, string[] validValues)
+    {
+        return validValues.Contains(value);
+    }
 
         public static void WriteRecordSetToFile(RecordSet recordSet, string filePath)
         {
