@@ -99,6 +99,19 @@ public partial class Program
                 // Map to RecordSet
                 RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
 
+                // Validate output RecordSet
+                var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
+                if (outputErrors.Count > 0)
+                {
+                    string errorMessage = $"RecordSet validation failed with {outputErrors.Count} error(s):\n" +
+                                        string.Join("\n", outputErrors);
+                    Console.WriteLine($"✗ {errorMessage}");
+                    SimpleLogger.LogError(errorMessage);
+                    throw new Exception(errorMessage);
+                }
+                Console.WriteLine("✓ RecordSet output validation passed");
+                SimpleLogger.LogInfo("✓ RecordSet output validation passed");
+
                 var options = new JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -209,6 +222,21 @@ public partial class Program
             RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
             Console.WriteLine($"✓ RecordSet mapped successfully\n");
             SimpleLogger.LogInfo("✓ RecordSet mapped successfully");
+
+            // Validate output RecordSet
+            Console.WriteLine("Validating RecordSet output...");
+            SimpleLogger.LogInfo("Validating RecordSet output...");
+            var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
+            if (outputErrors.Count > 0)
+            {
+                string errorMessage = $"✗ RecordSet validation failed with {outputErrors.Count} error(s):\n" +
+                                    string.Join("\n  - ", outputErrors.Prepend(""));
+                Console.WriteLine(errorMessage);
+                SimpleLogger.LogError(errorMessage);
+                return;
+            }
+            Console.WriteLine("✓ RecordSet output validation passed\n");
+            SimpleLogger.LogInfo("✓ RecordSet output validation passed");
 
             var options = new JsonSerializerOptions
             {
@@ -1658,6 +1686,115 @@ public partial class Program
     private static bool IsValidEnum(string value, string[] validValues)
     {
         return validValues.Contains(value);
+    }
+
+    // RecordSet Output Validation (RIMSLF/RIMTNF)
+    public static List<string> ValidateRecordSetOutput(RecordSet recordSet)
+    {
+        var errors = new List<string>();
+
+        if (recordSet == null)
+        {
+            errors.Add("RecordSet is null");
+            return errors;
+        }
+
+        // Validate OrderRecords (RIMSLF)
+        if (recordSet.OrderRecords != null)
+        {
+            for (int i = 0; i < recordSet.OrderRecords.Count; i++)
+            {
+                var order = recordSet.OrderRecords[i];
+                string prefix = $"RIMSLF[{i}]";
+
+                // Required fields
+                if (string.IsNullOrEmpty(order.TransType))
+                    errors.Add($"{prefix}: SLFTTP (TransType) is required");
+                if (string.IsNullOrEmpty(order.LineType))
+                    errors.Add($"{prefix}: SLFLNT (LineType) is required");
+                if (string.IsNullOrEmpty(order.TransDate))
+                    errors.Add($"{prefix}: SLFTDT (TransDate) is required");
+                if (string.IsNullOrEmpty(order.TransTime))
+                    errors.Add($"{prefix}: SLFTTM (TransTime) is required");
+                if (string.IsNullOrEmpty(order.TransNumber))
+                    errors.Add($"{prefix}: SLFTTX (TransNumber) is required");
+                if (string.IsNullOrEmpty(order.TransSeq))
+                    errors.Add($"{prefix}: SLFTSQ (TransSeq) is required");
+                if (string.IsNullOrEmpty(order.RegisterID))
+                    errors.Add($"{prefix}: SLFREG (RegisterID) is required");
+                if (string.IsNullOrEmpty(order.SKUNumber))
+                    errors.Add($"{prefix}: SLFSKU (SKUNumber) is required");
+                if (order.PolledStore == 0)
+                    errors.Add($"{prefix}: SLFPST (PolledStore) is required");
+                if (order.PollCen == 0)
+                    errors.Add($"{prefix}: SLFPCN (PollCen) is required");
+                if (order.PollDate == 0)
+                    errors.Add($"{prefix}: SLFPDT (PollDate) is required");
+                if (order.CreateCen == 0)
+                    errors.Add($"{prefix}: SLFCCN (CreateCen) is required");
+                if (order.CreateDate == 0)
+                    errors.Add($"{prefix}: SLFCDT (CreateDate) is required");
+                if (order.CreateTime == 0)
+                    errors.Add($"{prefix}: SLFCTM (CreateTime) is required");
+
+                // Pricing fields
+                if (string.IsNullOrEmpty(order.Quantity))
+                    errors.Add($"{prefix}: SLFQTY (Quantity) is required");
+                if (string.IsNullOrEmpty(order.ItemSellPrice))
+                    errors.Add($"{prefix}: SLFSEL (ItemSellPrice) is required");
+                if (string.IsNullOrEmpty(order.ExtendedValue))
+                    errors.Add($"{prefix}: SLFEXT (ExtendedValue) is required");
+            }
+        }
+
+        // Validate TenderRecords (RIMTNF)
+        if (recordSet.TenderRecords != null)
+        {
+            for (int i = 0; i < recordSet.TenderRecords.Count; i++)
+            {
+                var tender = recordSet.TenderRecords[i];
+                string prefix = $"RIMTNF[{i}]";
+
+                // Required fields
+                if (string.IsNullOrEmpty(tender.TransactionType))
+                    errors.Add($"{prefix}: TNFTTP (TransactionType) is required");
+                if (string.IsNullOrEmpty(tender.TransactionDate))
+                    errors.Add($"{prefix}: TNFTDT (TransactionDate) is required");
+                if (string.IsNullOrEmpty(tender.TransactionTime))
+                    errors.Add($"{prefix}: TNFTTM (TransactionTime) is required");
+                if (string.IsNullOrEmpty(tender.TransactionNumber))
+                    errors.Add($"{prefix}: TNFTTX (TransactionNumber) is required");
+                if (string.IsNullOrEmpty(tender.TransactionSeq))
+                    errors.Add($"{prefix}: TNFTSQ (TransactionSeq) is required");
+                if (string.IsNullOrEmpty(tender.RegisterID))
+                    errors.Add($"{prefix}: TNFREG (RegisterID) is required");
+                if (string.IsNullOrEmpty(tender.FundCode))
+                    errors.Add($"{prefix}: TNFFCD (FundCode) is required");
+                if (string.IsNullOrEmpty(tender.Amount))
+                    errors.Add($"{prefix}: TNFAMT (Amount) is required");
+                if (tender.PolledStore == 0)
+                    errors.Add($"{prefix}: TNFPST (PolledStore) is required");
+                if (tender.PollCen == 0)
+                    errors.Add($"{prefix}: TNFPCN (PollCen) is required");
+                if (tender.PollDate == 0)
+                    errors.Add($"{prefix}: TNFPDT (PollDate) is required");
+                if (tender.CreateCen == 0)
+                    errors.Add($"{prefix}: TNFCCN (CreateCen) is required");
+                if (tender.CreateDate == 0)
+                    errors.Add($"{prefix}: TNFCDT (CreateDate) is required");
+                if (tender.CreateTime == 0)
+                    errors.Add($"{prefix}: TNFCTM (CreateTime) is required");
+            }
+        }
+
+        // Warn if both are empty
+        if ((recordSet.OrderRecords == null || recordSet.OrderRecords.Count == 0) &&
+            (recordSet.TenderRecords == null || recordSet.TenderRecords.Count == 0))
+        {
+            errors.Add("RecordSet contains no OrderRecords or TenderRecords");
+        }
+
+        return errors;
     }
 
         public static void WriteRecordSetToFile(RecordSet recordSet, string filePath)
