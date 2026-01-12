@@ -1726,12 +1726,13 @@ public partial class Program
                     errors.Add($"{prefix}: SLFSKU (SKUNumber) is required");
                 if (order.PolledStore == 0)
                     errors.Add($"{prefix}: SLFPST (PolledStore) is required");
-                if (order.PollCen == 0)
-                    errors.Add($"{prefix}: SLFPCN (PollCen) is required");
+                // PollCen and CreateCen are century digits (0-9), so 0 is valid for 2000-2099
+                if (order.PollCen < 0 || order.PollCen > 9)
+                    errors.Add($"{prefix}: SLFPCN (PollCen) must be 0-9");
                 if (order.PollDate == 0)
                     errors.Add($"{prefix}: SLFPDT (PollDate) is required");
-                if (order.CreateCen == 0)
-                    errors.Add($"{prefix}: SLFCCN (CreateCen) is required");
+                if (order.CreateCen < 0 || order.CreateCen > 9)
+                    errors.Add($"{prefix}: SLFCCN (CreateCen) must be 0-9");
                 if (order.CreateDate == 0)
                     errors.Add($"{prefix}: SLFCDT (CreateDate) is required");
                 if (order.CreateTime == 0)
@@ -1774,12 +1775,13 @@ public partial class Program
                     errors.Add($"{prefix}: TNFAMT (Amount) is required");
                 if (tender.PolledStore == 0)
                     errors.Add($"{prefix}: TNFPST (PolledStore) is required");
-                if (tender.PollCen == 0)
-                    errors.Add($"{prefix}: TNFPCN (PollCen) is required");
+                // PollCen and CreateCen are century digits (0-9), so 0 is valid for 2000-2099
+                if (tender.PollCen < 0 || tender.PollCen > 9)
+                    errors.Add($"{prefix}: TNFPCN (PollCen) must be 0-9");
                 if (tender.PollDate == 0)
                     errors.Add($"{prefix}: TNFPDT (PollDate) is required");
-                if (tender.CreateCen == 0)
-                    errors.Add($"{prefix}: TNFCCN (CreateCen) is required");
+                if (tender.CreateCen < 0 || tender.CreateCen > 9)
+                    errors.Add($"{prefix}: TNFCCN (CreateCen) must be 0-9");
                 if (tender.CreateDate == 0)
                     errors.Add($"{prefix}: TNFCDT (CreateDate) is required");
                 if (tender.CreateTime == 0)
