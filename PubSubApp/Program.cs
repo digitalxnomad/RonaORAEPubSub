@@ -169,7 +169,7 @@ public partial class Program
         await publisher.ShutdownAsync(TimeSpan.FromSeconds(15));
     }
 
-    static async Task TestJsonFile(string jsonPath)
+    static Task TestJsonFile(string jsonPath)
     {
         try
         {
@@ -194,7 +194,7 @@ public partial class Program
             {
                 Console.WriteLine($"✗ Error: File not found: {jsonPath}");
                 SimpleLogger.LogError($"✗ Error: File not found: {jsonPath}");
-                return;
+                return Task.CompletedTask;
             }
 
             string jsonContent = File.ReadAllText(jsonPath);
@@ -223,7 +223,7 @@ public partial class Program
                                     string.Join("\n  - ", validationErrors.Prepend(""));
                 Console.WriteLine(errorMessage);
                 SimpleLogger.LogError(errorMessage);
-                return;
+                return Task.CompletedTask;
             }
             Console.WriteLine("✓ ORAE v2.0.0 validation passed\n");
             SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
@@ -244,7 +244,7 @@ public partial class Program
                                     string.Join("\n  - ", outputErrors.Prepend(""));
                 Console.WriteLine(errorMessage);
                 SimpleLogger.LogError(errorMessage);
-                return;
+                return Task.CompletedTask;
             }
             Console.WriteLine("✓ RecordSet output validation passed\n");
             SimpleLogger.LogInfo("✓ RecordSet output validation passed");
@@ -292,6 +292,8 @@ public partial class Program
             SimpleLogger.LogError($"✗ Error: {ex.Message}");
             SimpleLogger.LogError($"Stack trace: {ex.StackTrace}");
         }
+
+        return Task.CompletedTask;
     }
 
     static void ValidateRecordSet(RecordSet recordSet)
@@ -893,7 +895,7 @@ public partial class Program
         public string? SchemaVersion { get; set; }
 
         [JsonPropertyName("transaction")]
-        public Transaction Transaction { get; set; }
+        public required Transaction Transaction { get; set; }
     }
 
     public class BusinessContext
@@ -908,10 +910,10 @@ public partial class Program
         public string? Fulfillment { get; set; }
 
         [JsonPropertyName("store")]
-        public Store Store { get; set; }
+        public required Store Store { get; set; }
 
         [JsonPropertyName("workstation")]
-        public Workstation Workstation { get; set; }
+        public required Workstation Workstation { get; set; }
     }
 
     public class Store
@@ -953,13 +955,13 @@ public partial class Program
         public string? TransactionType { get; set; }
 
         [JsonPropertyName("items")]
-        public List<TransactionItem> Items { get; set; }
+        public required List<TransactionItem> Items { get; set; }
 
         [JsonPropertyName("tenders")]
         public List<Tender>? Tenders { get; set; }
 
         [JsonPropertyName("totals")]
-        public Totals Totals { get; set; }
+        public required Totals Totals { get; set; }
     }
 
     public class Tender
@@ -1520,7 +1522,8 @@ public partial class Program
         {
             string jsonContent = datain;
             var retailEvent = JsonSerializer.Deserialize<RetailEvent>(jsonContent);
-            return retailEvent ?? new RetailEvent();
+            // Fix for CS9035: Always set required Transaction property
+            return retailEvent ?? new RetailEvent { Transaction = new Transaction { Items = new List<TransactionItem>(), Totals = new Totals() } };
         }
         catch (FileNotFoundException ex)
         {
@@ -1536,24 +1539,25 @@ public partial class Program
 
 
     public static RetailEvent ReadRecordSetFromFile(string filePath)
+    {
+        try
         {
-            try
-            {
-                string jsonContent = File.ReadAllText(filePath);
-                var retailEvent = JsonSerializer.Deserialize<RetailEvent>(jsonContent);
-                return retailEvent ?? new RetailEvent();
-            }
-            catch (FileNotFoundException ex)
-            {
-                Console.WriteLine($"File not found: {ex.Message}");
-                throw;
-            }
-            catch (JsonException ex)
-            {
-                Console.WriteLine($"JSON parsing error: {ex.Message}");
-                throw;
-            }
+            string jsonContent = File.ReadAllText(filePath);
+            var retailEvent = JsonSerializer.Deserialize<RetailEvent>(jsonContent);
+            // Fix for CS9035: Always set required Transaction property
+            return retailEvent ?? new RetailEvent { Transaction = new Transaction { Items = new List<TransactionItem>(), Totals = new Totals() } };
         }
+        catch (FileNotFoundException ex)
+        {
+            Console.WriteLine($"File not found: {ex.Message}");
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"JSON parsing error: {ex.Message}");
+            throw;
+        }
+    }
 
     // ORAE v2.0.0 Compliance Validation
     public static List<string> ValidateOraeCompliance(RetailEvent retailEvent)
