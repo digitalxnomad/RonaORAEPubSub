@@ -1148,7 +1148,7 @@ public partial class Program
                         TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
 
                         // Transaction Identification - with proper padding
-                        TransNumber = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each item
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1165,7 +1165,7 @@ public partial class Program
                     };
 
                     // SKU Number - 9-digits with leading zeros
-                    orderRecord.SKUNumber = PadOrTruncate(item.Item?.Sku, 9);
+                    orderRecord.SKUNumber = PadNumeric(item.Item?.Sku, 9);
 
                     // Quantity - 9-digits without decimal (multiply by 100)
                     if (item.Quantity != null)
@@ -1297,7 +1297,7 @@ public partial class Program
 
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
-                        TransactionNumber = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1380,7 +1380,7 @@ public partial class Program
                 TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                 TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
                 TransactionType = mappedTransactionTypeSLFTTP,
-                TransactionNumber = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                 TransactionSeq = "00001",
                 RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
                 PolledStore = polledStoreInt,
@@ -1608,6 +1608,27 @@ public partial class Program
             if (value.Length < length)
             {
                 return value.PadRight(length, ' '); // Pad with spaces if too short
+            }
+
+            return value; // Exact length
+        }
+
+        // Helper method to pad numeric fields with leading zeros
+        private string? PadNumeric(string? value, int length)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return new string('0', length); // Pad with zeros for blank numeric fields
+            }
+
+            if (value.Length > length)
+            {
+                return value.Substring(0, length); // Truncate if too long
+            }
+
+            if (value.Length < length)
+            {
+                return value.PadLeft(length, '0'); // Pad with leading zeros if too short
             }
 
             return value; // Exact length
