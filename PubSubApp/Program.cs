@@ -989,6 +989,9 @@ public partial class Program
 
         [JsonPropertyName("quantity")]
         public Quantity? Quantity { get; set; }
+
+        [JsonPropertyName("taxes")]
+        public List<TaxDetail>? Taxes { get; set; }
     }
 
     public class Item
@@ -1025,6 +1028,36 @@ public partial class Program
 
         [JsonPropertyName("tareWeight")]
         public decimal? TareWeight { get; set; }
+    }
+
+    public class TaxDetail
+    {
+        [JsonPropertyName("taxType")]
+        public string? TaxType { get; set; }
+
+        [JsonPropertyName("taxCategory")]
+        public string? TaxCategory { get; set; }
+
+        [JsonPropertyName("taxCode")]
+        public string? TaxCode { get; set; }
+
+        [JsonPropertyName("taxAuthority")]
+        public string? TaxAuthority { get; set; }
+
+        [JsonPropertyName("taxRate")]
+        public decimal? TaxRate { get; set; }
+
+        [JsonPropertyName("taxAmount")]
+        public CurrencyAmount? TaxAmount { get; set; }
+
+        [JsonPropertyName("taxableAmount")]
+        public CurrencyAmount? TaxableAmount { get; set; }
+
+        [JsonPropertyName("taxExempt")]
+        public bool? TaxExempt { get; set; }
+
+        [JsonPropertyName("exemptReason")]
+        public string? ExemptReason { get; set; }
     }
 
     public class Totals
@@ -1192,26 +1225,8 @@ public partial class Program
                     // Item Scanned Y/N
                     orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
 
-                    // Tax flags - default to N
-                    orderRecord.ChargedTax1 = "N";
-                    orderRecord.ChargedTax2 = "N";
-                    orderRecord.ChargedTax3 = "N";
-                    orderRecord.ChargedTax4 = "N";
-
-                    // Set tax flags if tax amount exists
-                    if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
-                        decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
-                        taxAmount > 0)
-                    {
-                        orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
-
-                        // Tax authority and rate code from store's tax area
-                        if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
-                        {
-                            orderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                            orderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                        }
-                    }
+                    // Parse item-level taxes
+                    ParseItemTaxes(item, orderRecord, retailEvent);
 
                     // Reference for line ID
                     if (!string.IsNullOrEmpty(item.LineId))
@@ -1423,6 +1438,124 @@ public partial class Program
                 "CHANGE" => "ZZ",
                 _ => "CA" // Default to cash
             };
+        }
+
+        // Parse item-level taxes and map to OrderRecord tax fields
+        private void ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
+        {
+            // Tax flags - default to N
+            orderRecord.ChargedTax1 = "N";
+            orderRecord.ChargedTax2 = "N";
+            orderRecord.ChargedTax3 = "N";
+            orderRecord.ChargedTax4 = "N";
+
+            // Check if item has item-level taxes
+            if (item.Taxes != null && item.Taxes.Count > 0)
+            {
+                // Process each tax detail
+                foreach (var tax in item.Taxes)
+                {
+                    // Skip if tax is exempt
+                    if (tax.TaxExempt == true)
+                    {
+                        // Handle tax exemption
+                        if (!string.IsNullOrEmpty(tax.ExemptReason))
+                        {
+                            orderRecord.TaxExemptId1 = PadOrTruncate(tax.ExemptReason, 20);
+                        }
+                        continue;
+                    }
+
+                    // Check if tax amount is greater than zero
+                    decimal taxAmount = 0;
+                    if (tax.TaxAmount?.Value != null)
+                    {
+                        decimal.TryParse(tax.TaxAmount.Value, out taxAmount);
+                    }
+
+                    if (taxAmount <= 0)
+                        continue;
+
+                    // Map tax type/category to ChargedTax1-4 flags
+                    string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
+
+                    switch (taxType)
+                    {
+                        case "PST":
+                        case "PROVINCIAL":
+                        case "STATE":
+                            orderRecord.ChargedTax1 = "Y";
+                            break;
+                        case "GST":
+                        case "FEDERAL":
+                        case "VAT":
+                        case "NATIONAL":
+                            orderRecord.ChargedTax2 = "Y";
+                            break;
+                        case "HST":
+                        case "HARMONIZED":
+                            // HST is combined PST+GST
+                            orderRecord.ChargedTax1 = "Y";
+                            orderRecord.ChargedTax2 = "Y";
+                            break;
+                        case "QST":
+                        case "QUEBEC":
+                            orderRecord.ChargedTax3 = "Y";
+                            break;
+                        case "MUNICIPAL":
+                        case "LOCAL":
+                        case "CITY":
+                            orderRecord.ChargedTax4 = "Y";
+                            break;
+                        default:
+                            // Default unrecognized tax types to GST (Tax2)
+                            orderRecord.ChargedTax2 = "Y";
+                            break;
+                    }
+
+                    // Set tax authority code from first tax with authority
+                    if (string.IsNullOrEmpty(orderRecord.TaxAuthCode) && !string.IsNullOrEmpty(tax.TaxAuthority))
+                    {
+                        orderRecord.TaxAuthCode = PadOrTruncate(tax.TaxAuthority, 6);
+                    }
+
+                    // Set tax rate code from first tax with code
+                    if (string.IsNullOrEmpty(orderRecord.TaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
+                    {
+                        orderRecord.TaxRateCode = PadOrTruncate(tax.TaxCode, 6);
+                    }
+                }
+
+                // If no tax authority/rate codes found in item taxes, use store tax area
+                if (string.IsNullOrEmpty(orderRecord.TaxAuthCode) &&
+                    !string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
+                {
+                    orderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                }
+
+                if (string.IsNullOrEmpty(orderRecord.TaxRateCode) &&
+                    !string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
+                {
+                    orderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                }
+            }
+            else
+            {
+                // Fallback: Use transaction-level tax if no item-level taxes
+                if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
+                    decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
+                    taxAmount > 0)
+                {
+                    orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
+
+                    // Tax authority and rate code from store's tax area
+                    if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
+                    {
+                        orderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                        orderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
+                    }
+                }
+            }
         }
 
         // Helper method to format currency values to fixed-length strings
