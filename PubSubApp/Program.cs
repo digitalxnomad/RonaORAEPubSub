@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -2278,6 +2279,9 @@ public partial class Program
                     errors.Add($"{prefix}: SLFSEL (ItemSellPrice) is required");
                 if (string.IsNullOrEmpty(order.ExtendedValue))
                     errors.Add($"{prefix}: SLFEXT (ExtendedValue) is required");
+
+                // Validate all string field lengths using reflection
+                ValidateStringFieldLengths(order, typeof(OrderRecord), prefix, errors);
             }
         }
 
@@ -2319,6 +2323,9 @@ public partial class Program
                     errors.Add($"{prefix}: TNFCDT (CreateDate) is required");
                 if (tender.CreateTime == 0)
                     errors.Add($"{prefix}: TNFCTM (CreateTime) is required");
+
+                // Validate all string field lengths using reflection
+                ValidateStringFieldLengths(tender, typeof(TenderRecord), prefix, errors);
             }
         }
 
@@ -2330,6 +2337,57 @@ public partial class Program
         }
 
         return errors;
+    }
+
+    // Helper method to validate string field lengths based on StringLength attributes
+    private static void ValidateStringFieldLengths(object record, Type recordType, string prefix, List<string> errors)
+    {
+        var properties = recordType.GetProperties();
+
+        foreach (var prop in properties)
+        {
+            // Only validate string properties
+            if (prop.PropertyType != typeof(string))
+                continue;
+
+            var stringLengthAttr = prop.GetCustomAttributes(typeof(StringLengthAttribute), false)
+                                       .FirstOrDefault() as StringLengthAttribute;
+
+            if (stringLengthAttr == null)
+                continue;
+
+            var jsonAttr = prop.GetCustomAttributes(typeof(JsonPropertyNameAttribute), false)
+                              .FirstOrDefault() as JsonPropertyNameAttribute;
+            string fieldName = jsonAttr?.Name ?? prop.Name;
+
+            string? value = prop.GetValue(record) as string;
+            int minLength = stringLengthAttr.MinimumLength;
+            int maxLength = stringLengthAttr.MaximumLength;
+
+            // Rule: For blank values, they can be zero length OR properly padded.
+            //       For non-blank values, length must match exactly (MinimumLength == MaxLength due to padding)
+            if (string.IsNullOrEmpty(value))
+            {
+                // Blank field - can be empty (length 0) or properly padded to minLength
+                // No validation error for blank fields
+                continue;
+            }
+
+            // Non-blank field - must match exact length (MinimumLength should equal MaxLength)
+            if (value.Length < minLength)
+            {
+                errors.Add($"{prefix}: {fieldName} ({prop.Name}) length is {value.Length}, but minimum is {minLength}");
+            }
+            else if (value.Length > maxLength)
+            {
+                errors.Add($"{prefix}: {fieldName} ({prop.Name}) length is {value.Length}, but maximum is {maxLength}");
+            }
+            else if (minLength == maxLength && value.Length != minLength)
+            {
+                // When min==max, value must be exact length
+                errors.Add($"{prefix}: {fieldName} ({prop.Name}) length is {value.Length}, but must be exactly {minLength}");
+            }
+        }
     }
 
         public static void WriteRecordSetToFile(RecordSet recordSet, string filePath)
