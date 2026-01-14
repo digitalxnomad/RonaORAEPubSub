@@ -1379,7 +1379,7 @@ public partial class Program
 
                         // Blank fields for tax line
                         SKUNumber = "", // No SKU for tax line
-                        Quantity = "",
+                        Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
                         QuantityNegativeSign = " ",
                         OriginalPrice = "",
                         OriginalPriceNegativeSign = " ",
