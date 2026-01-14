@@ -1378,7 +1378,7 @@ public partial class Program
                         ExtendedValueNegativeSign = totalTax < 0 ? "-" : " ",
 
                         // Blank fields for tax line
-                        SKUNumber = "", // No SKU for tax line
+                        SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
                         Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
                         QuantityNegativeSign = " ",
                         OriginalPrice = "",
