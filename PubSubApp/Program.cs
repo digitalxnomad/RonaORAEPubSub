@@ -1310,6 +1310,20 @@ public partial class Program
                     // Reason codes - SLFRSN (return/price override/post voided - left justified)
                     orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
 
+                    // Required fields with fixed values - per validation spec
+                    orderRecord.OriginalSalesperson = "00000"; // SLFOSP - Required, must be "00000"
+                    orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
+                    orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
+                    orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
+
+                    // Discount fields - default to required values when no discount applied
+                    if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
+                    {
+                        orderRecord.DiscountAmount = "000000000"; // SLFDSA - Must be "000000000" per validation
+                        orderRecord.DiscountType = ""; // SLFDST - Must be empty string
+                        orderRecord.DiscountNegativeSign = ""; // SLFDSN - Must be empty string
+                    }
+
                     // Discount reasons - per CSV rules
                     orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
                     orderRecord.RegDiscReason = "00"; // SLFRDR - Default '00', TODO: set to 'I2' when price vehicle code = MAN
@@ -1382,6 +1396,16 @@ public partial class Program
                         UPCCode = "",
                         EReceiptEmail = "",
                         ReasonCode = "",
+
+                        // Required fields with fixed values - per validation spec
+                        OriginalSalesperson = "00000", // SLFOSP - Required
+                        OriginalStore = "00000", // SLFOST - Required
+                        GroupDiscAmount = "000000000", // SLFGDA - Required
+                        GroupDiscSign = "", // SLFGDS - Empty string
+                        DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
+                        DiscountType = "", // SLFDST - Empty string
+                        DiscountNegativeSign = "", // SLFDSN - Empty string
+
                         GroupDiscReason = "00",
                         RegDiscReason = "00",
                         OrderNumber = "",
@@ -1448,7 +1472,7 @@ public partial class Program
 
                     // Card/Payment fields - per CSV rules
                     tenderRecord.CreditCardNumber = ""; // TNFCCD - TODO: populate masked card number
-                    tenderRecord.CardExpirationDate = ""; // TNFEXP - Default blank
+                    tenderRecord.CardExpirationDate = "0000"; // TNFEXP - Must be "0000" per validation spec
                     tenderRecord.AuthNumber = ""; // TNFAUT - TODO: populate authorization number
                     tenderRecord.MagStripeFlag = " "; // TNFMSR (1 space) - TODO: populate based on card processing type
                     tenderRecord.PaymentHashValue = ""; // TNFHSH - TODO: populate from bank
