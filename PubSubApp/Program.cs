@@ -1345,7 +1345,7 @@ public partial class Program
                         decimal itemTaxTotal = 0;
                         foreach (var tax in item.Taxes)
                         {
-                            if (tax.Amount?.Value != null && decimal.TryParse(tax.Amount.Value, out decimal taxAmount))
+                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
                             {
                                 itemTaxTotal += taxAmount;
                             }
