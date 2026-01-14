@@ -121,17 +121,35 @@ public partial class Program
                 };
 
                 string jsonString = JsonSerializer.Serialize(recordSet, options);
-                SimpleLogger.LogInfo($"✓ Mapped to RecordSet: {jsonString}");
+
+                // Log summary instead of full JSON (can be very large)
+                int orderCount = recordSet.OrderRecords?.Count ?? 0;
+                int tenderCount = recordSet.TenderRecords?.Count ?? 0;
+                SimpleLogger.LogInfo($"✓ Mapped to RecordSet: {orderCount} OrderRecords, {tenderCount} TenderRecords");
 
                 // Save output RecordSet to file
                 if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
                 {
-                    Directory.CreateDirectory(pubSubConfig.OutputSavePath);
-                    string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
-                        $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
-                    File.WriteAllText(outputFilePath, jsonString);
-                    Console.WriteLine($"✓ Saved output to: {outputFilePath}");
-                    SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath}");
+                    try
+                    {
+                        Directory.CreateDirectory(pubSubConfig.OutputSavePath);
+                        string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
+                            $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
+                        File.WriteAllText(outputFilePath, jsonString);
+                        Console.WriteLine($"✓ Saved output to: {outputFilePath}");
+                        SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
+                    }
+                    catch (Exception ex)
+                    {
+                        string errorMsg = $"✗ Failed to save output file: {ex.Message}";
+                        Console.WriteLine(errorMsg);
+                        SimpleLogger.LogError(errorMsg, ex);
+                        // Don't throw - continue with publishing
+                    }
+                }
+                else
+                {
+                    SimpleLogger.LogWarning("⚠ OutputSavePath not configured - output file not saved");
                 }
 
                 // Publish response with attributes
@@ -259,10 +277,14 @@ public partial class Program
 
             string jsonOutput = JsonSerializer.Serialize(recordSet, options);
 
+            // Log summary instead of full JSON (can be very large)
+            int orderCount = recordSet.OrderRecords?.Count ?? 0;
+            int tenderCount = recordSet.TenderRecords?.Count ?? 0;
+            SimpleLogger.LogInfo($"Output JSON generated: {orderCount} OrderRecords, {tenderCount} TenderRecords ({jsonOutput.Length} bytes)");
+
             Console.WriteLine("=== Output JSON ===");
             Console.WriteLine(jsonOutput);
             Console.WriteLine();
-            SimpleLogger.LogInfo($"Output JSON: {jsonOutput}");
 
             Console.WriteLine("=== Validation ===");
             SimpleLogger.LogInfo("=== Validation ===");
@@ -271,20 +293,38 @@ public partial class Program
             // Write output to file using configured path if available
             if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
             {
-                Directory.CreateDirectory(pubSubConfig.OutputSavePath);
-                string outputPath = Path.Combine(pubSubConfig.OutputSavePath,
-                    $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_test.json");
-                File.WriteAllText(outputPath, jsonOutput);
-                Console.WriteLine($"\n✓ Output written to: {outputPath}");
-                SimpleLogger.LogInfo($"✓ Output written to: {outputPath}");
+                try
+                {
+                    Directory.CreateDirectory(pubSubConfig.OutputSavePath);
+                    string outputPath = Path.Combine(pubSubConfig.OutputSavePath,
+                        $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_test.json");
+                    File.WriteAllText(outputPath, jsonOutput);
+                    Console.WriteLine($"\n✓ Output written to: {outputPath}");
+                    SimpleLogger.LogInfo($"✓ Output written to: {outputPath} ({jsonOutput.Length} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    string errorMsg = $"✗ Failed to save output file: {ex.Message}";
+                    Console.WriteLine(errorMsg);
+                    SimpleLogger.LogError(errorMsg, ex);
+                }
             }
             else
             {
-                // Fallback to local directory if not configured
-                string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
-                File.WriteAllText(outputPath, jsonOutput);
-                Console.WriteLine($"\n✓ Output written to: {outputPath}");
-                SimpleLogger.LogInfo($"✓ Output written to: {outputPath}");
+                try
+                {
+                    // Fallback to local directory if not configured
+                    string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
+                    File.WriteAllText(outputPath, jsonOutput);
+                    Console.WriteLine($"\n✓ Output written to: {outputPath}");
+                    SimpleLogger.LogInfo($"✓ Output written to: {outputPath} ({jsonOutput.Length} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    string errorMsg = $"✗ Failed to save output file: {ex.Message}";
+                    Console.WriteLine(errorMsg);
+                    SimpleLogger.LogError(errorMsg, ex);
+                }
             }
         }
         catch (Exception ex)
