@@ -1337,87 +1337,100 @@ public partial class Program
                     // Add this OrderRecord to the list
                     recordSet.OrderRecords.Add(orderRecord);
                     sequence++;
-                }
 
-                // Add separate tax line item after all product items
-                if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
-                    decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal totalTax) &&
-                    totalTax > 0)
-                {
-                    string taxAuthority = DetermineTaxAuthority(retailEvent, totalTax);
-
-                    var taxRecord = new OrderRecord
+                    // Add tax line item for this specific item (LineType = "XH")
+                    if (item.Taxes != null && item.Taxes.Count > 0)
                     {
-                        // Same transaction identifiers as items
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = "XH", // Tax line type per spec
-                        TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = sequence.ToString().PadLeft(5, '0'), // Next sequence number
-                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                        // Calculate total tax for this item
+                        decimal itemTaxTotal = 0;
+                        foreach (var tax in item.Taxes)
+                        {
+                            if (tax.Amount?.Value != null && decimal.TryParse(tax.Amount.Value, out decimal taxAmount))
+                            {
+                                itemTaxTotal += taxAmount;
+                            }
+                        }
 
-                        // Store Information
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
+                        // Only create tax line if there's a non-zero tax amount
+                        if (itemTaxTotal != 0)
+                        {
+                            string taxAuthority = DetermineTaxAuthority(retailEvent, itemTaxTotal);
 
-                        // Tax-specific fields - all tax flags set to N per spec
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+                            var taxRecord = new OrderRecord
+                            {
+                                // Same transaction identifiers as parent item
+                                TransType = mappedTransactionTypeSLFTTP,
+                                LineType = "XH", // Tax line type per spec
+                                TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                                TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                                TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                                TransSeq = sequence.ToString().PadLeft(5, '0'), // Next sequence number
+                                RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
-                        // Tax amount in ExtendedValue and ItemSellPrice
-                        ExtendedValue = FormatCurrency(retailEvent.Transaction.Totals.Tax.Value, 11),
-                        ExtendedValueNegativeSign = totalTax < 0 ? "-" : " ",
-                        ItemSellPrice = FormatCurrency(retailEvent.Transaction.Totals.Tax.Value, 9),
-                        SellPriceNegativeSign = totalTax < 0 ? "-" : " ",
+                                // Store Information
+                                PolledStore = polledStoreInt,
+                                PollCen = pollCen,
+                                PollDate = pollDate,
+                                CreateCen = createCen,
+                                CreateDate = createDate,
+                                CreateTime = createTime,
+                                Status = " ",
 
-                        // Blank fields for tax line
-                        SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
-                        Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
-                        QuantityNegativeSign = " ",
-                        OriginalPrice = "",
-                        OriginalPriceNegativeSign = " ",
-                        OriginalRetail = "",
-                        OriginalRetailNegativeSign = " ",
-                        ReferenceDesc = "", // Blank per spec
-                        CustomerName = "",
-                        CustomerNumber = "",
-                        ZipCode = "",
-                        Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                        EmployeeCardNumber = 0,
-                        UPCCode = "",
-                        EReceiptEmail = "",
-                        ReasonCode = "",
+                                // Tax-specific fields - all tax flags set to N per spec
+                                ChargedTax1 = "N",
+                                ChargedTax2 = "N",
+                                ChargedTax3 = "N",
+                                ChargedTax4 = "N",
+                                TaxAuthCode = PadOrTruncate(taxAuthority, 6),
 
-                        // Required fields with fixed values - per validation spec
-                        OriginalSalesperson = "00000", // SLFOSP - Required
-                        OriginalStore = "00000", // SLFOST - Required
-                        GroupDiscAmount = "000000000", // SLFGDA - Required
-                        GroupDiscSign = "", // SLFGDS - Empty string
-                        DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
-                        DiscountType = "", // SLFDST - Empty string
-                        DiscountAmountNegativeSign = "", // SLFDSN - Empty string
+                                // Tax amount in ExtendedValue and ItemSellPrice
+                                ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
+                                ExtendedValueNegativeSign = itemTaxTotal < 0 ? "-" : " ",
+                                ItemSellPrice = FormatCurrency(itemTaxTotal.ToString("F2"), 9),
+                                SellPriceNegativeSign = itemTaxTotal < 0 ? "-" : " ",
 
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        ItemScanned = "N"
-                    };
+                                // Blank fields for tax line
+                                SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
+                                Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
+                                QuantityNegativeSign = " ",
+                                OriginalPrice = "",
+                                OriginalPriceNegativeSign = " ",
+                                OriginalRetail = "",
+                                OriginalRetailNegativeSign = " ",
+                                ReferenceDesc = "", // Blank per spec
+                                CustomerName = "",
+                                CustomerNumber = "",
+                                ZipCode = "",
+                                Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                                EmployeeCardNumber = 0,
+                                UPCCode = "",
+                                EReceiptEmail = "",
+                                ReasonCode = "",
 
-                    recordSet.OrderRecords.Add(taxRecord);
-                    sequence++;
+                                // Required fields with fixed values - per validation spec
+                                OriginalSalesperson = "00000", // SLFOSP - Required
+                                OriginalStore = "00000", // SLFOST - Required
+                                GroupDiscAmount = "000000000", // SLFGDA - Required
+                                GroupDiscSign = "", // SLFGDS - Empty string
+                                DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
+                                DiscountType = "", // SLFDST - Empty string
+                                DiscountAmountNegativeSign = "", // SLFDSN - Empty string
+
+                                GroupDiscReason = "00",
+                                RegDiscReason = "00",
+                                OrderNumber = "",
+                                ProjectNumber = "",
+                                SalesStore = 0,
+                                InvStore = 0,
+                                ItemScanned = "N"
+                            };
+
+                            recordSet.OrderRecords.Add(taxRecord);
+                            sequence++;
+                        }
+                    }
                 }
+
             }
 
             // Map ALL tenders (not just first one) - create one TenderRecord per tender
