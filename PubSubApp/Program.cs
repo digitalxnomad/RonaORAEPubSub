@@ -1192,7 +1192,7 @@ public partial class Program
                         TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
 
                         // Transaction Identification - with proper padding
-                        TransNumber = PadNumeric(retailEvent.References?.SourceTransactionId, 5),
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each item
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1353,7 +1353,7 @@ public partial class Program
                         LineType = "XH", // Tax line type per spec
                         TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                         TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.References?.SourceTransactionId, 5),
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransSeq = sequence.ToString().PadLeft(5, '0'), // Next sequence number
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1434,7 +1434,7 @@ public partial class Program
 
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
-                        TransactionNumber = PadNumeric(retailEvent.References?.SourceTransactionId, 5),
+                        TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
                         RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1517,7 +1517,7 @@ public partial class Program
                 TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
                 TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
                 TransactionType = mappedTransactionTypeSLFTTP,
-                TransactionNumber = PadNumeric(retailEvent.References?.SourceTransactionId, 5),
+                TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                 TransactionSeq = "00001",
                 RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
                 PolledStore = polledStoreInt,
