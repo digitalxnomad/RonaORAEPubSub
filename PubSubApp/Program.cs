@@ -1165,9 +1165,9 @@ public partial class Program
 
             // Get current date/time for polling and creation timestamps
             DateTime now = DateTime.Now;
-            int pollCen = GetCentury(now);
+            int pollCen = 1;  // Always 1 per specification
             int pollDate = GetDateAsInt(now);
-            int createCen = pollCen;
+            int createCen = 1;  // Always 1 per specification
             int createDate = pollDate;
             int createTime = GetTimeAsInt(now);
 
