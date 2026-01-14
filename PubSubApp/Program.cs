@@ -1936,18 +1936,47 @@ public partial class Program
             }
 
             // Calculate effective tax rate from totals
-            if (retailEvent.Transaction?.Totals?.Subtotal?.Value != null &&
-                decimal.TryParse(retailEvent.Transaction.Totals.Subtotal.Value, out decimal subtotal) &&
-                subtotal > 0)
+            // Calculate subtotal as: Net - Tax (pre-tax amount)
+            if (retailEvent.Transaction?.Totals?.Net?.Value != null &&
+                decimal.TryParse(retailEvent.Transaction.Totals.Net.Value, out decimal netAmount))
             {
-                decimal effectiveRate = totalTax / subtotal;
+                decimal subtotal = netAmount - totalTax;
 
-                // Check if rate is close to 13% (HST)
-                if (Math.Abs(effectiveRate - 0.13m) < 0.01m)
-                    return "HON"; // ~13% = HST
-                // Check if rate is close to 5% (GST)
-                else if (Math.Abs(effectiveRate - 0.05m) < 0.01m)
-                    return "HON1"; // ~5% = GST
+                if (subtotal > 0)
+                {
+                    decimal effectiveRate = totalTax / subtotal;
+
+                    // Check if rate is close to 13% (HST)
+                    if (Math.Abs(effectiveRate - 0.13m) < 0.01m)
+                        return "HON"; // ~13% = HST
+                    // Check if rate is close to 5% (GST)
+                    else if (Math.Abs(effectiveRate - 0.05m) < 0.01m)
+                        return "HON1"; // ~5% = GST
+                }
+            }
+            // Alternative: Calculate subtotal as Gross - Discounts
+            else if (retailEvent.Transaction?.Totals?.Gross?.Value != null &&
+                     decimal.TryParse(retailEvent.Transaction.Totals.Gross.Value, out decimal grossAmount))
+            {
+                decimal discountAmount = 0;
+                if (retailEvent.Transaction?.Totals?.Discounts?.Value != null)
+                {
+                    decimal.TryParse(retailEvent.Transaction.Totals.Discounts.Value, out discountAmount);
+                }
+
+                decimal subtotal = grossAmount - discountAmount;
+
+                if (subtotal > 0)
+                {
+                    decimal effectiveRate = totalTax / subtotal;
+
+                    // Check if rate is close to 13% (HST)
+                    if (Math.Abs(effectiveRate - 0.13m) < 0.01m)
+                        return "HON"; // ~13% = HST
+                    // Check if rate is close to 5% (GST)
+                    else if (Math.Abs(effectiveRate - 0.05m) < 0.01m)
+                        return "HON1"; // ~5% = GST
+                }
             }
 
             // Check province to determine default
