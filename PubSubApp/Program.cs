@@ -1321,7 +1321,7 @@ public partial class Program
                     {
                         orderRecord.DiscountAmount = "000000000"; // SLFDSA - Must be "000000000" per validation
                         orderRecord.DiscountType = ""; // SLFDST - Must be empty string
-                        orderRecord.DiscountNegativeSign = ""; // SLFDSN - Must be empty string
+                        orderRecord.DiscountAmountNegativeSign = ""; // SLFDSN - Must be empty string
                     }
 
                     // Discount reasons - per CSV rules
@@ -1404,7 +1404,7 @@ public partial class Program
                         GroupDiscSign = "", // SLFGDS - Empty string
                         DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
                         DiscountType = "", // SLFDST - Empty string
-                        DiscountNegativeSign = "", // SLFDSN - Empty string
+                        DiscountAmountNegativeSign = "", // SLFDSN - Empty string
 
                         GroupDiscReason = "00",
                         RegDiscReason = "00",
