@@ -4,6 +4,7 @@ using PubSubApp;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -1228,12 +1229,8 @@ public partial class Program
                     // Parse item-level taxes
                     ParseItemTaxes(item, orderRecord, retailEvent);
 
-                    // Reference for line ID
-                    if (!string.IsNullOrEmpty(item.LineId))
-                    {
-                        orderRecord.ReferenceCode = "L";
-                        orderRecord.ReferenceDesc = PadOrTruncate(item.LineId, 16);
-                    }
+                    // Reference for line ID - per spec SLFRFD must be blank for item records
+                    orderRecord.ReferenceDesc = new string(' ', 16); // Always blank (16 spaces)
 
                     // Map reference transaction if this is a return or void
                     if (retailEvent.References?.SourceTransactionId != null &&
@@ -1252,7 +1249,10 @@ public partial class Program
                     // Customer fields - per CSV rules
                     orderRecord.CustomerName = new string(' ', 35); // SLFCNM - Always blank (35 spaces)
                     orderRecord.CustomerNumber = new string(' ', 10); // SLFNUM - Default blank (10 spaces)
-                    orderRecord.ZipCode = new string(' ', 10); // SLFZIP - Default blank (10 spaces)
+
+                    // SLFZIP - 9 spaces + EPP eligibility digit
+                    string eppDigit = DetermineEPPEligibility(item, retailEvent);
+                    orderRecord.ZipCode = new string(' ', 9) + eppDigit;
 
                     // Till/Clerk - SLFCLK (from till number)
                     orderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
@@ -1281,6 +1281,76 @@ public partial class Program
 
                     // Add this OrderRecord to the list
                     recordSet.OrderRecords.Add(orderRecord);
+                    sequence++;
+                }
+
+                // Add separate tax line item after all product items
+                if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
+                    decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal totalTax) &&
+                    totalTax > 0)
+                {
+                    string taxAuthority = DetermineTaxAuthority(retailEvent, totalTax);
+
+                    var taxRecord = new OrderRecord
+                    {
+                        // Same transaction identifiers as items
+                        TransType = mappedTransactionTypeSLFTTP,
+                        LineType = "XH", // Tax line type per spec
+                        TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransSeq = sequence.ToString().PadLeft(5, '0'), // Next sequence number
+                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+
+                        // Store Information
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+                        Status = " ",
+
+                        // Tax-specific fields - all tax flags set to N per spec
+                        ChargedTax1 = "N",
+                        ChargedTax2 = "N",
+                        ChargedTax3 = "N",
+                        ChargedTax4 = "N",
+                        TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+
+                        // Tax amount in ExtendedValue
+                        ExtendedValue = FormatCurrency(retailEvent.Transaction.Totals.Tax.Value, 11),
+                        ExtendedValueNegativeSign = totalTax < 0 ? "-" : " ",
+
+                        // Blank fields for tax line
+                        SKUNumber = new string('0', 9), // No SKU for tax line
+                        Quantity = new string('0', 9),
+                        QuantityNegativeSign = " ",
+                        OriginalPrice = new string('0', 9),
+                        OriginalPriceNegativeSign = " ",
+                        ItemSellPrice = new string('0', 9),
+                        SellPriceNegativeSign = " ",
+                        OriginalRetail = new string('0', 9),
+                        OriginalRetailNegativeSign = " ",
+                        ReferenceDesc = new string(' ', 16), // Blank per spec
+                        CustomerName = new string(' ', 35),
+                        CustomerNumber = new string(' ', 10),
+                        ZipCode = new string(' ', 10),
+                        Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                        EmployeeCardNumber = 0,
+                        UPCCode = new string(' ', 13),
+                        EReceiptEmail = new string(' ', 60),
+                        ReasonCode = new string(' ', 16),
+                        GroupDiscReason = "00",
+                        RegDiscReason = "00",
+                        OrderNumber = new string(' ', 8),
+                        ProjectNumber = new string(' ', 5),
+                        SalesStore = 0,
+                        InvStore = 0,
+                        ItemScanned = "N"
+                    };
+
+                    recordSet.OrderRecords.Add(taxRecord);
                     sequence++;
                 }
             }
@@ -1443,6 +1513,10 @@ public partial class Program
         // Parse item-level taxes and map to OrderRecord tax fields
         private void ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
         {
+            // Detect province/state for tax logic
+            string? province = GetProvince(retailEvent);
+            bool isOntario = province?.ToUpper() == "ON" || province?.ToUpper() == "ONTARIO";
+
             // Tax flags - default to N
             orderRecord.ChargedTax1 = "N";
             orderRecord.ChargedTax2 = "N";
@@ -1479,38 +1553,76 @@ public partial class Program
                     // Map tax type/category to ChargedTax1-4 flags
                     string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
 
-                    switch (taxType)
+                    // Ontario-specific logic: SLFTX2=N, SLFTX3=Y for HST
+                    if (isOntario)
                     {
-                        case "PST":
-                        case "PROVINCIAL":
-                        case "STATE":
-                            orderRecord.ChargedTax1 = "Y";
-                            break;
-                        case "GST":
-                        case "FEDERAL":
-                        case "VAT":
-                        case "NATIONAL":
-                            orderRecord.ChargedTax2 = "Y";
-                            break;
-                        case "HST":
-                        case "HARMONIZED":
-                            // HST is combined PST+GST
-                            orderRecord.ChargedTax1 = "Y";
-                            orderRecord.ChargedTax2 = "Y";
-                            break;
-                        case "QST":
-                        case "QUEBEC":
-                            orderRecord.ChargedTax3 = "Y";
-                            break;
-                        case "MUNICIPAL":
-                        case "LOCAL":
-                        case "CITY":
-                            orderRecord.ChargedTax4 = "Y";
-                            break;
-                        default:
-                            // Default unrecognized tax types to GST (Tax2)
-                            orderRecord.ChargedTax2 = "Y";
-                            break;
+                        switch (taxType)
+                        {
+                            case "HST":
+                            case "HARMONIZED":
+                                // Ontario HST goes to Tax3
+                                orderRecord.ChargedTax2 = "N"; // GST not separate
+                                orderRecord.ChargedTax3 = "Y"; // HST
+                                break;
+                            case "GST":
+                            case "FEDERAL":
+                                // GST only (rare in Ontario)
+                                orderRecord.ChargedTax2 = "N";
+                                orderRecord.ChargedTax3 = "Y";
+                                break;
+                            case "PST":
+                            case "PROVINCIAL":
+                                // PST (not used in Ontario, but if present)
+                                orderRecord.ChargedTax1 = "Y";
+                                break;
+                            case "MUNICIPAL":
+                            case "LOCAL":
+                            case "CITY":
+                                orderRecord.ChargedTax4 = "Y";
+                                break;
+                            default:
+                                // Default to HST for Ontario
+                                orderRecord.ChargedTax2 = "N";
+                                orderRecord.ChargedTax3 = "Y";
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        // Non-Ontario provinces: use original logic
+                        switch (taxType)
+                        {
+                            case "PST":
+                            case "PROVINCIAL":
+                            case "STATE":
+                                orderRecord.ChargedTax1 = "Y";
+                                break;
+                            case "GST":
+                            case "FEDERAL":
+                            case "VAT":
+                            case "NATIONAL":
+                                orderRecord.ChargedTax2 = "Y";
+                                break;
+                            case "HST":
+                            case "HARMONIZED":
+                                // HST is combined PST+GST for non-Ontario
+                                orderRecord.ChargedTax1 = "Y";
+                                orderRecord.ChargedTax2 = "Y";
+                                break;
+                            case "QST":
+                            case "QUEBEC":
+                                orderRecord.ChargedTax3 = "Y";
+                                break;
+                            case "MUNICIPAL":
+                            case "LOCAL":
+                            case "CITY":
+                                orderRecord.ChargedTax4 = "Y";
+                                break;
+                            default:
+                                // Default unrecognized tax types to GST (Tax2)
+                                orderRecord.ChargedTax2 = "Y";
+                                break;
+                        }
                     }
 
                     // Set tax authority code from first tax with authority
@@ -1546,7 +1658,16 @@ public partial class Program
                     decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
                     taxAmount > 0)
                 {
-                    orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
+                    // Ontario: SLFTX2=N, SLFTX3=Y
+                    if (isOntario)
+                    {
+                        orderRecord.ChargedTax2 = "N";
+                        orderRecord.ChargedTax3 = "Y";
+                    }
+                    else
+                    {
+                        orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
+                    }
 
                     // Tax authority and rate code from store's tax area
                     if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
@@ -1641,6 +1762,201 @@ public partial class Program
         {
             int year = date.Year;
             return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
+        }
+
+        // Get province/state from retail event (for tax logic)
+        private string? GetProvince(RetailEvent retailEvent)
+        {
+            // Try to extract province from tax area code
+            // Common patterns: "ON" for Ontario, "QC" for Quebec, etc.
+            string? taxArea = retailEvent.BusinessContext?.Store?.TaxArea;
+
+            if (!string.IsNullOrEmpty(taxArea))
+            {
+                // If tax area starts with province code, extract it
+                if (taxArea.Length >= 2)
+                {
+                    string prefix = taxArea.Substring(0, 2).ToUpper();
+
+                    // Canadian provinces
+                    if (prefix == "ON" || prefix == "QC" || prefix == "BC" ||
+                        prefix == "AB" || prefix == "MB" || prefix == "SK" ||
+                        prefix == "NS" || prefix == "NB" || prefix == "PE" ||
+                        prefix == "NL" || prefix == "YT" || prefix == "NT" || prefix == "NU")
+                    {
+                        return prefix;
+                    }
+                }
+
+                // Check if tax area contains province name
+                string taxAreaUpper = taxArea.ToUpper();
+                if (taxAreaUpper.Contains("ONTARIO") || taxAreaUpper.Contains("HON"))
+                    return "ON";
+                if (taxAreaUpper.Contains("QUEBEC"))
+                    return "QC";
+                if (taxAreaUpper.Contains("BRITISH") || taxAreaUpper.Contains("BC"))
+                    return "BC";
+            }
+
+            // TODO: Add province field to Store class for explicit province detection
+            // For now, return null if unable to detect
+            return null;
+        }
+
+        // Check if item is an EPP (Extended Protection Plan)
+        private bool IsEPPItem(TransactionItem item)
+        {
+            // Check if SKU indicates EPP
+            if (item.Item?.Sku != null)
+            {
+                string sku = item.Item.Sku.ToUpper();
+                if (sku.StartsWith("EPP") || sku.Contains("PROTECT") ||
+                    sku.Contains("WARRANTY") || sku.StartsWith("WTY") ||
+                    sku.StartsWith("WARR"))
+                    return true;
+            }
+
+            // Check item description
+            if (item.Item?.Description != null)
+            {
+                string desc = item.Item.Description.ToUpper();
+                if (desc.Contains("PROTECTION PLAN") || desc.Contains("WARRANTY") ||
+                    desc.Contains("EXTENDED PROTECTION") || desc.Contains("EPP"))
+                    return true;
+            }
+
+            return false;
+        }
+
+        // Check if SKU is eligible for EPP coverage
+        private bool IsSKUEligibleForEPP(string? sku)
+        {
+            // Business logic to determine if SKU can have EPP
+            // For now, assume most items are eligible (this would be configured per business rules)
+            // TODO: Implement SKU category lookup or eligibility table
+
+            if (string.IsNullOrEmpty(sku))
+                return false;
+
+            // EPP items themselves are not eligible for EPP
+            string skuUpper = sku.ToUpper();
+            if (skuUpper.StartsWith("EPP") || skuUpper.StartsWith("WTY") || skuUpper.StartsWith("WARR"))
+                return false;
+
+            // Most merchandise items are eligible
+            return true;
+        }
+
+        // Determine how many items an EPP covers
+        private int DetermineEPPCoveredItemCount(TransactionItem eppItem, RetailEvent retailEvent)
+        {
+            // Business logic to determine coverage count
+            // This could be based on:
+            // - EPP quantity
+            // - EPP metadata/description
+            // - Transaction-level EPP associations
+
+            // For now, use quantity as indicator
+            if (eppItem.Quantity != null && eppItem.Quantity.Value > 1)
+            {
+                return (int)eppItem.Quantity.Value;
+            }
+
+            // Default to single item coverage
+            return 1;
+        }
+
+        // Determine EPP eligibility digit for SLFZIP (last character)
+        private string DetermineEPPEligibility(TransactionItem item, RetailEvent retailEvent)
+        {
+            // Check if this item IS the EPP
+            if (IsEPPItem(item))
+                return "9";
+
+            // Check if EPP exists in transaction
+            bool hasEPP = retailEvent.Transaction?.Items?.Any(i => IsEPPItem(i)) ?? false;
+
+            if (!hasEPP)
+            {
+                // No EPP in transaction - check if this SKU is eligible
+                if (IsSKUEligibleForEPP(item.Item?.Sku))
+                    return "0"; // Eligible but no EPP
+                else
+                    return "0"; // Not eligible
+            }
+
+            // EPP exists - determine if this item is covered
+            var eppItem = retailEvent.Transaction?.Items?.FirstOrDefault(i => IsEPPItem(i));
+
+            if (eppItem != null)
+            {
+                int coveredItemCount = DetermineEPPCoveredItemCount(eppItem, retailEvent);
+
+                if (coveredItemCount == 1)
+                    return "1"; // Single item coverage
+                else if (coveredItemCount > 1)
+                    return "2"; // Multi-item coverage
+            }
+
+            // Default
+            return "0";
+        }
+
+        // Determine tax authority code based on tax rate and jurisdiction
+        private string DetermineTaxAuthority(RetailEvent retailEvent, decimal totalTax)
+        {
+            // Check item-level taxes for rate information
+            if (retailEvent.Transaction?.Items != null)
+            {
+                foreach (var item in retailEvent.Transaction.Items)
+                {
+                    if (item.Taxes != null)
+                    {
+                        foreach (var tax in item.Taxes)
+                        {
+                            if (tax.TaxRate != null)
+                            {
+                                decimal rate = tax.TaxRate.Value;
+
+                                // HST is 13% in Ontario
+                                if (Math.Abs(rate - 0.13m) < 0.001m)
+                                    return "HON"; // 13% HST
+
+                                // GST is 5% federal
+                                if (Math.Abs(rate - 0.05m) < 0.001m)
+                                    return "HON1"; // 5% GST
+                            }
+
+                            // Check tax authority from tax detail
+                            if (!string.IsNullOrEmpty(tax.TaxAuthority))
+                                return PadOrTruncate(tax.TaxAuthority, 6) ?? "HON";
+                        }
+                    }
+                }
+            }
+
+            // Calculate effective tax rate from totals
+            if (retailEvent.Transaction?.Totals?.Subtotal?.Value != null &&
+                decimal.TryParse(retailEvent.Transaction.Totals.Subtotal.Value, out decimal subtotal) &&
+                subtotal > 0)
+            {
+                decimal effectiveRate = totalTax / subtotal;
+
+                // Check if rate is close to 13% (HST)
+                if (Math.Abs(effectiveRate - 0.13m) < 0.01m)
+                    return "HON"; // ~13% = HST
+                // Check if rate is close to 5% (GST)
+                else if (Math.Abs(effectiveRate - 0.05m) < 0.01m)
+                    return "HON1"; // ~5% = GST
+            }
+
+            // Check province to determine default
+            string? province = GetProvince(retailEvent);
+            if (province?.ToUpper() == "ON" || province?.ToUpper() == "ONTARIO")
+                return "HON"; // Ontario defaults to HST
+
+            // Default to HON for unknown cases
+            return "HON";
         }
  
         private string MapTransTypeSLFTTP(string input)
