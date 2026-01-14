@@ -258,6 +258,7 @@ public partial class Program
             Console.WriteLine("Validating RecordSet output...");
             SimpleLogger.LogInfo("Validating RecordSet output...");
             var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
+                        
             if (outputErrors.Count > 0)
             {
                 string errorMessage = $"✗ RecordSet validation failed with {outputErrors.Count} error(s):\n" +
