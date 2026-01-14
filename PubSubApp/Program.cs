@@ -1232,10 +1232,10 @@ public partial class Program
                         orderRecord.OriginalRetailNegativeSign = sign;
                     }
 
-                    // Sell Price (unit price after discounts) - 9-digits without decimal
-                    if (item.Pricing?.UnitPrice?.Value != null)
+                    // Sell Price (extended price) - 9-digits without decimal
+                    if (item.Pricing?.ExtendedPrice?.Value != null)
                     {
-                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
+                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 9);
                         orderRecord.ItemSellPrice = amount;
                         orderRecord.SellPriceNegativeSign = sign;
                     }
