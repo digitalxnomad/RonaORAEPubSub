@@ -1089,7 +1089,7 @@ public partial class Program
         [JsonPropertyName("taxRate")]
         public decimal? TaxRate { get; set; }
 
-        [JsonPropertyName("taxAmount")]
+        [JsonPropertyName("amount")]
         public CurrencyAmount? TaxAmount { get; set; }
 
         [JsonPropertyName("taxableAmount")]
