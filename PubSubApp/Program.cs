@@ -1291,22 +1291,9 @@ public partial class Program
                     orderRecord.CustomerName = ""; // SLFCNM - Always blank
                     orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
 
-                    // SLFZIP - Postal code with EPP eligibility digit (optional per validation spec)
-                    // Only populate if there's actual customer postal code data, otherwise leave empty
-                    string? customerPostalCode = retailEvent.Transaction?.Customer?.Address?.PostalCode;
-                    if (!string.IsNullOrEmpty(customerPostalCode))
-                    {
-                        // If we have a real postal code, use it with EPP digit as last character
-                        string eppDigit = DetermineEPPEligibility(item, retailEvent);
-                        // Take first 9 chars of postal code and append EPP digit (max 10 chars per validation)
-                        string basePostalCode = customerPostalCode.Length > 9 ? customerPostalCode.Substring(0, 9) : customerPostalCode.PadRight(9, ' ');
-                        orderRecord.ZipCode = basePostalCode + eppDigit;
-                    }
-                    else
-                    {
-                        // No postal code available - leave empty to omit validation (per validate:"omitempty,max=10")
-                        orderRecord.ZipCode = "";
-                    }
+                    // SLFZIP - Leave empty to omit validation (per validate:"omitempty,max=10")
+                    // Customer postal code data not available in ORAE Transaction structure
+                    orderRecord.ZipCode = "";
 
                     // Till/Clerk - SLFCLK (from till number)
                     orderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
