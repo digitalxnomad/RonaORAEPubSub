@@ -1339,7 +1339,7 @@ public partial class Program
                     sequence++;
 
                     // Add tax line item for this specific item (LineType = "XH")
-                    if (item.Taxes != null && item.Taxes.Count > 0)
+                    if (item.Taxes != null)
                     {
                         // Calculate total tax for this item
                         decimal itemTaxTotal = 0;
