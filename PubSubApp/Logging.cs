@@ -48,5 +48,10 @@ namespace PubSubApp
         {
             Log($"DEBUG: {message}");
         }
+
+        public static void LogWarning(string message)
+        {
+            Log($"WARNING: {message}");
+        }
     }
 }
