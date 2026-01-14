@@ -1374,9 +1374,11 @@ public partial class Program
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate(taxAuthority, 6),
 
-                        // Tax amount in ExtendedValue
+                        // Tax amount in ExtendedValue and ItemSellPrice
                         ExtendedValue = FormatCurrency(retailEvent.Transaction.Totals.Tax.Value, 11),
                         ExtendedValueNegativeSign = totalTax < 0 ? "-" : " ",
+                        ItemSellPrice = FormatCurrency(retailEvent.Transaction.Totals.Tax.Value, 9),
+                        SellPriceNegativeSign = totalTax < 0 ? "-" : " ",
 
                         // Blank fields for tax line
                         SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
@@ -1384,8 +1386,6 @@ public partial class Program
                         QuantityNegativeSign = " ",
                         OriginalPrice = "",
                         OriginalPriceNegativeSign = " ",
-                        ItemSellPrice = "",
-                        SellPriceNegativeSign = " ",
                         OriginalRetail = "",
                         OriginalRetailNegativeSign = " ",
                         ReferenceDesc = "", // Blank per spec
