@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecordSet Output Validation - RIMSLF/RIMTNF</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .required {
+            background-color: #e8f5e9;
+        }
+        .optional {
+            background-color: #fff3e0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .section {
+            margin: 30px 0;
+        }
+        .note {
+            background-color: #fff9c4;
+            padding: 15px;
+            border-left: 4px solid #fbc02d;
+            margin: 20px 0;
+        }
+        .checkmark {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        @media print {
+            body {
+                margin: 20px;
+            }
+            table {
+                font-size: 10pt;
+            }
+            h1 {
+                page-break-before: always;
+            }
+            h1:first-of-type {
+                page-break-before: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>RecordSet Output Validation Tables</h1>
+    <p><strong>Schema:</strong> ORAE v2.0.0 → RIMSLF/RIMTNF (MMS Database Format)</p>
+    <p><strong>Generated:</strong> January 14, 2026</p>
+
+    <div class="section">
+        <h2>Overview</h2>
+        <p>This document describes the validation rules and field formatting requirements for the RecordSet output JSON, which contains OrderRecord (RIMSLF) and TenderRecord (RIMTNF) data structures.</p>
+
+        <div class="note">
+            <strong>Key Points:</strong>
+            <ul>
+                <li>All string fields must match exact MinimumLength = MaxLength requirements</li>
+                <li>Numeric IDs are zero-padded on the left</li>
+                <li>Currency amounts are zero-padded on the left</li>
+                <li>Text fields are space-padded on the right</li>
+                <li>Sign fields are exactly 1 character (space or "-")</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>RIMSLF (OrderRecord) Validation</h2>
+
+        <h3>Required Fields (Always Validated)</h3>
+        <table class="required">
+            <thead>
+                <tr>
+                    <th>Field Name</th>
+                    <th>JSON Property</th>
+                    <th>Type</th>
+                    <th>Min/Max Length</th>
+                    <th>Validation Rule</th>
+                    <th>Padding Strategy</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>TransType</td>
+                    <td>SLFTTP</td>
+                    <td>string</td>
+                    <td>2/2</td>
+                    <td>Required, not null/empty</td>
+                    <td>Spaces</td>
+                    <td><code>"01"</code></td>
+                </tr>
+                <tr>
+                    <td>LineType</td>
+                    <td>SLFLNT</td>
+                    <td>string</td>
+                    <td>2/2</td>
+                    <td>Required, not null/empty</td>
+                    <td>Spaces</td>
+                    <td><code>"01"</code></td>
+                </tr>
+                <tr>
+                    <td>TransDate</td>
+                    <td>SLFTDT</td>
+                    <td>string</td>
+                    <td>6/6</td>
+                    <td>Required, not null/empty</td>
+                    <td>N/A (formatted)</td>
+                    <td><code>"260114"</code></td>
+                </tr>
+                <tr>
+                    <td>TransTime</td>
+                    <td>SLFTTM</td>
+                    <td>string</td>
+                    <td>6/6</td>
+                    <td>Required, not null/empty</td>
+                    <td>N/A (formatted)</td>
+                    <td><code>"143000"</code></td>
+                </tr>
+                <tr>
+                    <td>TransNumber</td>
+                    <td>SLFTTX</td>
+                    <td>string</td>
+                    <td>5/5</td>
+                    <td>Required, not null/empty</td>
+                    <td><strong>Zeros (left)</strong></td>
+                    <td><code>"00123"</code></td>
+                </tr>
+                <tr>
+                    <td>TransSeq</td>
+                    <td>SLFTSQ</td>
+                    <td>string</td>
+                    <td>5/5</td>
+                    <td>Required, not null/empty</td>
+                    <td>Zeros (left)</td>
+                    <td><code>"00001"</code></td>
+                </tr>
+                <tr>
+                    <td>RegisterID</td>
+                    <td>SLFREG</td>
+                    <td>string</td>
+                    <td>3/3</td>
+                    <td>Required, not null/empty</td>
+                    <td>Spaces (right)</td>
+                    <td><code>"001"</code></td>
+                </tr>
+                <tr>
+                    <td>SKUNumber</td>
+                    <td>SLFSKU</td>
+                    <td>string</td>
+                    <td>9/9</td>
+                    <td>Required, not null/empty</td>
+                    <td><strong>Zeros (left)</strong></td>
+                    <td><code>"000012345"</code></td>
+                </tr>
+                <tr>
+                    <td>PolledStore</td>
+                    <td>SLFPLC</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>12345</code></td>
+                </tr>
+                <tr>
+                    <td>PollCen</td>
+                    <td>SLFPCN</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be 0-9</td>
+                    <td>N/A</td>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <td>PollDate</td>
+                    <td>SLFPDT</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>260114</code></td>
+                </tr>
+                <tr>
+                    <td>CreateCen</td>
+                    <td>SLFCCN</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be 0-9</td>
+                    <td>N/A</td>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <td>CreateDate</td>
+                    <td>SLFCDT</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>260114</code></td>
+                </tr>
+                <tr>
+                    <td>CreateTime</td>
+                    <td>SLFCTM</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>143000</code></td>
+                </tr>
+                <tr>
+                    <td>Quantity</td>
+                    <td>SLFQTY</td>
+                    <td>string</td>
+                    <td>9/9</td>
+                    <td>Required, not null/empty</td>
+                    <td>Zeros (left)</td>
+                    <td><code>"000000200"</code></td>
+                </tr>
+                <tr>
+                    <td>ItemSellPrice</td>
+                    <td>SLFSEL</td>
+                    <td>string</td>
+                    <td>9/9</td>
+                    <td>Required, not null/empty</td>
+                    <td>Zeros (left)</td>
+                    <td><code>"000002999"</code></td>
+                </tr>
+                <tr>
+                    <td>ExtendedValue</td>
+                    <td>SLFEXT</td>
+                    <td>string</td>
+                    <td>11/11</td>
+                    <td>Required, not null/empty</td>
+                    <td>Zeros (left)</td>
+                    <td><code>"00000005998"</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Tax-Related Fields</h3>
+        <table class="optional">
+            <thead>
+                <tr>
+                    <th>Field Name</th>
+                    <th>JSON Property</th>
+                    <th>Min/Max Length</th>
+                    <th>Default Value</th>
+                    <th>Source</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ChargedTax1</td>
+                    <td>SLFTX1</td>
+                    <td>1/1</td>
+                    <td>"Y" or "N"</td>
+                    <td>PST/Provincial/State</td>
+                    <td><code>"N"</code></td>
+                </tr>
+                <tr>
+                    <td>ChargedTax2</td>
+                    <td>SLFTX2</td>
+                    <td>1/1</td>
+                    <td>"Y" or "N"</td>
+                    <td>GST/Federal/VAT</td>
+                    <td><code>"Y"</code></td>
+                </tr>
+                <tr>
+                    <td>ChargedTax3</td>
+                    <td>SLFTX3</td>
+                    <td>1/1</td>
+                    <td>"Y" or "N"</td>
+                    <td>QST/Quebec</td>
+                    <td><code>"N"</code></td>
+                </tr>
+                <tr>
+                    <td>ChargedTax4</td>
+                    <td>SLFTX4</td>
+                    <td>1/1</td>
+                    <td>"Y" or "N"</td>
+                    <td>Municipal/Local</td>
+                    <td><code>"N"</code></td>
+                </tr>
+                <tr>
+                    <td>TaxAuthCode</td>
+                    <td>SLFACD</td>
+                    <td>6/6</td>
+                    <td>From taxes or store</td>
+                    <td>item.taxes[].taxAuthority</td>
+                    <td><code>"CANREV"</code></td>
+                </tr>
+                <tr>
+                    <td>TaxRateCode</td>
+                    <td>SLFTCD</td>
+                    <td>6/6</td>
+                    <td>From taxes or store</td>
+                    <td>item.taxes[].taxCode</td>
+                    <td><code>"GST001"</code></td>
+                </tr>
+                <tr>
+                    <td>TaxExemptId1</td>
+                    <td>SLFTE1</td>
+                    <td>20/20</td>
+                    <td>20 spaces</td>
+                    <td>item.taxes[].exemptReason</td>
+                    <td><code>"FOOD-BASIC         "</code></td>
+                </tr>
+                <tr>
+                    <td>TaxExemptId2</td>
+                    <td>SLFTE2</td>
+                    <td>20/20</td>
+                    <td>20 spaces</td>
+                    <td>Not populated</td>
+                    <td><code>"                    "</code></td>
+                </tr>
+                <tr>
+                    <td>TaxExemptionName</td>
+                    <td>SLFTEN</td>
+                    <td>35/35</td>
+                    <td>35 spaces</td>
+                    <td>Not populated</td>
+                    <td><code>"                                   "</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Blank/Default Fields (Space-Padded)</h3>
+        <table class="optional">
+            <thead>
+                <tr>
+                    <th>Field Name</th>
+                    <th>JSON Property</th>
+                    <th>Min/Max Length</th>
+                    <th>Default Value</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Status</td>
+                    <td>SLFSTS</td>
+                    <td>1/1</td>
+                    <td>" " (space)</td>
+                    <td>Space for active</td>
+                </tr>
+                <tr>
+                    <td>CustomerName</td>
+                    <td>SLFCNM</td>
+                    <td>35/35</td>
+                    <td>35 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>CustomerNumber</td>
+                    <td>SLFNUM</td>
+                    <td>10/10</td>
+                    <td>10 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>ZipCode</td>
+                    <td>SLFZIP</td>
+                    <td>10/10</td>
+                    <td>10 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>UPCCode</td>
+                    <td>SLFUPC</td>
+                    <td>13/13</td>
+                    <td>13 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>EReceiptEmail</td>
+                    <td>SLFEML</td>
+                    <td>60/60</td>
+                    <td>60 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>ReasonCode</td>
+                    <td>SLFRSN</td>
+                    <td>16/16</td>
+                    <td>16 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>OrderNumber</td>
+                    <td>SLFORD</td>
+                    <td>8/8</td>
+                    <td>8 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>ProjectNumber</td>
+                    <td>ASFPRO</td>
+                    <td>5/5</td>
+                    <td>5 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>GroupDiscReason</td>
+                    <td>SLFGDR</td>
+                    <td>2/2</td>
+                    <td>"00"</td>
+                    <td>Always '00'</td>
+                </tr>
+                <tr>
+                    <td>RegDiscReason</td>
+                    <td>SLFRDR</td>
+                    <td>2/2</td>
+                    <td>"00"</td>
+                    <td>Default '00'</td>
+                </tr>
+                <tr>
+                    <td>SalesStore</td>
+                    <td>ASFSST</td>
+                    <td>int</td>
+                    <td>0</td>
+                    <td>Always 0</td>
+                </tr>
+                <tr>
+                    <td>InvStore</td>
+                    <td>ASFIST</td>
+                    <td>int</td>
+                    <td>0</td>
+                    <td>Always 0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>RIMTNF (TenderRecord) Validation</h2>
+
+        <h3>Required Fields (Always Validated)</h3>
+        <table class="required">
+            <thead>
+                <tr>
+                    <th>Field Name</th>
+                    <th>JSON Property</th>
+                    <th>Type</th>
+                    <th>Min/Max Length</th>
+                    <th>Validation Rule</th>
+                    <th>Padding Strategy</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>TransactionType</td>
+                    <td>TNFTTP</td>
+                    <td>string</td>
+                    <td>2/2</td>
+                    <td>Required, not null/empty</td>
+                    <td>Spaces</td>
+                    <td><code>"01"</code></td>
+                </tr>
+                <tr>
+                    <td>TransactionDate</td>
+                    <td>TNFTDT</td>
+                    <td>string</td>
+                    <td>6/6</td>
+                    <td>Required, not null/empty</td>
+                    <td>N/A (formatted)</td>
+                    <td><code>"260114"</code></td>
+                </tr>
+                <tr>
+                    <td>TransactionTime</td>
+                    <td>TNFTTM</td>
+                    <td>string</td>
+                    <td>6/6</td>
+                    <td>Required, not null/empty</td>
+                    <td>N/A (formatted)</td>
+                    <td><code>"143000"</code></td>
+                </tr>
+                <tr>
+                    <td>TransactionNumber</td>
+                    <td>TNFTTX</td>
+                    <td>string</td>
+                    <td>5/5</td>
+                    <td>Required, not null/empty</td>
+                    <td><strong>Zeros (left)</strong></td>
+                    <td><code>"00123"</code></td>
+                </tr>
+                <tr>
+                    <td>TransactionSeq</td>
+                    <td>TNFTSQ</td>
+                    <td>string</td>
+                    <td>5/5</td>
+                    <td>Required, not null/empty</td>
+                    <td>Zeros (left)</td>
+                    <td><code>"00001"</code></td>
+                </tr>
+                <tr>
+                    <td>RegisterID</td>
+                    <td>TNFREG</td>
+                    <td>string</td>
+                    <td>3/3</td>
+                    <td>Required, not null/empty</td>
+                    <td>Spaces (right)</td>
+                    <td><code>"001"</code></td>
+                </tr>
+                <tr>
+                    <td>FundCode</td>
+                    <td>TNFFCD</td>
+                    <td>string</td>
+                    <td>2/2</td>
+                    <td>Required, not null/empty</td>
+                    <td>N/A</td>
+                    <td><code>"CA"</code></td>
+                </tr>
+                <tr>
+                    <td>Amount</td>
+                    <td>TNFAMT</td>
+                    <td>string</td>
+                    <td>11/11</td>
+                    <td>Required, not null/empty</td>
+                    <td>Zeros (left)</td>
+                    <td><code>"00000009145"</code></td>
+                </tr>
+                <tr>
+                    <td>PolledStore</td>
+                    <td>TNFPLC</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>12345</code></td>
+                </tr>
+                <tr>
+                    <td>PollCen</td>
+                    <td>TNFPCN</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be 0-9</td>
+                    <td>N/A</td>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <td>PollDate</td>
+                    <td>TNFPDT</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>260114</code></td>
+                </tr>
+                <tr>
+                    <td>CreateCen</td>
+                    <td>TNFCCN</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be 0-9</td>
+                    <td>N/A</td>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <td>CreateDate</td>
+                    <td>TNFCDT</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>260114</code></td>
+                </tr>
+                <tr>
+                    <td>CreateTime</td>
+                    <td>TNFCTM</td>
+                    <td>int</td>
+                    <td>-</td>
+                    <td>Must be &gt; 0</td>
+                    <td>N/A</td>
+                    <td><code>143000</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Fund Code Mapping</h3>
+        <table class="optional">
+            <thead>
+                <tr>
+                    <th>Tender Method</th>
+                    <th>Fund Code (TNFFCD)</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>CASH</td><td>CA</td><td>Cash</td></tr>
+                <tr><td>CHECK, CHEQUE</td><td>CH</td><td>Cheque</td></tr>
+                <tr><td>DEBIT, DEBIT_CARD</td><td>DC</td><td>Debit Card</td></tr>
+                <tr><td>VISA</td><td>VI</td><td>Visa</td></tr>
+                <tr><td>MASTERCARD, MASTER_CARD</td><td>MA</td><td>Mastercard</td></tr>
+                <tr><td>AMEX, AMERICAN_EXPRESS</td><td>AX</td><td>American Express</td></tr>
+                <tr><td>GIFT_CARD</td><td>PG</td><td>Gift Card</td></tr>
+                <tr><td>COUPON</td><td>CP</td><td>Coupon</td></tr>
+                <tr><td>TRAVELLERS_CHEQUE</td><td>TC</td><td>Travellers Cheque</td></tr>
+                <tr><td>US_CASH</td><td>US</td><td>US Cash</td></tr>
+                <tr><td>FLEXITI</td><td>FX</td><td>Flexiti</td></tr>
+                <tr><td>WEB_SALE</td><td>PL</td><td>Web Sale</td></tr>
+                <tr><td>PENNY_ROUNDING</td><td>PR</td><td>Penny Rounding</td></tr>
+                <tr><td>CHANGE</td><td>ZZ</td><td>Change</td></tr>
+                <tr><td>Default</td><td>CA</td><td>Cash (fallback)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Blank/Default Fields (Space-Padded)</h3>
+        <table class="optional">
+            <thead>
+                <tr>
+                    <th>Field Name</th>
+                    <th>JSON Property</th>
+                    <th>Min/Max Length</th>
+                    <th>Default Value</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Status</td>
+                    <td>TNFSTS</td>
+                    <td>1/1</td>
+                    <td>" " (space)</td>
+                    <td>Space for active</td>
+                </tr>
+                <tr>
+                    <td>CreditCardNumber</td>
+                    <td>TNFCCD</td>
+                    <td>19/19</td>
+                    <td>19 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>CardExpirationDate</td>
+                    <td>TNFEXP</td>
+                    <td>4/4</td>
+                    <td>4 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>AuthNumber</td>
+                    <td>TNFAUT</td>
+                    <td>6/6</td>
+                    <td>6 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>MagStripeFlag</td>
+                    <td>TNFMSR</td>
+                    <td>1/1</td>
+                    <td>" " (space)</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>PaymentHashValue</td>
+                    <td>TNFHSH</td>
+                    <td>64/64</td>
+                    <td>64 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>CustomerMember</td>
+                    <td>TNFMBR</td>
+                    <td>8/8</td>
+                    <td>8 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>PostalCode</td>
+                    <td>TNFZIP</td>
+                    <td>10/10</td>
+                    <td>10 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>EmployeeSaleId</td>
+                    <td>TNFESI</td>
+                    <td>5/5</td>
+                    <td>"#####" or 5 spaces</td>
+                    <td>"#####" if TransType = "04"</td>
+                </tr>
+                <tr>
+                    <td>EReceiptEmail</td>
+                    <td>TNFEML</td>
+                    <td>60/60</td>
+                    <td>60 spaces</td>
+                    <td>Default blank</td>
+                </tr>
+                <tr>
+                    <td>OriginalTransNumber</td>
+                    <td>ATFOTX</td>
+                    <td>5/5</td>
+                    <td>5 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>CustomerType</td>
+                    <td>ATFMBT</td>
+                    <td>1/1</td>
+                    <td>" " (space)</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>OrderNumber</td>
+                    <td>ATFORD</td>
+                    <td>8/8</td>
+                    <td>8 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>ProjectNumber</td>
+                    <td>ATFPRO</td>
+                    <td>5/5</td>
+                    <td>5 spaces</td>
+                    <td>Always blank</td>
+                </tr>
+                <tr>
+                    <td>SalesStore</td>
+                    <td>ATFSST</td>
+                    <td>int</td>
+                    <td>0</td>
+                    <td>Always 0</td>
+                </tr>
+                <tr>
+                    <td>InvStore</td>
+                    <td>ATFIST</td>
+                    <td>int</td>
+                    <td>0</td>
+                    <td>Always 0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Helper Methods Summary</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Purpose</th>
+                    <th>Input Example</th>
+                    <th>Output Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>PadNumeric(value, length)</code></td>
+                    <td>Zero-pad numeric fields left</td>
+                    <td>("123", 5)</td>
+                    <td>"00123"</td>
+                </tr>
+                <tr>
+                    <td><code>PadOrTruncate(value, length)</code></td>
+                    <td>Space-pad text fields right</td>
+                    <td>("ABC", 5)</td>
+                    <td>"ABC  "</td>
+                </tr>
+                <tr>
+                    <td><code>FormatCurrency(value, length)</code></td>
+                    <td>Convert currency to cents, zero-pad</td>
+                    <td>("12.50", 9)</td>
+                    <td>"000001250"</td>
+                </tr>
+                <tr>
+                    <td><code>FormatCurrencyWithSign(value, length)</code></td>
+                    <td>Convert currency with sign field</td>
+                    <td>("-12.50", 9)</td>
+                    <td>("000001250", "-")</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Validation Summary</h2>
+
+        <h3>RecordSet Level Validation</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Validation</th>
+                    <th>Rule</th>
+                    <th>Error Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>RecordSet null check</td>
+                    <td>RecordSet must not be null</td>
+                    <td>"RecordSet is null"</td>
+                </tr>
+                <tr>
+                    <td>Empty check</td>
+                    <td>At least one OrderRecord or TenderRecord must exist</td>
+                    <td>"RecordSet contains no OrderRecords or TenderRecords"</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Field Type Padding Summary</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Field Type</th>
+                    <th>Padding Strategy</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Numeric IDs</strong> (TransNumber, SKUNumber)</td>
+                    <td><strong>Zero-padded left</strong></td>
+                    <td>"00123" (5 chars)</td>
+                </tr>
+                <tr>
+                    <td><strong>Currency amounts</strong></td>
+                    <td><strong>Zero-padded left</strong></td>
+                    <td>"000001250" (9 chars)</td>
+                </tr>
+                <tr>
+                    <td><strong>Text/alphanumeric fields</strong></td>
+                    <td><strong>Space-padded right</strong></td>
+                    <td>"ABC  " (5 chars)</td>
+                </tr>
+                <tr>
+                    <td><strong>Sign fields</strong></td>
+                    <td><strong>Space for positive, "-" for negative</strong></td>
+                    <td>" " or "-" (1 char)</td>
+                </tr>
+                <tr>
+                    <td><strong>Flag fields</strong></td>
+                    <td><strong>No padding</strong></td>
+                    <td>"Y" or "N"</td>
+                </tr>
+                <tr>
+                    <td><strong>Century digits</strong></td>
+                    <td><strong>Range 0-9</strong></td>
+                    <td>0 (for 2000-2099)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Key Validation Points</h3>
+        <ul class="checkmark">
+            <li>✓ All required fields must not be null/empty</li>
+            <li>✓ All string fields must match exact MinimumLength = MaxLength</li>
+            <li>✓ Century fields (PollCen, CreateCen) must be 0-9 (0 is valid for 2000-2099)</li>
+            <li>✓ Store fields (PolledStore, CreateDate, CreateTime, PollDate) must be &gt; 0</li>
+            <li>✓ Numeric IDs are zero-padded on the left</li>
+            <li>✓ Blank text fields are space-padded to exact length</li>
+            <li>✓ Blank currency fields are zero-padded to exact length</li>
+            <li>✓ Sign fields are always exactly 1 character (space or "-")</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Tax Type Mapping Reference</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Input Tax Type</th>
+                    <th>ChargedTax1 (SLFTX1)</th>
+                    <th>ChargedTax2 (SLFTX2)</th>
+                    <th>ChargedTax3 (SLFTX3)</th>
+                    <th>ChargedTax4 (SLFTX4)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PST/Provincial/State</td>
+                    <td class="checkmark">✓</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>GST/Federal/VAT/National</td>
+                    <td></td>
+                    <td class="checkmark">✓</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>HST/Harmonized</td>
+                    <td class="checkmark">✓</td>
+                    <td class="checkmark">✓</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>QST/Quebec</td>
+                    <td></td>
+                    <td></td>
+                    <td class="checkmark">✓</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Municipal/Local/City</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="checkmark">✓</td>
+                </tr>
+                <tr>
+                    <td>Unknown</td>
+                    <td></td>
+                    <td class="checkmark">✓</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="note">
+        <p><strong>Document Information:</strong></p>
+        <ul>
+            <li>Schema Version: ORAE v2.0.0</li>
+            <li>Output Format: RIMSLF/RIMTNF (MMS Database Format)</li>
+            <li>Validation Method: <code>ValidateRecordSetOutput()</code></li>
+            <li>Implementation: Program.cs lines 1875-1984</li>
+        </ul>
+    </div>
+</body>
+</html>
