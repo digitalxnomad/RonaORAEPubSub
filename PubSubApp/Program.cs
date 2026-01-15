@@ -1248,6 +1248,10 @@ public partial class Program
                         orderRecord.ExtendedValueNegativeSign = sign;
                     }
 
+                    // Override Price - default to zeros if not present
+                    orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
+                    orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
+
                     // Calculate discount if unit price differs from original
                     if (item.Pricing?.OriginalUnitPrice?.Value != null &&
                         item.Pricing?.UnitPrice?.Value != null &&
@@ -1395,6 +1399,8 @@ public partial class Program
                                 QuantityNegativeSign = " ",
                                 OriginalPrice = "",
                                 OriginalPriceNegativeSign = " ",
+                                OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
+                                OverridePriceNegativeSign = "", // SLFOVN - Empty string
                                 OriginalRetail = "",
                                 OriginalRetailNegativeSign = " ",
                                 ReferenceDesc = "", // Blank per spec
