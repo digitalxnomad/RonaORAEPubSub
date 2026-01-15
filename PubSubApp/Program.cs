@@ -1275,9 +1275,8 @@ public partial class Program
                     // Parse item-level taxes
                     ParseItemTaxes(item, orderRecord, retailEvent);
 
-                    // Reference for line ID - SLFRFD contains 5-digit transaction number, padded to 16 chars
-                    string transNum = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5);
-                    orderRecord.ReferenceDesc = PadOrTruncate(string.IsNullOrEmpty(transNum) ? "00000" : transNum, 16);
+                    // Reference for line ID - SLFRFD contains transaction number, right justified with zeros to 16 chars
+                    orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16);
 
                     // Map reference transaction if this is a return or void
                     if (retailEvent.References?.SourceTransactionId != null &&
@@ -1405,10 +1404,7 @@ public partial class Program
                                 OverridePriceNegativeSign = "", // SLFOVN - Empty string
                                 OriginalRetail = "",
                                 OriginalRetailNegativeSign = " ",
-                                ReferenceDesc = PadOrTruncate(
-                                    string.IsNullOrEmpty(PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))
-                                    ? "00000"
-                                    : PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5), 16), // SLFRFD - 5-digit trans number padded to 16
+                                ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
                                 CustomerName = "",
                                 CustomerNumber = "",
                                 ZipCode = "",
