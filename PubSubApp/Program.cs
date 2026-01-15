@@ -1195,7 +1195,7 @@ public partial class Program
                         // Transaction Identification - with proper padding
                         TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each item
-                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                         // Store Information
                         PolledStore = polledStoreInt,
@@ -1296,8 +1296,8 @@ public partial class Program
                     // Customer postal code data not available in ORAE Transaction structure
                     orderRecord.ZipCode = "";
 
-                    // Till/Clerk - SLFCLK (from till number)
-                    orderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
+                    // Till/Clerk - SLFCLK (from till number) - right justified with zeros
+                    orderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
 
                     // Employee fields - per CSV rules
                     orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
@@ -1366,7 +1366,7 @@ public partial class Program
                                 TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                                 TransSeq = sequence.ToString().PadLeft(5, '0'), // Next sequence number
-                                RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                                RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                                 // Store Information
                                 PolledStore = polledStoreInt,
@@ -1402,7 +1402,7 @@ public partial class Program
                                 CustomerName = "",
                                 CustomerNumber = "",
                                 ZipCode = "",
-                                Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                                Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                                 EmployeeCardNumber = 0,
                                 UPCCode = "",
                                 EReceiptEmail = "",
@@ -1450,7 +1450,7 @@ public partial class Program
                         TransactionType = mappedTransactionTypeSLFTTP,
                         TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                         TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
-                        RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                         // Store Information
                         PolledStore = polledStoreInt,
@@ -1494,7 +1494,7 @@ public partial class Program
                     // Customer/Clerk fields - per CSV rules
                     tenderRecord.CustomerMember = ""; // TNFMBR - Default blank
                     tenderRecord.PostalCode = ""; // TNFZIP - Always blank
-                    tenderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number
+                    tenderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number, right justified with zeros
 
                     // Employee sale ID - TNFESI
                     // Set to '#####' for employee sales where TNFTTP = '04', otherwise blank
@@ -1533,7 +1533,7 @@ public partial class Program
                 TransactionType = mappedTransactionTypeSLFTTP,
                 TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                 TransactionSeq = "00001",
-                RegisterID = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
                 PolledStore = polledStoreInt,
                 PollCen = pollCen,
                 PollDate = pollDate,
