@@ -1305,8 +1305,8 @@ public partial class Program
                     // Employee fields - per CSV rules
                     orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
 
-                    // UPC Code - SLFUPC (SKU UPC if scanned, otherwise blank)
-                    orderRecord.UPCCode = ""; // Default blank, TODO: detect if scanned
+                    // UPC Code - SLFUPC (SKU UPC if scanned, otherwise all zeros)
+                    orderRecord.UPCCode = "0000000000000"; // 13 zeros when not scanned
 
                     // Email - SLFEML (for ereceipt)
                     orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
@@ -1409,7 +1409,7 @@ public partial class Program
                                 ZipCode = "",
                                 Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                                 EmployeeCardNumber = 0,
-                                UPCCode = "",
+                                UPCCode = "0000000000000", // SLFUPC - 13 zeros
                                 EReceiptEmail = "",
                                 ReasonCode = "",
 
