@@ -1295,8 +1295,8 @@ public partial class Program
                     // Customer postal code data not available in ORAE Transaction structure
                     orderRecord.ZipCode = "";
 
-                    // Till/Clerk - SLFCLK (from till number)
-                    orderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
+                    // Till/Clerk - SLFCLK (from till number) - right justified with zeros
+                    orderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
 
                     // Employee fields - per CSV rules
                     orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
@@ -1401,7 +1401,7 @@ public partial class Program
                                 CustomerName = "",
                                 CustomerNumber = "",
                                 ZipCode = "",
-                                Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                                Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                                 EmployeeCardNumber = 0,
                                 UPCCode = "",
                                 EReceiptEmail = "",
@@ -1493,7 +1493,7 @@ public partial class Program
                     // Customer/Clerk fields - per CSV rules
                     tenderRecord.CustomerMember = ""; // TNFMBR - Default blank
                     tenderRecord.PostalCode = ""; // TNFZIP - Always blank
-                    tenderRecord.Clerk = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number
+                    tenderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number, right justified with zeros
 
                     // Employee sale ID - TNFESI
                     // Set to '#####' for employee sales where TNFTTP = '04', otherwise blank
