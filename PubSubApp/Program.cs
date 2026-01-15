@@ -1320,6 +1320,7 @@ public partial class Program
                     orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
                     orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                     orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
+                    orderRecord.SalesPerson = "00000"; // SLFSPS - 5 zeros when blank
 
                     // Discount fields - default to required values when no discount applied
                     if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
@@ -1419,6 +1420,7 @@ public partial class Program
                                 OriginalStore = "00000", // SLFOST - Required
                                 GroupDiscAmount = "000000000", // SLFGDA - Required
                                 GroupDiscSign = "", // SLFGDS - Empty string
+                                SalesPerson = "00000", // SLFSPS - 5 zeros when blank
                                 DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
                                 DiscountType = "", // SLFDST - Empty string
                                 DiscountAmountNegativeSign = "", // SLFDSN - Empty string
