@@ -1391,20 +1391,20 @@ public partial class Program
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
                                 ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
-                                ExtendedValueNegativeSign = itemTaxTotal < 0 ? "-" : " ",
+                                ExtendedValueNegativeSign = itemTaxTotal < 0 ? "-" : "",
                                 ItemSellPrice = FormatCurrency(itemTaxTotal.ToString("F2"), 9),
-                                SellPriceNegativeSign = itemTaxTotal < 0 ? "-" : " ",
+                                SellPriceNegativeSign = itemTaxTotal < 0 ? "-" : "",
 
                                 // Blank fields for tax line
                                 SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
                                 Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
                                 QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "", // SLFQTN: "-" for Return, "" for all else
                                 OriginalPrice = "000000000", // SLFORG - 9 zeros for tax record
-                                OriginalPriceNegativeSign = " ",
+                                OriginalPriceNegativeSign = "",
                                 OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
                                 OverridePriceNegativeSign = "", // SLFOVN - Empty string
                                 OriginalRetail = "",
-                                OriginalRetailNegativeSign = " ",
+                                OriginalRetailNegativeSign = "",
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
                                 CustomerName = "",
                                 CustomerNumber = "",
@@ -1787,7 +1787,7 @@ public partial class Program
         {
             if (string.IsNullOrEmpty(value))
             {
-                return ("", " "); // Return empty string for amount, space for sign
+                return ("", ""); // Return empty string for amount and sign
             }
 
             if (decimal.TryParse(value, out decimal amount))
@@ -1795,11 +1795,11 @@ public partial class Program
                 bool isNegative = amount < 0;
                 int cents = (int)(Math.Abs(amount) * 100);
                 string formattedAmount = cents.ToString().PadLeft(length, '0');
-                string sign = isNegative ? "-" : " "; // Use space for positive/no sign
+                string sign = isNegative ? "-" : ""; // Use empty string for positive/no sign
                 return (formattedAmount, sign);
             }
 
-            return ("", " "); // Default to empty string and space
+            return ("", ""); // Default to empty strings
         }
 
         // Helper method to pad or truncate string to exact required length
