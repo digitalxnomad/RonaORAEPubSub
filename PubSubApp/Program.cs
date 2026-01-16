@@ -1276,8 +1276,9 @@ public partial class Program
                     // Parse item-level taxes
                     ParseItemTaxes(item, orderRecord, retailEvent);
 
-                    // Reference for line ID - SLFRFD contains transaction number, right justified with zeros to 16 chars
-                    orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16);
+                    // Reference fields
+                    orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
+                    orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16); // SLFRFD - right justified with zeros to 16 chars
 
                     // Map reference transaction if this is a return or void
                     if (retailEvent.References?.SourceTransactionId != null &&
@@ -1406,6 +1407,7 @@ public partial class Program
                                 OverridePriceNegativeSign = "", // SLFOVN - Empty string
                                 OriginalRetail = "",
                                 OriginalRetailNegativeSign = "",
+                                ReferenceCode = "", // SLFRFC - Always empty string
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
                                 CustomerName = "",
                                 CustomerNumber = "",
