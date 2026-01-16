@@ -1317,6 +1317,11 @@ public partial class Program
                     // Reason codes - SLFRSN (return/price override/post voided - left justified)
                     orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
 
+                    // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
+                    orderRecord.TaxExemptId1 = ""; // SLFTE1 - Always empty
+                    orderRecord.TaxExemptId2 = ""; // SLFTE2 - Always empty
+                    orderRecord.TaxExemptionName = ""; // SLFTEN - Always empty
+
                     // Required fields with fixed values - per validation spec
                     orderRecord.OriginalSalesperson = "00000"; // SLFOSP - Required, must be "00000"
                     orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
@@ -1417,6 +1422,9 @@ public partial class Program
                                 UPCCode = "0000000000000", // SLFUPC - 13 zeros
                                 EReceiptEmail = "",
                                 ReasonCode = "",
+                                TaxExemptId1 = "", // SLFTE1 - Always empty
+                                TaxExemptId2 = "", // SLFTE2 - Always empty
+                                TaxExemptionName = "", // SLFTEN - Always empty
 
                                 // Required fields with fixed values - per validation spec
                                 OriginalSalesperson = "00000", // SLFOSP - Required
@@ -1622,11 +1630,6 @@ public partial class Program
                     // Skip if tax is exempt
                     if (tax.TaxExempt == true)
                     {
-                        // Handle tax exemption
-                        if (!string.IsNullOrEmpty(tax.ExemptReason))
-                        {
-                            orderRecord.TaxExemptId1 = PadOrTruncate(tax.ExemptReason, 20);
-                        }
                         continue;
                     }
 
