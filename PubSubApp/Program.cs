@@ -1284,10 +1284,12 @@ public partial class Program
                     if (mappedTransactionTypeSLFTTP == "01") // SALE
                     {
                         orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
+                        orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
                     }
                     else if (mappedTransactionTypeSLFTTP == "11") // VOID
                     {
                         orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
+                        orderRecord.OriginalTxDate = retailEvent.OccurredAt.ToString("yyMMdd"); // SLFOTD - occurred date for voids
                     }
 
                     // Map reference transaction if this is a return or void
@@ -1300,8 +1302,8 @@ public partial class Program
                         if (retailEvent.Transaction?.TransactionType == "RETURN")
                         {
                             orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
+                            orderRecord.OriginalTxDate = retailEvent.OccurredAt.ToString("yyMMdd"); // SLFOTD - occurred date for returns
                         }
-                        orderRecord.OriginalTxDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd");
                         orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
                     }
 
@@ -1428,9 +1430,11 @@ public partial class Program
                                 ReferenceCode = "", // SLFRFC - Always empty string
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
 
-                                // SLFOTS - Set based on transaction type (same logic as regular items)
+                                // SLFOTS and SLFOTD - Set based on transaction type (same logic as regular items)
                                 OriginalTxStore = mappedTransactionTypeSLFTTP == "01" ? "00000" :
                                                  (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+                                OriginalTxDate = mappedTransactionTypeSLFTTP == "01" ? "000000" :
+                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? retailEvent.OccurredAt.ToString("yyMMdd") : null),
 
                                 CustomerName = "",
                                 CustomerNumber = "",
