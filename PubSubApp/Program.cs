@@ -15,7 +15,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/12/26 v1.0.9";
+    static string Version = "PubSubApp 01/14/26 v1.0.10";
 
     public static async Task Main(string[] args)
     {
@@ -258,6 +258,7 @@ public partial class Program
             Console.WriteLine("Validating RecordSet output...");
             SimpleLogger.LogInfo("Validating RecordSet output...");
             var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
+                        
             if (outputErrors.Count > 0)
             {
                 string errorMessage = $"✗ RecordSet validation failed with {outputErrors.Count} error(s):\n" +
