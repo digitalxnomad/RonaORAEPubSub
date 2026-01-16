@@ -1410,7 +1410,7 @@ public partial class Program
                                 OriginalPriceNegativeSign = "",
                                 OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
                                 OverridePriceNegativeSign = "", // SLFOVN - Empty string
-                                OriginalRetail = "",
+                                OriginalRetail = "000000000", // SLFORT - 9 zeros for tax record
                                 OriginalRetailNegativeSign = "",
                                 ReferenceCode = "", // SLFRFC - Always empty string
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
