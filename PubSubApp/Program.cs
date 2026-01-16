@@ -1280,6 +1280,16 @@ public partial class Program
                     orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
                     orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16); // SLFRFD - right justified with zeros to 16 chars
 
+                    // SLFOTS - Set based on transaction type
+                    if (mappedTransactionTypeSLFTTP == "01") // SALE
+                    {
+                        orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
+                    }
+                    else if (mappedTransactionTypeSLFTTP == "11") // VOID
+                    {
+                        orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
+                    }
+
                     // Map reference transaction if this is a return or void
                     if (retailEvent.References?.SourceTransactionId != null &&
                         (retailEvent.Transaction?.TransactionType == "RETURN" ||
@@ -1287,7 +1297,10 @@ public partial class Program
                     {
                         string sourceId = retailEvent.References.SourceTransactionId;
                         orderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5);
-                        orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
+                        if (retailEvent.Transaction?.TransactionType == "RETURN")
+                        {
+                            orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
+                        }
                         orderRecord.OriginalTxDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd");
                         orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
                     }
@@ -1414,6 +1427,11 @@ public partial class Program
                                 OriginalRetailNegativeSign = "",
                                 ReferenceCode = "", // SLFRFC - Always empty string
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
+
+                                // SLFOTS - Set based on transaction type (same logic as regular items)
+                                OriginalTxStore = mappedTransactionTypeSLFTTP == "01" ? "00000" :
+                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+
                                 CustomerName = "",
                                 CustomerNumber = "",
                                 ZipCode = "",
