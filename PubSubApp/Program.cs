@@ -1392,7 +1392,8 @@ public partial class Program
                                 // Tax amount in ExtendedValue and ItemSellPrice
                                 ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
                                 ExtendedValueNegativeSign = itemTaxTotal < 0 ? "-" : " ",
-                                ItemSellPrice = FormatCurrency(itemTaxTotal.ToString("F2"), 9),
+                     
+                     ItemSellPrice = FormatCurrency(itemTaxTotal.ToString("F2"), 9),
                                 SellPriceNegativeSign = itemTaxTotal < 0 ? "-" : " ",
 
                                 // Blank fields for tax line
