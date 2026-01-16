@@ -1280,16 +1280,18 @@ public partial class Program
                     orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
                     orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16); // SLFRFD - right justified with zeros to 16 chars
 
-                    // SLFOTS - Set based on transaction type
+                    // SLFOTS, SLFOTD, SLFOTR - Set based on transaction type
                     if (mappedTransactionTypeSLFTTP == "01") // SALE
                     {
                         orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
                         orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
+                        orderRecord.OriginalTxRegister = "000"; // SLFOTR - 3 zeros for sales
                     }
                     else if (mappedTransactionTypeSLFTTP == "11") // VOID
                     {
                         orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
                         orderRecord.OriginalTxDate = retailEvent.OccurredAt.ToString("yyMMdd"); // SLFOTD - occurred date for voids
+                        orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for voids
                     }
 
                     // Map reference transaction if this is a return or void
@@ -1303,8 +1305,8 @@ public partial class Program
                         {
                             orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
                             orderRecord.OriginalTxDate = retailEvent.OccurredAt.ToString("yyMMdd"); // SLFOTD - occurred date for returns
+                            orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for returns
                         }
-                        orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
                     }
 
                     // === CSV-specified field mappings ===
@@ -1430,11 +1432,13 @@ public partial class Program
                                 ReferenceCode = "", // SLFRFC - Always empty string
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
 
-                                // SLFOTS and SLFOTD - Set based on transaction type (same logic as regular items)
+                                // SLFOTS, SLFOTD, SLFOTR - Set based on transaction type (same logic as regular items)
                                 OriginalTxStore = mappedTransactionTypeSLFTTP == "01" ? "00000" :
                                                  (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
                                 OriginalTxDate = mappedTransactionTypeSLFTTP == "01" ? "000000" :
                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? retailEvent.OccurredAt.ToString("yyMMdd") : null),
+                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" ? "000" :
+                                                    (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
 
                                 CustomerName = "",
                                 CustomerNumber = "",
