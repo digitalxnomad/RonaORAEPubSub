@@ -1220,7 +1220,8 @@ public partial class Program
                         int qtyCents = (int)(Math.Abs(qtyValue) * 100);
 
                         orderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
-                        orderRecord.QuantityNegativeSign = isNegative ? "-" : " ";
+                        // SLFQTN: "-" for Return, "" for all else
+                        orderRecord.QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "";
                     }
 
                     // Original Price - 9-digits without decimal
@@ -1399,8 +1400,8 @@ public partial class Program
                                 // Blank fields for tax line
                                 SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
                                 Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
-                                QuantityNegativeSign = " ",
-                                OriginalPrice = "",
+                                QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "", // SLFQTN: "-" for Return, "" for all else
+                                OriginalPrice = "000000000", // SLFORG - 9 zeros for tax record
                                 OriginalPriceNegativeSign = " ",
                                 OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
                                 OverridePriceNegativeSign = "", // SLFOVN - Empty string
