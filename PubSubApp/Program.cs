@@ -1164,13 +1164,15 @@ public partial class Program
                 polledStoreInt = storeId;
             }
 
-            // Get current date/time for polling and creation timestamps
-            DateTime now = DateTime.Now;
+            // Apply timezone adjustment based on store region
+            DateTime transactionDateTime = ApplyTimezoneAdjustment(retailEvent.OccurredAt, retailEvent.BusinessContext?.Store?.StoreId);
+
+            // Get date/time values from adjusted transaction time
             int pollCen = 1;  // Always 1 per specification
-            int pollDate = GetDateAsInt(retailEvent.OccurredAt); // SLFPDT - Use transaction occurred date
+            int pollDate = GetDateAsInt(transactionDateTime); // SLFPDT - Use adjusted transaction date
             int createCen = 1;  // Always 1 per specification
             int createDate = pollDate;
-            int createTime = GetTimeAsInt(now);
+            int createTime = GetTimeAsInt(transactionDateTime);
 
             var recordSet = new RecordSet
             {
@@ -1189,8 +1191,8 @@ public partial class Program
                         // Required Fields - per CSV specs
                         TransType = mappedTransactionTypeSLFTTP,
                         LineType = mappedTransactionTypeSLFLNT,
-                        TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                        TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted occurred date
+                        TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted occurred time
 
                         // Transaction Identification - with proper padding
                         TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
@@ -1393,8 +1395,8 @@ public partial class Program
                                 // Same transaction identifiers as parent item
                                 TransType = mappedTransactionTypeSLFTTP,
                                 LineType = "XH", // Tax line type per spec
-                                TransDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                                TransTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                                TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted occurred date
+                                TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted occurred time
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                                 TransSeq = sequence.ToString().PadLeft(5, '0'), // Next sequence number
                                 RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
@@ -1602,6 +1604,74 @@ public partial class Program
         }
         return recordSet;
      }
+
+        // Apply timezone adjustment based on store region
+        // Western region (BC, AB, SK, MB): subtract 8 hours
+        // Eastern region (ON, QC): subtract 5 hours
+        private DateTime ApplyTimezoneAdjustment(DateTime occurredAt, string? storeId)
+        {
+            if (string.IsNullOrEmpty(storeId))
+            {
+                return occurredAt.AddHours(-5); // Default to eastern
+            }
+
+            bool isWesternRegion = IsWesternRegionStore(storeId);
+            int hoursOffset = isWesternRegion ? -8 : -5;
+            return occurredAt.AddHours(hoursOffset);
+        }
+
+        // Determine if store is in western region (BC, AB, SK, MB) based on store ID
+        private bool IsWesternRegionStore(string storeId)
+        {
+            if (!int.TryParse(storeId, out int storeNum))
+            {
+                return false;
+            }
+
+            // Western region stores (BC, AB, SK, MB) based on CSV data:
+            // BC/AB/SK/MB stores: 170, 286, 384, 489, 103-104, 611-647, 61XXX, 62450, 63XXX, 64670, 65950
+            // Plus specific 82XXX and 83XXX stores in western provinces
+
+            // Single store IDs
+            if (storeNum == 170 || storeNum == 286 || storeNum == 384 || storeNum == 489 ||
+                storeNum == 103 || storeNum == 104)
+            {
+                return true;
+            }
+
+            // 6XX range (AB stores)
+            if (storeNum >= 611 && storeNum <= 647)
+            {
+                return true;
+            }
+
+            // 61XXX range (BC stores)
+            if (storeNum >= 61000 && storeNum <= 61999)
+            {
+                return true;
+            }
+
+            // 62450 (AB), 63XXX (SK), 64670 (MB), 65950 (BC)
+            if (storeNum == 62450 || (storeNum >= 63000 && storeNum <= 63999) ||
+                storeNum == 64670 || storeNum == 65950)
+            {
+                return true;
+            }
+
+            // Western 82XXX and 83XXX stores
+            if (storeNum == 82952 || storeNum == 82953 || storeNum == 88007 ||
+                storeNum == 83059 || storeNum == 83105 || storeNum == 83158 || storeNum == 83211 ||
+                storeNum == 83230 || storeNum == 83309 || storeNum == 83313 || storeNum == 83318 ||
+                storeNum == 83706 || storeNum == 83714 || storeNum == 83323 || storeNum == 83330 ||
+                storeNum == 83702 || storeNum == 83704 || storeNum == 83285 || storeNum == 83718 ||
+                storeNum == 83163 || storeNum == 83208)
+            {
+                return true;
+            }
+
+            // All other stores are eastern region (ON, QC)
+            return false;
+        }
 
        // Get date as integer in YYMMDD format
         private int GetDateAsInt(DateTime date)
