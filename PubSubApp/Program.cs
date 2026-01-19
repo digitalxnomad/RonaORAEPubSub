@@ -1537,8 +1537,8 @@ public partial class Program
                                 TaxExemptId2 = "", // SLFTE2 - Always empty
                                 TaxExemptionName = "", // SLFTEN - Always empty
                                 AdCode = "0000", // SLFADC - Always "0000" for tax records
-                                PriceVehicleCode = PadOrTruncate("", 4), // SLFPVC - Empty for tax records
-                                PriceVehicleReference = PadOrTruncate("", 12), // SLFREF - Empty for tax records
+                                PriceVehicleCode = "", // SLFPVC - Empty string for tax records
+                                PriceVehicleReference = "", // SLFREF - Empty string for tax records
 
                                 // Required fields with fixed values - per validation spec
                                 OriginalSalesperson = "00000", // SLFOSP - Required
