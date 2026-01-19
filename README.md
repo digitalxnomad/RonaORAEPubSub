@@ -336,6 +336,14 @@ Log entries include:
 - ✨ **SLFORT (OriginalRetail)** - Uses OriginalUnitPrice for order records, "000000000" for tax records
 - ✨ **SLFRFC (ReferenceCode)** - Always empty string "" for all records
 - ✨ **SLFTE1, SLFTE2, SLFTEN** - Always empty string "" for all records (tax exemption fields)
+- ✨ **SLFADC (AdCode)** - Conditional logic based on pricing:
+  - "####" when POS price ≠ regular retail (unitPrice ≠ originalUnitPrice)
+  - "0000" when at regular price (unitPrice = originalUnitPrice)
+  - Always "0000" for tax records
+- ✨ **SLFEXT (ExtendedValue)** - Calculated value instead of using extendedPrice directly:
+  - Formula: Quantity × Override (if pricing.override exists)
+  - Fallback: Quantity × UnitPrice (if no override)
+  - Formatted as 11-digit field with sign
 - 🔧 **Negative sign fields** - All changed from " " (space) to "" (empty string) for non-negative values
   - Affects: SLFQTN, SLFORN, SLFADN, SLFOVN, SLFDSN, SLFSLN, SLFEXN, SLFOPN, TNFAMN
 
@@ -362,11 +370,25 @@ Log entries include:
   - Store region detection based on store ID patterns
   - Covers 200+ stores across all provinces
 
+**ORAE Data Structure Enhancements:**
+- ✨ **pricing.override field** - Added optional `override` field to Pricing class (CurrencyAmount type)
+  - Allows incoming ORAE data to specify price overrides
+  - Used in SLFEXT calculation when present
+  - JSON property name: "override"
+
+**Error Handling & Reliability:**
+- ✨ **Invalid JSON handling** - Messages with invalid JSON are now ACKed instead of NACKed
+  - Prevents infinite redelivery of malformed messages
+  - Logs error details for debugging
+  - Returns `SubscriberClient.Reply.Ack` for `JsonException`
+  - Other exceptions continue to NACK for proper retry handling
+
 **Technical Improvements:**
 - Added `ApplyTimezoneAdjustment()` method for timezone conversion
 - Added `IsWesternRegionStore()` helper to identify store regions by ID
 - Changed from `PadOrTruncate()` to `PadNumeric()` for numeric fields requiring zero-padding
 - Enhanced field initialization logic for tax line items
+- Added try-catch for `JsonException` in message processing pipeline
 
 ### v1.1.0 (01/14/26)
 **Major Features:**
