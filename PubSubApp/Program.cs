@@ -1303,6 +1303,17 @@ public partial class Program
                     // Price Vehicle Code - set to "EMP" for employee discounts
                     orderRecord.PriceVehicleCode = hasEmployeeDiscount ? "EMP" : "";
 
+                    // SLFADC - Additional Code: "####" when POS price != regular retail, "0000" when regular price
+                    bool isRegularPrice = true;
+                    if (item.Pricing?.OriginalUnitPrice?.Value != null &&
+                        item.Pricing?.UnitPrice?.Value != null &&
+                        decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPriceAdc) &&
+                        decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPriceAdc))
+                    {
+                        isRegularPrice = (unitPriceAdc == origPriceAdc);
+                    }
+                    orderRecord.AdCode = isRegularPrice ? "0000" : "####";
+
                     // Parse item-level taxes
                     ParseItemTaxes(item, orderRecord, retailEvent);
 
@@ -1486,6 +1497,7 @@ public partial class Program
                                 TaxExemptId1 = "", // SLFTE1 - Always empty
                                 TaxExemptId2 = "", // SLFTE2 - Always empty
                                 TaxExemptionName = "", // SLFTEN - Always empty
+                                AdCode = "0000", // SLFADC - Always "0000" for tax records
 
                                 // Required fields with fixed values - per validation spec
                                 OriginalSalesperson = "00000", // SLFOSP - Required
