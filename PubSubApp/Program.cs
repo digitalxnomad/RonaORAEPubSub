@@ -1070,6 +1070,9 @@ public partial class Program
 
         [JsonPropertyName("unitPrice")]
         public CurrencyAmount? UnitPrice { get; set; }
+
+        [JsonPropertyName("override")]
+        public CurrencyAmount? Override { get; set; }
     }
 
     public class Quantity
@@ -1270,15 +1273,18 @@ public partial class Program
                     }
 
                     // Extended Value (Quantity * Net Price) - 11-digits without decimal
-                    // Calculate: Quantity * UnitPrice (or use override if exists)
+                    // Calculate: Quantity * Override (if exists), otherwise Quantity * UnitPrice
                     decimal extendedValue = 0;
-                    if (item.Quantity?.Value != null && item.Pricing?.UnitPrice?.Value != null)
+                    if (item.Quantity?.Value != null)
                     {
                         decimal quantity = item.Quantity.Value;
-                        decimal unitPriceValue;
-                        if (decimal.TryParse(item.Pricing.UnitPrice.Value, out unitPriceValue))
+
+                        // Use override price if it exists, otherwise use unit price
+                        string? priceToUse = item.Pricing?.Override?.Value ?? item.Pricing?.UnitPrice?.Value;
+
+                        if (priceToUse != null && decimal.TryParse(priceToUse, out decimal priceValue))
                         {
-                            extendedValue = quantity * unitPriceValue;
+                            extendedValue = quantity * priceValue;
                         }
                     }
 
