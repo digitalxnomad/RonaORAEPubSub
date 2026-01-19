@@ -326,7 +326,49 @@ Log entries include:
 
 ## Version History
 
-### v1.1.0 (01/14/26) ✨ Current
+### v1.2.0 (01/19/26) ✨ Current
+**Field Formatting & Validation Improvements:**
+- ✨ **SLFRFD (ReferenceDesc)** - Right justified with zeros to 16 characters using transaction number
+- ✨ **SLFUPC (UPCCode)** - Set to "0000000000000" (13 zeros) when blank
+- ✨ **SLFSPS (SalesPerson)** - Set to "00000" (5 zeros) when blank
+- ✨ **SLFQTN (QuantityNegativeSign)** - "-" for RETURN transactions, "" for all others (based on transaction type, not quantity sign)
+- ✨ **SLFORG (OriginalPrice)** - Set to "000000000" for tax records
+- ✨ **SLFORT (OriginalRetail)** - Uses OriginalUnitPrice for order records, "000000000" for tax records
+- ✨ **SLFRFC (ReferenceCode)** - Always empty string "" for all records
+- ✨ **SLFTE1, SLFTE2, SLFTEN** - Always empty string "" for all records (tax exemption fields)
+- 🔧 **Negative sign fields** - All changed from " " (space) to "" (empty string) for non-negative values
+  - Affects: SLFQTN, SLFORN, SLFADN, SLFOVN, SLFDSN, SLFSLN, SLFEXN, SLFOPN, TNFAMN
+
+**Transaction Type-Based Field Logic:**
+- ✨ **SLFOTS (OriginalTxStore)**
+  - SALE (01): "00000" (5 zeros)
+  - VOID (11) / RETURN (04): StoreId (padded to 5 chars)
+- ✨ **SLFOTD (OriginalTxDate)**
+  - SALE (01): "000000" (6 zeros)
+  - VOID (11) / RETURN (04): Occurred date in YYMMDD format
+- ✨ **SLFOTR (OriginalTxRegister)**
+  - SALE (01): "000" (3 zeros)
+  - VOID (11) / RETURN (04): Register number (padded to 3 chars)
+- ✨ **SLFOTT (OriginalTxNumber)**
+  - SALE (01): "00000" (5 zeros)
+  - VOID (11): Transaction number from sequenceNumber (zero-padded to 5 chars)
+  - RETURN (04): Source transaction ID (padded to 5 chars)
+
+**Timezone & Date/Time Adjustments:**
+- ✨ **SLFPDT (PollDate)** - Changed from DateTime.Now to transaction occurred date
+- ✨ **Timezone adjustments** - Applied to SLFCTM, SLFCDT, SLFTTM, SLFTDT
+  - Western region stores (BC, AB, SK, MB): Subtract 8 hours from occurredAt
+  - Eastern region stores (ON, QC): Subtract 5 hours from occurredAt
+  - Store region detection based on store ID patterns
+  - Covers 200+ stores across all provinces
+
+**Technical Improvements:**
+- Added `ApplyTimezoneAdjustment()` method for timezone conversion
+- Added `IsWesternRegionStore()` helper to identify store regions by ID
+- Changed from `PadOrTruncate()` to `PadNumeric()` for numeric fields requiring zero-padding
+- Enhanced field initialization logic for tax line items
+
+### v1.1.0 (01/14/26)
 **Major Features:**
 - ✨ **Item-level tax parsing** - Comprehensive TaxDetail class with rate, amount, authority, and exemption tracking
 - ✨ **Province-aware tax logic** - Ontario-specific rules (SLFTX2=N, SLFTX3=Y) with automatic province detection
