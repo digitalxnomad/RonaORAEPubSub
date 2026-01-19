@@ -1073,6 +1073,9 @@ public partial class Program
 
         [JsonPropertyName("override")]
         public CurrencyAmount? Override { get; set; }
+
+        [JsonPropertyName("priceVehicle")]
+        public string? PriceVehicle { get; set; }
     }
 
     public class Quantity
@@ -1315,8 +1318,29 @@ public partial class Program
                     // Item Scanned Y/N
                     orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
 
-                    // Price Vehicle Code - set to "EMP" for employee discounts
-                    orderRecord.PriceVehicleCode = hasEmployeeDiscount ? "EMP" : "";
+                    // Price Vehicle Code (SLFPVC) and Reference (SLFREF) - parse from pricing.priceVehicle
+                    // Format: "LEFT:RIGHT" where LEFT goes to SLFPVC (4 chars) and RIGHT goes to SLFREF (12 chars)
+                    if (!string.IsNullOrEmpty(item.Pricing?.PriceVehicle))
+                    {
+                        string[] parts = item.Pricing.PriceVehicle.Split(':');
+                        if (parts.Length == 2)
+                        {
+                            orderRecord.PriceVehicleCode = PadOrTruncate(parts[0], 4); // Left side to SLFPVC
+                            orderRecord.PriceVehicleReference = PadOrTruncate(parts[1], 12); // Right side to SLFREF
+                        }
+                        else
+                        {
+                            // If format is incorrect, pad the whole value to SLFPVC
+                            orderRecord.PriceVehicleCode = PadOrTruncate(item.Pricing.PriceVehicle, 4);
+                            orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: use "EMP" for employee discounts if priceVehicle not provided
+                        orderRecord.PriceVehicleCode = hasEmployeeDiscount ? PadOrTruncate("EMP", 4) : PadOrTruncate("", 4);
+                        orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
+                    }
 
                     // SLFADC - Additional Code: "####" when POS price != regular retail, "0000" when regular price
                     bool isRegularPrice = true;
@@ -1513,6 +1537,8 @@ public partial class Program
                                 TaxExemptId2 = "", // SLFTE2 - Always empty
                                 TaxExemptionName = "", // SLFTEN - Always empty
                                 AdCode = "0000", // SLFADC - Always "0000" for tax records
+                                PriceVehicleCode = "", // SLFPVC - Empty string for tax records
+                                PriceVehicleReference = "", // SLFREF - Empty string for tax records
 
                                 // Required fields with fixed values - per validation spec
                                 OriginalSalesperson = "00000", // SLFOSP - Required
