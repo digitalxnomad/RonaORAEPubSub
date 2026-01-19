@@ -1167,7 +1167,7 @@ public partial class Program
             // Get current date/time for polling and creation timestamps
             DateTime now = DateTime.Now;
             int pollCen = 1;  // Always 1 per specification
-            int pollDate = GetDateAsInt(now);
+            int pollDate = GetDateAsInt(retailEvent.OccurredAt); // SLFPDT - Use transaction occurred date
             int createCen = 1;  // Always 1 per specification
             int createDate = pollDate;
             int createTime = GetTimeAsInt(now);
