@@ -1,8 +1,7 @@
 {
   "profiles": {
     "PubSubApp": {
-      "commandName": "Project",
-      "commandLineArgs": "--test c:\\temp18\\test5.json"
+      "commandName": "Project"
     }
   }
 }
