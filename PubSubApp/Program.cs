@@ -83,7 +83,21 @@ public partial class Program
 
                 MainClass mainClass = new MainClass();
 
-                RetailEvent retailEvent = mainClass.ReadRecordSetFromString(data);
+                RetailEvent retailEvent;
+                try
+                {
+                    retailEvent = mainClass.ReadRecordSetFromString(data);
+                }
+                catch (JsonException jsonEx)
+                {
+                    // Invalid JSON - log and ACK to prevent redelivery
+                    string errorMessage = $"JSON parsing error: {jsonEx.Message}";
+                    Console.WriteLine($"✗ {errorMessage}");
+                    SimpleLogger.LogError(errorMessage);
+                    Console.WriteLine($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
+                    SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
+                    return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
+                }
 
                 // Validate ORAE v2.0.0 compliance
                 var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
