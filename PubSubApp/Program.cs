@@ -1270,12 +1270,21 @@ public partial class Program
                     }
 
                     // Extended Value (Quantity * Net Price) - 11-digits without decimal
-                    if (item.Pricing?.ExtendedPrice?.Value != null)
+                    // Calculate: Quantity * UnitPrice (or use override if exists)
+                    decimal extendedValue = 0;
+                    if (item.Quantity?.Value != null && item.Pricing?.UnitPrice?.Value != null)
                     {
-                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 11);
-                        orderRecord.ExtendedValue = amount;
-                        orderRecord.ExtendedValueNegativeSign = sign;
+                        decimal quantity = item.Quantity.Value;
+                        decimal unitPriceValue;
+                        if (decimal.TryParse(item.Pricing.UnitPrice.Value, out unitPriceValue))
+                        {
+                            extendedValue = quantity * unitPriceValue;
+                        }
                     }
+
+                    var (amountExt, signExt) = FormatCurrencyWithSign(extendedValue.ToString("F2"), 11);
+                    orderRecord.ExtendedValue = amountExt;
+                    orderRecord.ExtendedValueNegativeSign = signExt;
 
                     // Override Price - default to zeros if not present
                     orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
