@@ -1154,8 +1154,19 @@ public partial class Program
 
         public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
         {
-            string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ? MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType) : null;
-            string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ? MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType) : null;
+            // Check for employee discount (will set SLFPVC and affect SLFTTP/SLFLNT)
+            bool hasEmployeeDiscount = HasEmployeeDiscount(retailEvent);
+
+            // Check for gift card tender
+            bool hasGiftCardTender = HasGiftCardTender(retailEvent);
+
+            // Check for customer ID (currently always blank, but ready for future)
+            bool hasCustomerId = !string.IsNullOrEmpty(GetCustomerId(retailEvent));
+
+            string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ?
+                MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType, hasEmployeeDiscount) : null;
+            string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ?
+                MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType, hasEmployeeDiscount, hasGiftCardTender, hasCustomerId) : null;
 
             // Parse storeId as integer for PolledStore fields
             int? polledStoreInt = null;
@@ -1274,6 +1285,9 @@ public partial class Program
 
                     // Item Scanned Y/N
                     orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
+
+                    // Price Vehicle Code - set to "EMP" for employee discounts
+                    orderRecord.PriceVehicleCode = hasEmployeeDiscount ? "EMP" : "";
 
                     // Parse item-level taxes
                     ParseItemTaxes(item, orderRecord, retailEvent);
@@ -1618,6 +1632,68 @@ public partial class Program
             bool isWesternRegion = IsWesternRegionStore(storeId);
             int hoursOffset = isWesternRegion ? -8 : -5;
             return occurredAt.AddHours(hoursOffset);
+        }
+
+        // Check if transaction has employee discount
+        // Employee discounts are indicated by specific price vehicle codes or discount patterns
+        private bool HasEmployeeDiscount(RetailEvent retailEvent)
+        {
+            // Check if any item has a discount that indicates employee pricing
+            // For now, we'll detect this by checking for specific discount patterns
+            // This can be enhanced based on actual employee discount indicators in the data
+            if (retailEvent.Transaction?.Items != null)
+            {
+                foreach (var item in retailEvent.Transaction.Items)
+                {
+                    // Check if item has pricing with discount that might indicate employee sale
+                    // This is a placeholder - actual logic should be based on business rules
+                    // Common indicators: specific SKU patterns, discount codes, price vehicle codes
+                    if (item.Pricing?.OriginalUnitPrice?.Value != null &&
+                        item.Pricing?.UnitPrice?.Value != null)
+                    {
+                        decimal originalPrice;
+                        decimal unitPrice;
+                        if (decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out originalPrice) &&
+                            decimal.TryParse(item.Pricing.UnitPrice.Value, out unitPrice))
+                        {
+                            // If discount is greater than 30%, might be employee discount
+                            // This threshold can be adjusted based on business rules
+                            decimal discountPercent = originalPrice > 0 ? ((originalPrice - unitPrice) / originalPrice) * 100 : 0;
+                            if (discountPercent >= 30)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Check if transaction has gift card tender
+        private bool HasGiftCardTender(RetailEvent retailEvent)
+        {
+            if (retailEvent.Transaction?.Tenders != null)
+            {
+                foreach (var tender in retailEvent.Transaction.Tenders)
+                {
+                    if (tender.Method == "GIFT_CARD")
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Get customer ID from transaction
+        // Currently returns empty as Transaction doesn't have Customer property
+        // Ready for future enhancement when customer data is available
+        private string GetCustomerId(RetailEvent retailEvent)
+        {
+            // TODO: When customer data is added to Transaction, extract customer ID here
+            // For now, return empty string
+            return "";
         }
 
         // Determine if store is in western region (BC, AB, SK, MB) based on store ID
@@ -2182,8 +2258,14 @@ public partial class Program
             return "HON";
         }
  
-        private string MapTransTypeSLFTTP(string input)
+        private string MapTransTypeSLFTTP(string input, bool hasEmployeeDiscount)
         {
+            // Employee sales get SLFTTP = "04"
+            if (input == "SALE" && hasEmployeeDiscount)
+            {
+                return "04";
+            }
+
             return input switch
             {
                 "SALE" => "01",
@@ -2195,12 +2277,55 @@ public partial class Program
             };
         }
 
-        private string MapTransTypeSLFLNT(string input)
+        private string MapTransTypeSLFLNT(string input, bool hasEmployeeDiscount, bool hasGiftCardTender, bool hasCustomerId)
         {
+            // Handle SALE transactions
+            if (input == "SALE")
+            {
+                // Employee sales → SLFLNT = "04"
+                if (hasEmployeeDiscount)
+                {
+                    return "04";
+                }
+
+                // Gift card sales → SLFLNT = "45"
+                if (hasGiftCardTender)
+                {
+                    return "45";
+                }
+
+                // Regular trade (with customer) → SLFLNT = "02"
+                if (hasCustomerId)
+                {
+                    return "02";
+                }
+
+                // Regular sales (no customer) → SLFLNT = "01"
+                return "01";
+            }
+
+            // Handle RETURN transactions
+            if (input == "RETURN")
+            {
+                // Gift card return → SLFLNT = "45"
+                if (hasGiftCardTender)
+                {
+                    return "45";
+                }
+
+                // Trade return (with customer) → SLFLNT = "12"
+                if (hasCustomerId)
+                {
+                    return "12";
+                }
+
+                // Regular return (no customer) → SLFLNT = "11"
+                return "11";
+            }
+
+            // Handle other transaction types
             return input switch
             {
-                "SALE" => "01",
-                "RETURN" => "02",
                 "AR_PAYMENT" => "43",
                 "LAYAWAY_PAYMENT" => "45",
                 "LAYAWAY_SALE" => "50",
