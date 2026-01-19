@@ -1361,7 +1361,7 @@ public partial class Program
                     orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16); // SLFRFD - right justified with zeros to 16 chars
 
                     // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
-                    if (mappedTransactionTypeSLFTTP == "01") // SALE
+                    if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04") // SALE or Employee SALE
                     {
                         orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
                         orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
@@ -1515,15 +1515,15 @@ public partial class Program
                                 ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
 
                                 // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type (same logic as regular items)
-                                OriginalTxStore = mappedTransactionTypeSLFTTP == "01" ? "00000" :
-                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                                OriginalTxDate = mappedTransactionTypeSLFTTP == "01" ? "000000" :
-                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? retailEvent.OccurredAt.ToString("yyMMdd") : null),
-                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" ? "000" :
-                                                    (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "04" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                                OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" ? "00000" :
+                                OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
+                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+                                OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000000" :
+                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? retailEvent.OccurredAt.ToString("yyMMdd") : null),
+                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000" :
+                                                    (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
+                                OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
                                                   (mappedTransactionTypeSLFTTP == "11" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                                  (mappedTransactionTypeSLFTTP == "04" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) : null)),
+                                                  (mappedTransactionTypeSLFTTP == "02" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) : null)),
 
                                 CustomerName = "",
                                 CustomerNumber = "",
@@ -2335,9 +2335,9 @@ public partial class Program
 
             return input switch
             {
-                "SALE" => "01",
-                "RETURN" => "04",
-                "VOID" => "11",
+                "SALE" => "01",    // Regular sale (no employee discount)
+                "RETURN" => "02",  // Return transactions
+                "VOID" => "11",    // Void transactions
                 "OPEN" => "87",
                 "CLOSE" => "88",
                 _ => "Unknown: " + input
