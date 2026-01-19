@@ -1070,6 +1070,9 @@ public partial class Program
 
         [JsonPropertyName("unitPrice")]
         public CurrencyAmount? UnitPrice { get; set; }
+
+        [JsonPropertyName("override")]
+        public CurrencyAmount? Override { get; set; }
     }
 
     public class Quantity
@@ -1270,12 +1273,24 @@ public partial class Program
                     }
 
                     // Extended Value (Quantity * Net Price) - 11-digits without decimal
-                    if (item.Pricing?.ExtendedPrice?.Value != null)
+                    // Calculate: Quantity * Override (if exists), otherwise Quantity * UnitPrice
+                    decimal extendedValue = 0;
+                    if (item.Quantity?.Value != null)
                     {
-                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 11);
-                        orderRecord.ExtendedValue = amount;
-                        orderRecord.ExtendedValueNegativeSign = sign;
+                        decimal quantity = item.Quantity.Value;
+
+                        // Use override price if it exists, otherwise use unit price
+                        string? priceToUse = item.Pricing?.Override?.Value ?? item.Pricing?.UnitPrice?.Value;
+
+                        if (priceToUse != null && decimal.TryParse(priceToUse, out decimal priceValue))
+                        {
+                            extendedValue = quantity * priceValue;
+                        }
                     }
+
+                    var (amountExt, signExt) = FormatCurrencyWithSign(extendedValue.ToString("F2"), 11);
+                    orderRecord.ExtendedValue = amountExt;
+                    orderRecord.ExtendedValueNegativeSign = signExt;
 
                     // Override Price - default to zeros if not present
                     orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
