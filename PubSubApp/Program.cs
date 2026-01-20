@@ -1211,10 +1211,12 @@ public partial class Program
                 TenderRecords = new List<TenderRecord>()
             };
 
+            // Sequence counter shared across OrderRecords and TenderRecords
+            int sequence = 1;
+
             // Map ALL items (not just first one) - create one OrderRecord per item
             if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
             {
-                int sequence = 1;
                 foreach (var item in retailEvent.Transaction.Items)
                 {
                     var orderRecord = new OrderRecord
@@ -1568,9 +1570,9 @@ public partial class Program
             }
 
             // Map ALL tenders (not just first one) - create one TenderRecord per tender
+            // Continue sequence from OrderRecords
             if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
             {
-                int sequence = 1;
                 foreach (var tender in retailEvent.Transaction.Tenders)
                 {
                     var tenderRecord = new TenderRecord
