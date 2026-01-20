@@ -1355,6 +1355,29 @@ public partial class Program
                     }
                     orderRecord.AdCode = isRegularPrice ? "0000" : "####";
 
+                    // SLFADP - Ad Price: "000000000" when PVCode is REG or MAN, otherwise unit price
+                    string pvCode = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                    if (pvCode == "REG" || pvCode == "MAN")
+                    {
+                        orderRecord.AdPrice = "000000000"; // 9 zeros for REG or MAN
+                        orderRecord.AdPriceNegativeSign = ""; // Empty sign
+                    }
+                    else
+                    {
+                        // Use unit price formatted as 9-digit currency
+                        if (item.Pricing?.UnitPrice?.Value != null)
+                        {
+                            var (amount, sign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
+                            orderRecord.AdPrice = amount;
+                            orderRecord.AdPriceNegativeSign = sign;
+                        }
+                        else
+                        {
+                            orderRecord.AdPrice = "000000000";
+                            orderRecord.AdPriceNegativeSign = "";
+                        }
+                    }
+
                     // Parse item-level taxes
                     ParseItemTaxes(item, orderRecord, retailEvent);
 
@@ -1539,6 +1562,8 @@ public partial class Program
                                 TaxExemptId2 = "", // SLFTE2 - Always empty
                                 TaxExemptionName = "", // SLFTEN - Always empty
                                 AdCode = "0000", // SLFADC - Always "0000" for tax records
+                                AdPrice = "000000000", // SLFADP - Always "000000000" for tax records
+                                AdPriceNegativeSign = "", // SLFADN - Empty string for tax records
                                 PriceVehicleCode = "", // SLFPVC - Empty string for tax records
                                 PriceVehicleReference = "", // SLFREF - Empty string for tax records
 
