@@ -1383,7 +1383,7 @@ public partial class Program
 
                     // Reference fields
                     orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
-                    orderRecord.ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16); // SLFRFD - right justified with zeros to 16 chars
+                    orderRecord.ReferenceDesc = ""; // SLFRFD - Always empty string
 
                     // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
                     if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04") // SALE or Employee SALE
@@ -1537,7 +1537,7 @@ public partial class Program
                                 OriginalRetail = "000000000", // SLFORT - 9 zeros for tax record
                                 OriginalRetailNegativeSign = "",
                                 ReferenceCode = "", // SLFRFC - Always empty string
-                                ReferenceDesc = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString() ?? "", 16), // SLFRFD - right justified with zeros to 16
+                                ReferenceDesc = "", // SLFRFD - Always empty string
 
                                 // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type (same logic as regular items)
                                 OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
