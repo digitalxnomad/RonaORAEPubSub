@@ -1463,7 +1463,10 @@ public partial class Program
 
                     // Discount reasons - per CSV rules
                     orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
-                    orderRecord.RegDiscReason = "00"; // SLFRDR - Default '00', TODO: set to 'I2' when price vehicle code = MAN
+
+                    // SLFRDR - Set to 'I2' when PVC = 'MAN', otherwise '00'
+                    string pvCodeForRdr = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                    orderRecord.RegDiscReason = (pvCodeForRdr == "MAN") ? "I2" : "00";
 
                     // Blank fields - per CSV rules
                     orderRecord.OrderNumber = ""; // SLFORD - Always blank
