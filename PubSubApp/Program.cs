@@ -1501,7 +1501,7 @@ public partial class Program
                                 TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted occurred date
                                 TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted occurred time
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                                TransSeq = "00000", // SLFTSQ - Always 5 zeros for tax records
+                                TransSeq = sequence.ToString().PadLeft(5, '0'), // SLFTSQ - Increment for tax records
                                 RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                                 // Store Information
@@ -1587,7 +1587,7 @@ public partial class Program
                             };
 
                             recordSet.OrderRecords.Add(taxRecord);
-                            // Note: Do not increment sequence for tax records as they use "00000"
+                            sequence++; // Increment sequence for tax records
                         }
                     }
                 }
