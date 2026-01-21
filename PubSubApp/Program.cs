@@ -1048,6 +1048,21 @@ public partial class Program
 
         [JsonPropertyName("amount")]
         public CurrencyAmount? Amount { get; set; }
+
+        [JsonPropertyName("card")]
+        public Card? Card { get; set; }
+    }
+
+    public class Card
+    {
+        [JsonPropertyName("scheme")]
+        public string? Scheme { get; set; }
+
+        [JsonPropertyName("last4")]
+        public string? Last4 { get; set; }
+
+        [JsonPropertyName("authCode")]
+        public string? AuthCode { get; set; }
     }
 
     public class TransactionItem
@@ -1664,10 +1679,23 @@ public partial class Program
 
                     // === CSV-specified tender field mappings ===
 
-                    // Card/Payment fields - per CSV rules
-                    tenderRecord.CreditCardNumber = ""; // TNFCCD - TODO: populate masked card number
+                    // Card/Payment fields - populate from tender.card if available
+                    if (tender.Card != null)
+                    {
+                        // TNFCCD - Credit card number: scheme + last4, padded to 19 chars
+                        string cardNumber = $"{tender.Card.Scheme ?? ""}{tender.Card.Last4 ?? ""}";
+                        tenderRecord.CreditCardNumber = PadOrTruncate(cardNumber, 19);
+
+                        // TNFAUT - Authorization code, padded to 6 chars
+                        tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
+                    }
+                    else
+                    {
+                        tenderRecord.CreditCardNumber = PadOrTruncate("", 19); // Empty when no card data
+                        tenderRecord.AuthNumber = PadOrTruncate("", 6); // Empty when no card data
+                    }
+
                     tenderRecord.CardExpirationDate = "0000"; // TNFEXP - Must be "0000" per validation spec
-                    tenderRecord.AuthNumber = ""; // TNFAUT - TODO: populate authorization number
                     tenderRecord.MagStripeFlag = " "; // TNFMSR (1 space) - TODO: populate based on card processing type
                     tenderRecord.PaymentHashValue = ""; // TNFHSH - TODO: populate from bank
 
