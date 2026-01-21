@@ -99,18 +99,26 @@ public partial class Program
                     return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
                 }
 
-                // Validate ORAE v2.0.0 compliance
-                var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
-                if (validationErrors.Count > 0)
+                // Validate ORAE v2.0.0 compliance (if not disabled)
+                if (!pubSubConfig.DisableOraeValidation)
                 {
-                    string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
-                                        string.Join("\n", validationErrors);
-                    Console.WriteLine($"✗ {errorMessage}");
-                    SimpleLogger.LogError(errorMessage);
-                    throw new Exception(errorMessage);
+                    var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
+                    if (validationErrors.Count > 0)
+                    {
+                        string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
+                                            string.Join("\n", validationErrors);
+                        Console.WriteLine($"✗ {errorMessage}");
+                        SimpleLogger.LogError(errorMessage);
+                        throw new Exception(errorMessage);
+                    }
+                    Console.WriteLine("✓ ORAE v2.0.0 validation passed");
+                    SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
                 }
-                Console.WriteLine("✓ ORAE v2.0.0 validation passed");
-                SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
+                else
+                {
+                    Console.WriteLine("⚠ ORAE validation skipped (disabled in configuration)");
+                    SimpleLogger.LogWarning("⚠ ORAE validation skipped (disabled in configuration)");
+                }
 
                 // Map to RecordSet
                 RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
@@ -248,19 +256,28 @@ public partial class Program
             Console.WriteLine($"✓ RetailEvent parsed successfully\n");
             SimpleLogger.LogInfo("✓ RetailEvent parsed successfully");
 
-            Console.WriteLine("Validating ORAE v2.0.0 compliance...");
-            SimpleLogger.LogInfo("Validating ORAE v2.0.0 compliance...");
-            var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
-            if (validationErrors.Count > 0)
+            // Validate ORAE v2.0.0 compliance (if not disabled)
+            if (!pubSubConfig.DisableOraeValidation)
             {
-                string errorMessage = $"✗ ORAE validation failed with {validationErrors.Count} error(s):\n" +
-                                    string.Join("\n  - ", validationErrors.Prepend(""));
-                Console.WriteLine(errorMessage);
-                SimpleLogger.LogError(errorMessage);
-                return Task.CompletedTask;
+                Console.WriteLine("Validating ORAE v2.0.0 compliance...");
+                SimpleLogger.LogInfo("Validating ORAE v2.0.0 compliance...");
+                var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
+                if (validationErrors.Count > 0)
+                {
+                    string errorMessage = $"✗ ORAE validation failed with {validationErrors.Count} error(s):\n" +
+                                        string.Join("\n  - ", validationErrors.Prepend(""));
+                    Console.WriteLine(errorMessage);
+                    SimpleLogger.LogError(errorMessage);
+                    return Task.CompletedTask;
+                }
+                Console.WriteLine("✓ ORAE v2.0.0 validation passed\n");
+                SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
             }
-            Console.WriteLine("✓ ORAE v2.0.0 validation passed\n");
-            SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
+            else
+            {
+                Console.WriteLine("⚠ ORAE validation skipped (disabled in configuration)\n");
+                SimpleLogger.LogWarning("⚠ ORAE validation skipped (disabled in configuration)");
+            }
 
             Console.WriteLine("Mapping to RecordSet...");
             SimpleLogger.LogInfo("Mapping to RecordSet...");
