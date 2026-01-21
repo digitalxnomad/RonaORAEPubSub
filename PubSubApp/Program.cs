@@ -1243,8 +1243,9 @@ public partial class Program
                 TenderRecords = new List<TenderRecord>()
             };
 
-            // Sequence counter shared across OrderRecords and TenderRecords
-            int sequence = 1;
+            // Temporary lists to group records by type
+            List<OrderRecord> itemRecords = new List<OrderRecord>();
+            List<OrderRecord> taxRecords = new List<OrderRecord>();
 
             // Map ALL items (not just first one) - create one OrderRecord per item
             if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
@@ -1261,7 +1262,7 @@ public partial class Program
 
                         // Transaction Identification - with proper padding
                         TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each item
+                        TransSeq = "00000", // Placeholder - will be updated after grouping
                         RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                         // Store Information
@@ -1506,9 +1507,8 @@ public partial class Program
                     orderRecord.SalesStore = 0; // ASFSST - Always blank (0)
                     orderRecord.InvStore = 0; // ASFIST - Always blank (0)
 
-                    // Add this OrderRecord to the list
-                    recordSet.OrderRecords.Add(orderRecord);
-                    sequence++;
+                    // Add this OrderRecord to the item records list
+                    itemRecords.Add(orderRecord);
 
                     // Add tax line item for this specific item (LineType = "XH")
                     if (item.Taxes != null)
@@ -1536,7 +1536,7 @@ public partial class Program
                                 TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted occurred date
                                 TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted occurred time
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                                TransSeq = sequence.ToString().PadLeft(5, '0'), // SLFTSQ - Increment for tax records
+                                TransSeq = "00000", // Placeholder - will be updated after grouping
                                 RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                                 // Store Information
@@ -1621,16 +1621,33 @@ public partial class Program
                                 ItemScanned = "N"
                             };
 
-                            recordSet.OrderRecords.Add(taxRecord);
-                            sequence++; // Increment sequence for tax records
+                            taxRecords.Add(taxRecord);
                         }
                     }
                 }
 
             }
 
+            // Group records: Add all item records first, then all tax records
+            // Update sequence numbers after grouping
+            int sequence = 1;
+
+            foreach (var itemRecord in itemRecords)
+            {
+                itemRecord.TransSeq = sequence.ToString().PadLeft(5, '0');
+                recordSet.OrderRecords.Add(itemRecord);
+                sequence++;
+            }
+
+            foreach (var taxRecord in taxRecords)
+            {
+                taxRecord.TransSeq = sequence.ToString().PadLeft(5, '0');
+                recordSet.OrderRecords.Add(taxRecord);
+                sequence++;
+            }
+
             // Map ALL tenders (not just first one) - create one TenderRecord per tender
-            // Continue sequence from OrderRecords
+            // Continue sequence from OrderRecords (will be updated after grouping)
             if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
             {
                 foreach (var tender in retailEvent.Transaction.Tenders)
@@ -1644,7 +1661,7 @@ public partial class Program
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
                         TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransactionSeq = sequence.ToString().PadLeft(5, '0'), // Increment for each tender
+                        TransactionSeq = "00000", // Placeholder - will be updated after grouping
                         RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
                         // Store Information
@@ -1734,39 +1751,46 @@ public partial class Program
                     tenderRecord.OrderNumber = ""; // ATFORD - Always blank
                     tenderRecord.ProjectNumber = ""; // ATFPRO - Always blank
 
-                    // Add this TenderRecord to the list
+                    // Add this TenderRecord to the list (will update sequence after grouping)
                     recordSet.TenderRecords.Add(tenderRecord);
-                    sequence++;
                 }
             }
-        else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
-        {
-            // Fallback: create one tender record with net total if no tenders array
-            var tenderRecord = new TenderRecord
+            else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
             {
-                TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
-                TransactionType = mappedTransactionTypeSLFTTP,
-                TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                TransactionSeq = "00001",
-                RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                PolledStore = polledStoreInt,
-                PollCen = pollCen,
-                PollDate = pollDate,
-                CreateCen = createCen,
-                CreateDate = createDate,
-                CreateTime = createTime,
-                FundCode = "CA", // Default cash (TNFFCD)
-                Status = " " // Space for active
-            };
+                // Fallback: create one tender record with net total if no tenders array
+                var tenderRecord = new TenderRecord
+                {
+                    TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                    TransactionType = mappedTransactionTypeSLFTTP,
+                    TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                    TransactionSeq = "00000", // Placeholder - will be updated after grouping
+                    RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                    PolledStore = polledStoreInt,
+                    PollCen = pollCen,
+                    PollDate = pollDate,
+                    CreateCen = createCen,
+                    CreateDate = createDate,
+                    CreateTime = createTime,
+                    FundCode = "CA", // Default cash (TNFFCD)
+                    Status = " " // Space for active
+                };
 
-            var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
-            tenderRecord.Amount = amount;
-            tenderRecord.AmountNegativeSign = sign;
+                var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
+                tenderRecord.Amount = amount;
+                tenderRecord.AmountNegativeSign = sign;
 
-            recordSet.TenderRecords.Add(tenderRecord);
-        }
-        return recordSet;
+                recordSet.TenderRecords.Add(tenderRecord);
+            }
+
+            // Update all tender record sequences (continuing from last OrderRecord sequence)
+            foreach (var tenderRecord in recordSet.TenderRecords)
+            {
+                tenderRecord.TransactionSeq = sequence.ToString().PadLeft(5, '0');
+                sequence++;
+            }
+
+            return recordSet;
      }
 
         // Apply timezone adjustment based on store region
