@@ -1918,12 +1918,12 @@ public partial class Program
             {
                 "CASH" => "CA",
                 "CHECK" or "CHEQUE" => "CH",
-                "DEBIT" or "DEBIT_CARD" => "DC",
+                "DEBIT" or "DEBIT_CARD" or "DEBITATM" => "DC",
                 "CREDIT" or "CREDIT_CARD" => "VI", // Default to VISA if card scheme not available
                 "VISA" => "VI",
                 "MASTERCARD" or "MASTER_CARD" => "MA",
                 "AMEX" or "AMERICAN_EXPRESS" => "AX",
-                "GIFT_CARD" => "PG", // TODO: Distinguish between PC/PG/PP/PX based on transaction
+                "GIFT_CARD" or "GIFTCARD" => "PG", // Gift card redeemed
                 "COUPON" => "CP",
                 "TRAVELLERS_CHEQUE" or "TRAVELERS_CHECK" => "TC",
                 "US_CASH" => "US",
@@ -1942,7 +1942,8 @@ public partial class Program
                 "VISA" => "VI",
                 "MASTERCARD" or "MASTER_CARD" or "MC" => "MA",
                 "AMEX" or "AMERICAN EXPRESS" or "AMERICANEXPRESS" => "AX",
-                "DEBIT" => "DC",
+                "DEBIT" or "DEBITATM" => "DC",
+                "GIFTCARD" or "GIFT_CARD" => "PG",
                 _ => "VI" // Default to VISA for unknown card schemes
             };
         }
