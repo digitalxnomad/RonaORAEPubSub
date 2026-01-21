@@ -1660,7 +1660,15 @@ public partial class Program
                     };
 
                     // Map tender method to fund code
-                    tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+                    // Use card.scheme if available, otherwise use tender.method
+                    if (tender.Card != null && !string.IsNullOrEmpty(tender.Card.Scheme))
+                    {
+                        tenderRecord.FundCode = MapCardSchemeToFundCode(tender.Card.Scheme);
+                    }
+                    else
+                    {
+                        tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+                    }
 
                     // Tender amount with sign
                     if (tender.Amount?.Value != null)
@@ -1911,7 +1919,7 @@ public partial class Program
                 "CASH" => "CA",
                 "CHECK" or "CHEQUE" => "CH",
                 "DEBIT" or "DEBIT_CARD" => "DC",
-                "CREDIT" or "CREDIT_CARD" => "VI", // TODO: Detect actual card type (VI/MA/AX)
+                "CREDIT" or "CREDIT_CARD" => "VI", // Default to VISA if card scheme not available
                 "VISA" => "VI",
                 "MASTERCARD" or "MASTER_CARD" => "MA",
                 "AMEX" or "AMERICAN_EXPRESS" => "AX",
@@ -1924,6 +1932,18 @@ public partial class Program
                 "PENNY_ROUNDING" => "PR",
                 "CHANGE" => "ZZ",
                 _ => "CA" // Default to cash
+            };
+        }
+
+        private string MapCardSchemeToFundCode(string? scheme)
+        {
+            return scheme?.ToUpper() switch
+            {
+                "VISA" => "VI",
+                "MASTERCARD" or "MASTER_CARD" or "MC" => "MA",
+                "AMEX" or "AMERICAN EXPRESS" or "AMERICANEXPRESS" => "AX",
+                "DEBIT" => "DC",
+                _ => "VI" // Default to VISA for unknown card schemes
             };
         }
 
