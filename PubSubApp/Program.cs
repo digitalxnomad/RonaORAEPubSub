@@ -1048,6 +1048,21 @@ public partial class Program
 
         [JsonPropertyName("amount")]
         public CurrencyAmount? Amount { get; set; }
+
+        [JsonPropertyName("card")]
+        public Card? Card { get; set; }
+    }
+
+    public class Card
+    {
+        [JsonPropertyName("scheme")]
+        public string? Scheme { get; set; }
+
+        [JsonPropertyName("last4")]
+        public string? Last4 { get; set; }
+
+        [JsonPropertyName("authCode")]
+        public string? AuthCode { get; set; }
     }
 
     public class TransactionItem
@@ -1645,7 +1660,15 @@ public partial class Program
                     };
 
                     // Map tender method to fund code
-                    tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+                    // Use card.scheme if available, otherwise use tender.method
+                    if (tender.Card != null && !string.IsNullOrEmpty(tender.Card.Scheme))
+                    {
+                        tenderRecord.FundCode = MapCardSchemeToFundCode(tender.Card.Scheme);
+                    }
+                    else
+                    {
+                        tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+                    }
 
                     // Tender amount with sign
                     if (tender.Amount?.Value != null)
@@ -1664,10 +1687,23 @@ public partial class Program
 
                     // === CSV-specified tender field mappings ===
 
-                    // Card/Payment fields - per CSV rules
-                    tenderRecord.CreditCardNumber = ""; // TNFCCD - TODO: populate masked card number
+                    // Card/Payment fields - populate from tender.card if available
+                    if (tender.Card != null)
+                    {
+                        // TNFCCD - Credit card number: scheme + last4, padded to 19 chars
+                        string cardNumber = $"{tender.Card.Scheme ?? ""}{tender.Card.Last4 ?? ""}";
+                        tenderRecord.CreditCardNumber = PadOrTruncate(cardNumber, 19);
+
+                        // TNFAUT - Authorization code, padded to 6 chars
+                        tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
+                    }
+                    else
+                    {
+                        tenderRecord.CreditCardNumber = PadOrTruncate("", 19); // Empty when no card data
+                        tenderRecord.AuthNumber = PadOrTruncate("", 6); // Empty when no card data
+                    }
+
                     tenderRecord.CardExpirationDate = "0000"; // TNFEXP - Must be "0000" per validation spec
-                    tenderRecord.AuthNumber = ""; // TNFAUT - TODO: populate authorization number
                     tenderRecord.MagStripeFlag = " "; // TNFMSR (1 space) - TODO: populate based on card processing type
                     tenderRecord.PaymentHashValue = ""; // TNFHSH - TODO: populate from bank
 
@@ -1883,7 +1919,7 @@ public partial class Program
                 "CASH" => "CA",
                 "CHECK" or "CHEQUE" => "CH",
                 "DEBIT" or "DEBIT_CARD" => "DC",
-                "CREDIT" or "CREDIT_CARD" => "VI", // TODO: Detect actual card type (VI/MA/AX)
+                "CREDIT" or "CREDIT_CARD" => "VI", // Default to VISA if card scheme not available
                 "VISA" => "VI",
                 "MASTERCARD" or "MASTER_CARD" => "MA",
                 "AMEX" or "AMERICAN_EXPRESS" => "AX",
@@ -1896,6 +1932,18 @@ public partial class Program
                 "PENNY_ROUNDING" => "PR",
                 "CHANGE" => "ZZ",
                 _ => "CA" // Default to cash
+            };
+        }
+
+        private string MapCardSchemeToFundCode(string? scheme)
+        {
+            return scheme?.ToUpper() switch
+            {
+                "VISA" => "VI",
+                "MASTERCARD" or "MASTER_CARD" or "MC" => "MA",
+                "AMEX" or "AMERICAN EXPRESS" or "AMERICANEXPRESS" => "AX",
+                "DEBIT" => "DC",
+                _ => "VI" // Default to VISA for unknown card schemes
             };
         }
 
