@@ -1713,8 +1713,22 @@ public partial class Program
                     }
 
                     // Tender reference - use tender ID
+                    // TNFRDC - Always blank
+                    tenderRecord.ReferenceCode = ""; // TNFRDC - Always blank
+
+                    // TNFRDS should be blank for credit, debit, and flexiti tender types
+                    string tenderMethod = tender.Method?.ToUpper() ?? "";
+                    bool isBlankReferenceType = tenderMethod.Contains("CREDIT") ||
+                                                tenderMethod.Contains("DEBIT") ||
+                                                tenderMethod == "FLEXITI";
+
                     if (!string.IsNullOrEmpty(tender.TenderId))
                     {
+                        tenderRecord.ReferenceDesc = isBlankReferenceType ? "" : PadOrTruncate(tender.TenderId, 16); // TNFRDS - Blank for credit/debit/flexiti
+                    }
+                    else
+                    {
+                        tenderRecord.ReferenceDesc = "";
                         tenderRecord.ReferenceCode = "";
                         tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
                     }
@@ -1724,8 +1738,8 @@ public partial class Program
                     // Card/Payment fields - populate from tender.card if available
                     if (tender.Card != null)
                     {
-                        // TNFCCD - Credit card number: scheme + last4, padded to 19 chars
-                        string cardNumber = $"{tender.Card.Scheme ?? ""}{tender.Card.Last4 ?? ""}";
+                        // TNFCCD - Credit card number: * + scheme + last4, padded to 19 chars
+                        string cardNumber = $"*{tender.Card.Scheme ?? ""}{tender.Card.Last4 ?? ""}";
                         tenderRecord.CreditCardNumber = PadOrTruncate(cardNumber, 19);
 
                         // TNFAUT - Authorization code, padded to 6 chars
