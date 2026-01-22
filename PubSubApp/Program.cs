@@ -1713,6 +1713,9 @@ public partial class Program
                     }
 
                     // Tender reference - use tender ID
+                    // TNFRDC - Always blank
+                    tenderRecord.ReferenceCode = ""; // TNFRDC - Always blank
+
                     // TNFRDS should be blank for credit, debit, and flexiti tender types
                     string tenderMethod = tender.Method?.ToUpper() ?? "";
                     bool isBlankReferenceType = tenderMethod.Contains("CREDIT") ||
@@ -1721,12 +1724,10 @@ public partial class Program
 
                     if (!string.IsNullOrEmpty(tender.TenderId))
                     {
-                        tenderRecord.ReferenceCode = "T"; // TNFRDC - Always "T" when TenderId exists
                         tenderRecord.ReferenceDesc = isBlankReferenceType ? "" : PadOrTruncate(tender.TenderId, 16); // TNFRDS - Blank for credit/debit/flexiti
                     }
                     else
                     {
-                        tenderRecord.ReferenceCode = "";
                         tenderRecord.ReferenceDesc = "";
                     }
 
