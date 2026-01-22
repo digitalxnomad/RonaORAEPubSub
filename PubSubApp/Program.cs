@@ -1743,8 +1743,8 @@ public partial class Program
                     // Card/Payment fields - populate from tender.card if available
                     if (tender.Card != null)
                     {
-                        // TNFCCD - Credit card number: scheme + last4, padded left with * to 19 chars
-                        string cardNumber = $"{tender.Card.Scheme ?? ""}{tender.Card.Last4 ?? ""}";
+                        // TNFCCD - Credit card number: last4 only, padded left with * to 19 chars
+                        string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
 
                         // TNFAUT - Authorization code, padded to 6 chars
