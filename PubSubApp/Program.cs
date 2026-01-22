@@ -109,7 +109,9 @@ public partial class Program
                                             string.Join("\n", validationErrors);
                         Console.WriteLine($"✗ {errorMessage}");
                         SimpleLogger.LogError(errorMessage);
-                        throw new Exception(errorMessage);
+                        Console.WriteLine($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
+                        SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
+                        return SubscriberClient.Reply.Ack; // ACK to prevent redelivery of invalid ORAE data
                     }
                     Console.WriteLine("✓ ORAE v2.0.0 validation passed");
                     SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
