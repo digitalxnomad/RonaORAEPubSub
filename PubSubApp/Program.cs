@@ -1038,6 +1038,21 @@ public partial class Program
 
         [JsonPropertyName("totals")]
         public required Totals Totals { get; set; }
+
+        [JsonPropertyName("actor")]
+        public Actor? Actor { get; set; }
+    }
+
+    public class Actor
+    {
+        [JsonPropertyName("cashier")]
+        public Cashier? Cashier { get; set; }
+    }
+
+    public class Cashier
+    {
+        [JsonPropertyName("loginId")]
+        public string? LoginId { get; set; }
     }
 
     public class Tender
@@ -1253,6 +1268,21 @@ public partial class Program
             int createCen = 1;  // Always 1 per specification
             int createDate = pollDate;
             int createTime = GetTimeAsInt(transactionDateTime);
+
+            // Calculate SLFSPS - SalesPerson ID: If register starts with 8 (SCO), use register ID; otherwise ACO uses "00000"
+            string salesPersonId;
+            string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
+            if (registerId.StartsWith("8"))
+            {
+                // SCO (Self-Checkout) - use Workstation.RegisterID padded with zeros to 5 digits
+                salesPersonId = PadNumeric(registerId, 5);
+            }
+            else
+            {
+                // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
+                string cashierLoginId = retailEvent.Transaction?.Actor?.Cashier?.LoginId ?? "";
+                salesPersonId = PadNumeric(cashierLoginId, 5);
+            }
 
             var recordSet = new RecordSet
             {
@@ -1501,7 +1531,7 @@ public partial class Program
                     orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
                     orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                     orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
-                    orderRecord.SalesPerson = "00000"; // SLFSPS - 5 zeros when blank
+                    orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
 
                     // Discount fields - default to required values when no discount applied
                     if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
@@ -1624,7 +1654,7 @@ public partial class Program
                                 OriginalStore = "00000", // SLFOST - Required
                                 GroupDiscAmount = "000000000", // SLFGDA - Required
                                 GroupDiscSign = "", // SLFGDS - Empty string
-                                SalesPerson = "00000", // SLFSPS - 5 zeros when blank
+                                SalesPerson = salesPersonId, // SLFSPS - SCO uses register ID, ACO uses "00000"
                                 DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
                                 DiscountType = "", // SLFDST - Empty string
                                 DiscountAmountNegativeSign = "", // SLFDSN - Empty string
