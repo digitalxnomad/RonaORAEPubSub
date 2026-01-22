@@ -1716,21 +1716,26 @@ public partial class Program
                     // TNFRDC - Always blank
                     tenderRecord.ReferenceCode = ""; // TNFRDC - Always blank
 
-                    // TNFRDS should be blank for credit, debit, and flexiti tender types
+                    // TNFRDS - Always blank for credit, debit, and flexiti tender types
                     string tenderMethod = tender.Method?.ToUpper() ?? "";
                     bool isBlankReferenceType = tenderMethod.Contains("CREDIT") ||
                                                 tenderMethod.Contains("DEBIT") ||
                                                 tenderMethod == "FLEXITI";
 
-                    if (!string.IsNullOrEmpty(tender.TenderId))
+                    if (isBlankReferenceType)
                     {
-                        tenderRecord.ReferenceDesc = isBlankReferenceType ? "" : PadOrTruncate(tender.TenderId, 16); // TNFRDS - Blank for credit/debit/flexiti
+                        // Always blank for credit/debit/flexiti regardless of TenderId
+                        tenderRecord.ReferenceDesc = ""; // TNFRDS - Always blank for credit/debit/flexiti
+                    }
+                    else if (!string.IsNullOrEmpty(tender.TenderId))
+                    {
+                        // Use TenderId for other tender types
+                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16); // TNFRDS - Use TenderId for other types
                     }
                     else
                     {
+                        // Blank when no TenderId
                         tenderRecord.ReferenceDesc = "";
-                        tenderRecord.ReferenceCode = "";
-                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
                     }
 
                     // === CSV-specified tender field mappings ===
@@ -1738,8 +1743,8 @@ public partial class Program
                     // Card/Payment fields - populate from tender.card if available
                     if (tender.Card != null)
                     {
-                        // TNFCCD - Credit card number: scheme + last4, padded left with * to 19 chars
-                        string cardNumber = $"{tender.Card.Scheme ?? ""}{tender.Card.Last4 ?? ""}";
+                        // TNFCCD - Credit card number: last4 only, padded left with * to 19 chars
+                        string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
 
                         // TNFAUT - Authorization code, padded to 6 chars
