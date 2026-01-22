@@ -2203,6 +2203,9 @@ public partial class Program
                     }
                 }
             }
+
+            // SLFTCD - TaxRateCode should always be blank for transaction records
+            orderRecord.TaxRateCode = "";
         }
 
         // Helper method to format currency values to fixed-length strings
