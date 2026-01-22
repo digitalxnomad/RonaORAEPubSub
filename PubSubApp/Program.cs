@@ -1065,6 +1065,21 @@ public partial class Program
 
         [JsonPropertyName("authCode")]
         public string? AuthCode { get; set; }
+
+        [JsonPropertyName("emv")]
+        public Emv? Emv { get; set; }
+    }
+
+    public class Emv
+    {
+        [JsonPropertyName("tags")]
+        public EmvTags? Tags { get; set; }
+    }
+
+    public class EmvTags
+    {
+        [JsonPropertyName("magStrip")]
+        public string? MagStrip { get; set; }
     }
 
     public class TransactionItem
@@ -1715,15 +1730,18 @@ public partial class Program
 
                         // TNFAUT - Authorization code, padded to 6 chars
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
+
+                        // TNFMSR - Mag stripe flag from card.emv.tags.magStrip, default to " " (1 space)
+                        tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
                     }
                     else
                     {
                         tenderRecord.CreditCardNumber = PadOrTruncate("", 19); // Empty when no card data
                         tenderRecord.AuthNumber = PadOrTruncate("", 6); // Empty when no card data
+                        tenderRecord.MagStripeFlag = " "; // TNFMSR - Default to 1 space when no card data
                     }
 
                     tenderRecord.CardExpirationDate = "0000"; // TNFEXP - Must be "0000" per validation spec
-                    tenderRecord.MagStripeFlag = " "; // TNFMSR (1 space) - TODO: populate based on card processing type
                     tenderRecord.PaymentHashValue = ""; // TNFHSH - TODO: populate from bank
 
                     // Customer/Clerk fields - per CSV rules
