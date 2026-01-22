@@ -1259,8 +1259,8 @@ public partial class Program
                         // Required Fields - per CSV specs
                         TransType = mappedTransactionTypeSLFTTP,
                         LineType = mappedTransactionTypeSLFLNT,
-                        TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted occurred date
-                        TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted occurred time
+                        TransDate = retailEvent.OccurredAt.ToString("yyMMdd"), // SLFTDT - Use raw OccurredAt date
+                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // SLFTTM - Use raw OccurredAt time
 
                         // Transaction Identification - with proper padding
                         TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
@@ -1535,8 +1535,8 @@ public partial class Program
                                 // Same transaction identifiers as parent item
                                 TransType = mappedTransactionTypeSLFTTP,
                                 LineType = "XH", // Tax line type per spec
-                                TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted occurred date
-                                TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted occurred time
+                                TransDate = retailEvent.OccurredAt.ToString("yyMMdd"), // SLFTDT - Use raw OccurredAt date
+                                TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // SLFTTM - Use raw OccurredAt time
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                                 TransSeq = "00000", // Placeholder - will be updated after grouping
                                 RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
@@ -1658,7 +1658,7 @@ public partial class Program
                     {
                         // Required Fields - per CSV specs
                         TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                        TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                        TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // TNFTTM - Use raw OccurredAt time
 
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
@@ -1763,7 +1763,7 @@ public partial class Program
                 var tenderRecord = new TenderRecord
                 {
                     TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"),
+                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // TNFTTM - Use raw OccurredAt time
                     TransactionType = mappedTransactionTypeSLFTTP,
                     TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                     TransactionSeq = "00000", // Placeholder - will be updated after grouping
