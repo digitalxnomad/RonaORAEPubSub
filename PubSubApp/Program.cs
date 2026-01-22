@@ -15,7 +15,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/21/26 v1.0.23";
+    static string Version = "PubSubApp 01/22/26 v1.0.24";
 
     public static async Task Main(string[] args)
     {
