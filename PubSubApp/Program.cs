@@ -1280,7 +1280,7 @@ public partial class Program
             else
             {
                 // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
-                string cashierLoginId = retailEvent.Transaction?.Actor?.Cashier?.LoginId ?? "";
+                string cashierLoginId = retailEvent.Actor?.Cashier?.LoginId ?? "";
                 salesPersonId = PadNumeric(cashierLoginId, 5);
             }
 
