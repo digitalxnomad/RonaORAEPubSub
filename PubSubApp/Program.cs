@@ -1713,10 +1713,21 @@ public partial class Program
                     }
 
                     // Tender reference - use tender ID
+                    // TNFRDS should be blank for credit, debit, and flexiti tender types
+                    string tenderMethod = tender.Method?.ToUpper() ?? "";
+                    bool isBlankReferenceType = tenderMethod.Contains("CREDIT") ||
+                                                tenderMethod.Contains("DEBIT") ||
+                                                tenderMethod == "FLEXITI";
+
                     if (!string.IsNullOrEmpty(tender.TenderId))
                     {
-                        tenderRecord.ReferenceCode = "T";
-                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
+                        tenderRecord.ReferenceCode = isBlankReferenceType ? "" : "T";
+                        tenderRecord.ReferenceDesc = isBlankReferenceType ? "" : PadOrTruncate(tender.TenderId, 16);
+                    }
+                    else
+                    {
+                        tenderRecord.ReferenceCode = "";
+                        tenderRecord.ReferenceDesc = "";
                     }
 
                     // === CSV-specified tender field mappings ===
