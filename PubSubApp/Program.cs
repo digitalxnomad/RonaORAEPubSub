@@ -1270,7 +1270,7 @@ public partial class Program
             int createTime = GetTimeAsInt(transactionDateTime);
 
             // Calculate SLFSPS - SalesPerson ID: If register starts with 8 (SCO), use register ID; otherwise ACO uses "00000"
-            string salesPersonId;
+            string? salesPersonId;
             string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
             if (registerId.StartsWith("8"))
             {
@@ -1280,9 +1280,9 @@ public partial class Program
             else
             {
                 // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
-                string cashierLoginId = retailEvent.Transaction?.Actor?.Cashier?.LoginId ?? "";
-                salesPersonId = PadNumeric(cashierLoginId, 5);
-            }
+                string cashierLoginId = retailEvent.Transaction?.Actor?.Cashier?.LoginId ?? "";  
+            salesPersonId = PadNumeric(cashierLoginId, 5);            
+        }
 
             var recordSet = new RecordSet
             {
