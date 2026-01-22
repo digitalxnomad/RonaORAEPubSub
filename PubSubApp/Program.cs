@@ -1721,8 +1721,8 @@ public partial class Program
 
                     if (!string.IsNullOrEmpty(tender.TenderId))
                     {
-                        tenderRecord.ReferenceCode = isBlankReferenceType ? "" : "T";
-                        tenderRecord.ReferenceDesc = isBlankReferenceType ? "" : PadOrTruncate(tender.TenderId, 16);
+                        tenderRecord.ReferenceCode = "T"; // TNFRDC - Always "T" when TenderId exists
+                        tenderRecord.ReferenceDesc = isBlankReferenceType ? "" : PadOrTruncate(tender.TenderId, 16); // TNFRDS - Blank for credit/debit/flexiti
                     }
                     else
                     {
