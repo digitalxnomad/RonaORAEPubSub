@@ -1658,7 +1658,7 @@ public partial class Program
                     {
                         // Required Fields - per CSV specs
                         TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                        TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // TNFTTM - Use raw OccurredAt (NOT timezone-adjusted)
+                        TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time (same as SLFTTM)
 
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
@@ -1763,7 +1763,7 @@ public partial class Program
                 var tenderRecord = new TenderRecord
                 {
                     TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // TNFTTM - Use raw OccurredAt (NOT timezone-adjusted)
+                    TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time (same as SLFTTM)
                     TransactionType = mappedTransactionTypeSLFTTP,
                     TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                     TransactionSeq = "00000", // Placeholder - will be updated after grouping
