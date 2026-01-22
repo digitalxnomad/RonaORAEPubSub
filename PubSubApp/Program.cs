@@ -15,7 +15,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/14/26 v1.0.10";
+    static string Version = "PubSubApp 01/22/26 v1.0.24";
 
     public static async Task Main(string[] args)
     {
@@ -1729,6 +1729,8 @@ public partial class Program
                     else
                     {
                         tenderRecord.ReferenceDesc = "";
+                        tenderRecord.ReferenceCode = "";
+                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
                     }
 
                     // === CSV-specified tender field mappings ===
