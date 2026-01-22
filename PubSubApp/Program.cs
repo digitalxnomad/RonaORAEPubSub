@@ -1038,6 +1038,21 @@ public partial class Program
 
         [JsonPropertyName("totals")]
         public required Totals Totals { get; set; }
+
+        [JsonPropertyName("actor")]
+        public Actor? Actor { get; set; }
+    }
+
+    public class Actor
+    {
+        [JsonPropertyName("cashier")]
+        public Cashier? Cashier { get; set; }
+    }
+
+    public class Cashier
+    {
+        [JsonPropertyName("loginId")]
+        public string? LoginId { get; set; }
     }
 
     public class Tender
@@ -1259,13 +1274,14 @@ public partial class Program
             string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
             if (registerId.StartsWith("8"))
             {
-                // SCO (Self-Checkout) - use register ID padded with zeros to 5 digits
+                // SCO (Self-Checkout) - use Workstation.RegisterID padded with zeros to 5 digits
                 salesPersonId = PadNumeric(registerId, 5);
             }
             else
             {
-                // ACO (Assisted Checkout) - use mapping (default to "00000")
-                salesPersonId = "00000";
+                // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
+                string cashierLoginId = retailEvent.Transaction?.Actor?.Cashier?.LoginId ?? "";
+                salesPersonId = PadNumeric(cashierLoginId, 5);
             }
 
             var recordSet = new RecordSet
