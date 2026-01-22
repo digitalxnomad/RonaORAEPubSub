@@ -1715,7 +1715,7 @@ public partial class Program
                     // Tender reference - use tender ID
                     if (!string.IsNullOrEmpty(tender.TenderId))
                     {
-                        tenderRecord.ReferenceCode = "T";
+                        tenderRecord.ReferenceCode = "";
                         tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16);
                     }
 
