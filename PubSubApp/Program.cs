@@ -1254,6 +1254,20 @@ public partial class Program
             int createDate = pollDate;
             int createTime = GetTimeAsInt(transactionDateTime);
 
+            // Calculate SLFSPS - SalesPerson ID: If register starts with 8 (SCO), use register ID; otherwise ACO uses "00000"
+            string salesPersonId;
+            string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
+            if (registerId.StartsWith("8"))
+            {
+                // SCO (Self-Checkout) - use register ID padded with zeros to 5 digits
+                salesPersonId = PadNumeric(registerId, 5);
+            }
+            else
+            {
+                // ACO (Assisted Checkout) - use mapping (default to "00000")
+                salesPersonId = "00000";
+            }
+
             var recordSet = new RecordSet
             {
                 OrderRecords = new List<OrderRecord>(),
@@ -1501,7 +1515,7 @@ public partial class Program
                     orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
                     orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                     orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
-                    orderRecord.SalesPerson = "00000"; // SLFSPS - 5 zeros when blank
+                    orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
 
                     // Discount fields - default to required values when no discount applied
                     if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
@@ -1624,7 +1638,7 @@ public partial class Program
                                 OriginalStore = "00000", // SLFOST - Required
                                 GroupDiscAmount = "000000000", // SLFGDA - Required
                                 GroupDiscSign = "", // SLFGDS - Empty string
-                                SalesPerson = "00000", // SLFSPS - 5 zeros when blank
+                                SalesPerson = salesPersonId, // SLFSPS - SCO uses register ID, ACO uses "00000"
                                 DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
                                 DiscountType = "", // SLFDST - Empty string
                                 DiscountAmountNegativeSign = "", // SLFDSN - Empty string
