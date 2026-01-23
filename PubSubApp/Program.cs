@@ -15,7 +15,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/22/26 v1.0.24";
+    static string Version = "PubSubApp 01/22/26 v1.0.25";
 
     public static async Task Main(string[] args)
     {
@@ -1299,30 +1299,32 @@ public partial class Program
             {
                 foreach (var item in retailEvent.Transaction.Items)
                 {
-                    var orderRecord = new OrderRecord
-                    {
-                        // Required Fields - per CSV specs
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = mappedTransactionTypeSLFLNT,
-                        TransDate = retailEvent.OccurredAt.ToString("yyMMdd"), // SLFTDT - Use raw OccurredAt date
+                var orderRecord = new OrderRecord
+                {
+                    // Required Fields - per CSV specs
+                    TransType = mappedTransactionTypeSLFTTP,
+                    LineType = mappedTransactionTypeSLFLNT,
+                    TransDate = createDate,
+
+
                         TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // SLFTTM - Use raw OccurredAt time
 
-                        // Transaction Identification - with proper padding
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000", // Placeholder - will be updated after grouping
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                    // Transaction Identification - with proper padding
+                    TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                    TransSeq = "00000", // Placeholder - will be updated after grouping
+                    RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
-                        // Store Information
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
+                    // Store Information
+                    PolledStore = polledStoreInt,
+                    PollCen = pollCen,
+                    PollDate = pollDate,
+                    CreateCen = createCen,
+                    CreateDate = createDate,
+                    CreateTime = createTime,
 
-                        // Status - default to active (space for active)
-                        Status = " "
-                    };
+                    // Status - default to active (space for active)
+                    Status = " "
+                };   
 
                     // SKU Number - 9-digits with leading zeros
                     orderRecord.SKUNumber = PadNumeric(item.Item?.Sku, 9);
@@ -1775,7 +1777,7 @@ public partial class Program
                     {
                         // TNFCCD - Credit card number: last4 only, padded left with * to 19 chars
                         string cardNumber = tender.Card.Last4 ?? "";
-                        tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
+                        tenderRecord.CreditCardNumber = "************" + cardNumber;
 
                         // TNFAUT - Authorization code, padded to 6 chars
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
