@@ -1702,7 +1702,7 @@ public partial class Program
                     var tenderRecord = new TenderRecord
                     {
                         // Required Fields - per CSV specs
-                        TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                        TransactionDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
                         TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time
 
                         // Transaction Identification - with proper padding
@@ -1829,7 +1829,7 @@ public partial class Program
                 // Fallback: create one tender record with net total if no tenders array
                 var tenderRecord = new TenderRecord
                 {
-                    TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
+                    TransactionDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
                     TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time
                     TransactionType = mappedTransactionTypeSLFTTP,
                     TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
