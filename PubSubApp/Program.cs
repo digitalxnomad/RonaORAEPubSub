@@ -15,7 +15,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/22/26 v1.0.25";
+    static string Version = "PubSubApp 01/23/26 v1.0.26";
 
     public static async Task Main(string[] args)
     {
@@ -1304,11 +1304,10 @@ public partial class Program
                         // Required Fields - per CSV specs
                         TransType = mappedTransactionTypeSLFTTP,
                         LineType = mappedTransactionTypeSLFLNT,
-                        TransDate = retailEvent.OccurredAt.ToString("yyMMdd"), // SLFTDT - Use raw OccurredAt date
-                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // SLFTTM - Use raw OccurredAt time
-
-                    // Transaction Identification - with proper padding
-                    TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
+                        TransTime = transactionDateTime.ToString("HHmmss"),
+                        // Transaction Identification - with proper padding
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                     TransSeq = "00000", // Placeholder - will be updated after grouping
                     RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1573,7 +1572,7 @@ public partial class Program
                         // Only create tax line if there's a non-zero tax amount
                         if (itemTaxTotal != 0)
                         {
-                            string taxAuthority = DetermineTaxAuthority(retailEvent, itemTaxTotal);
+                        string taxAuthority = DetermineTaxAuthority(retailEvent, itemTaxTotal);
 
                             var taxRecord = new OrderRecord
                             {
@@ -1600,7 +1599,9 @@ public partial class Program
                                 ChargedTax2 = "N",
                                 ChargedTax3 = "N",
                                 ChargedTax4 = "N",
+
                                 TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+                                TaxRateCode = "HST   ",
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
                                 ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
@@ -1775,7 +1776,7 @@ public partial class Program
                     {
                         // TNFCCD - Credit card number: last4 only, padded left with * to 19 chars
                         string cardNumber = tender.Card.Last4 ?? "";
-                        tenderRecord.CreditCardNumber = "************" + cardNumber;
+                        tenderRecord.CreditCardNumber = "***************" + cardNumber;
 
                         // TNFAUT - Authorization code, padded to 6 chars
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
