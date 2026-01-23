@@ -1304,8 +1304,8 @@ public partial class Program
                         // Required Fields - per CSV specs
                         TransType = mappedTransactionTypeSLFTTP,
                         LineType = mappedTransactionTypeSLFLNT,
-                        TransDate = retailEvent.OccurredAt.ToString("yyMMdd"), // SLFTDT - Use raw OccurredAt date
-                        TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // SLFTTM - Use raw OccurredAt time
+                        TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted date
+                        TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted time
 
                         // Transaction Identification - with proper padding
                         TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
@@ -1476,7 +1476,7 @@ public partial class Program
                     else if (mappedTransactionTypeSLFTTP == "11") // VOID
                     {
                         orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
-                        orderRecord.OriginalTxDate = retailEvent.OccurredAt.ToString("yyMMdd"); // SLFOTD - occurred date for voids
+                        orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for voids
                         orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for voids
                         orderRecord.OriginalTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5); // SLFOTT - transaction number for voids
                     }
@@ -1490,7 +1490,7 @@ public partial class Program
                         if (retailEvent.Transaction?.TransactionType == "RETURN")
                         {
                             orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
-                            orderRecord.OriginalTxDate = retailEvent.OccurredAt.ToString("yyMMdd"); // SLFOTD - occurred date for returns
+                            orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for returns
                             orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for returns
                             orderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5); // SLFOTT - source transaction ID for returns
                         }
@@ -1580,8 +1580,8 @@ public partial class Program
                                 // Same transaction identifiers as parent item
                                 TransType = mappedTransactionTypeSLFTTP,
                                 LineType = "XH", // Tax line type per spec
-                                TransDate = retailEvent.OccurredAt.ToString("yyMMdd"), // SLFTDT - Use raw OccurredAt date
-                                TransTime = retailEvent.OccurredAt.ToString("HHmmss"), // SLFTTM - Use raw OccurredAt time
+                                TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted date
+                                TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted time
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                                 TransSeq = "00000", // Placeholder - will be updated after grouping
                                 RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
@@ -1625,7 +1625,7 @@ public partial class Program
                                 OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
                                                  (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
                                 OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000000" :
-                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? retailEvent.OccurredAt.ToString("yyMMdd") : null),
+                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? transactionDateTime.ToString("yyMMdd") : null),
                                 OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000" :
                                                     (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
                                 OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
@@ -1703,7 +1703,7 @@ public partial class Program
                     {
                         // Required Fields - per CSV specs
                         TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                        TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // TNFTTM - Use raw OccurredAt time
+                        TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time
 
                         // Transaction Identification - with proper padding
                         TransactionType = mappedTransactionTypeSLFTTP,
@@ -1830,7 +1830,7 @@ public partial class Program
                 var tenderRecord = new TenderRecord
                 {
                     TransactionDate = retailEvent.BusinessContext?.BusinessDay.ToString("yyMMdd"),
-                    TransactionTime = retailEvent.OccurredAt.ToString("HHmmss"), // TNFTTM - Use raw OccurredAt time
+                    TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time
                     TransactionType = mappedTransactionTypeSLFTTP,
                     TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                     TransactionSeq = "00000", // Placeholder - will be updated after grouping
