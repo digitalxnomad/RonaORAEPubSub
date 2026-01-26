@@ -1865,16 +1865,8 @@ public partial class Program
                         Status = " "
                     };
 
-                    // Map tender method to fund code
-                    // Use card.scheme if available, otherwise use tender.method
-                    if (tender.Card != null && !string.IsNullOrEmpty(tender.Card.Scheme))
-                    {
-                        tenderRecord.FundCode = MapCardSchemeToFundCode(tender.Card.Scheme);
-                    }
-                    else
-                    {
-                        tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
-                    }
+                    // TNFFCD - Fund code: Use TenderId directly from incoming ORAE data
+                    tenderRecord.FundCode = tender.TenderId ?? "";
 
                     // Tender amount with sign
                     if (tender.Amount?.Value != null)
