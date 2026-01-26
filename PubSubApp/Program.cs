@@ -1813,8 +1813,8 @@ public partial class Program
                         }
                     }
                 }
-
             }
+        }
 
             // Group records: Add all item records first, then all tax records
             // Update sequence numbers after grouping
