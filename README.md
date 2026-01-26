@@ -61,6 +61,9 @@ Retail transaction event from Google Cloud Pub/Sub containing:
 - channel (e.g., "STORE")
 - fulfillment (e.g., "CARRYOUT")
 
+**Actor (Root Level):** ✨ NEW
+- actor.cashier.loginId (cashier login identifier for ACO transactions)
+
 **Transaction Details:**
 - transactionType (SALE, RETURN, VOID, etc.)
 - items[] (line items with SKU, quantity, pricing)
@@ -76,6 +79,8 @@ Retail transaction event from Google Cloud Pub/Sub containing:
     - exemptReason (exemption description)
 - tenders[] (payment methods: CASH, CARD, etc.)
   - tenderId, method, amount
+  - card.scheme, card.last4, card.authCode ✨
+  - card.emv.tags.magStrip (mag stripe flag) ✨ NEW
 - totals (gross, discounts, tax, net, tendered, changeDue)
 
 ### Output: RecordSet
@@ -109,7 +114,12 @@ Line item details with 70+ fields including:
 Payment/tender information with 30+ fields including:
 - Transaction identification
 - Payment method details (fund code)
-- Credit/debit card information (masked card number, auth number)
+- Credit/debit card information
+  - **TNFCCD**: Last4 padded LEFT with asterisks (e.g., `************1234`) ✨
+  - **TNFAUT**: Authorization code
+  - **TNFMSR**: Mag stripe flag from EMV tags ✨ NEW
+  - **TNFRDC**: Always blank ✨
+  - **TNFRDS**: Blank for credit/debit/flexiti, otherwise TenderId ✨
 - Gift card tracking
 - Employee sale identification
 - Customer/member information
@@ -153,6 +163,9 @@ The application now supports comprehensive item-level tax parsing from ORAE v2.0
 - **Tax Authority**: Automatically determined based on rate
   - 13% → "HON" (Ontario HST)
   - 5% → "HON1" (Federal GST)
+- **Tax Consolidation**: All item taxes combined into ONE tax record per transaction ✨
+  - `ExtendedValue` and `ItemSellPrice` contain transaction-level tax total
+  - Single tax line item representing HST or Partial HST across all SKUs
 
 **Other Provinces:**
 - **PST**: `SLFTX1=Y`
@@ -160,22 +173,40 @@ The application now supports comprehensive item-level tax parsing from ORAE v2.0
 - **HST**: `SLFTX1=Y`, `SLFTX2=Y` (combined)
 - **QST**: `SLFTX3=Y` (Quebec)
 - **Municipal**: `SLFTX4=Y`
+- **Tax Records**: Per-item tax records (one tax line per item)
 
 ### Tax Line Items
-For every transaction with taxes, a separate tax line item is created:
 
+**Ontario Transactions:**
+One consolidated tax line item per transaction:
 - **LineType**: "XH" (tax record)
 - **Tax Flags**: All set to "N" (`SLFTX1-4=N`)
-- **Tax Authority**: HON or HON1 based on rate
-- **ExtendedValue**: Contains the tax amount
-- **Sequence**: Gets its own sequence number after item lines
+- **Tax Authority**: "HON" (13% HST) or "HON1" (5% GST)
+- **ExtendedValue**: Sum of all item taxes in transaction
+- **Sequence**: Gets its own sequence number after all item lines
 
-**Example Transaction Structure:**
+**Non-Ontario Transactions:**
+Per-item tax line items:
+- **LineType**: "XH" (tax record)
+- **Tax Flags**: Province-specific flags
+- **ExtendedValue**: Individual item tax amount
+- **Sequence**: One per item with taxes
+
+**Example Ontario Transaction Structure:**
 ```
 OrderRecords:
-  [1] Item 1 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFZIP="         0"
-  [2] Item 2 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFZIP="         0"
-  [3] Tax    - SLFLNT="XH", SLFTX2="N", SLFTX3="N", SLFACD="HON"
+  [1] Item 1 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFEXT="$50.00"
+  [2] Item 2 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFEXT="$30.00"
+  [3] Tax    - SLFLNT="XH", SLFTX2="N", SLFTX3="N", SLFACD="HON", SLFEXT="$10.40" (combined)
+```
+
+**Example Non-Ontario Transaction Structure:**
+```
+OrderRecords:
+  [1] Item 1 - SLFLNT="01", SLFTX1="Y", SLFEXT="$50.00"
+  [2] Tax    - SLFLNT="XH", SLFACD="...", SLFEXT="$6.50" (item 1 tax)
+  [3] Item 2 - SLFLNT="01", SLFTX1="Y", SLFEXT="$30.00"
+  [4] Tax    - SLFLNT="XH", SLFACD="...", SLFEXT="$3.90" (item 2 tax)
 ```
 
 ## EPP (Extended Protection Plan) ✨ NEW
@@ -326,7 +357,57 @@ Log entries include:
 
 ## Version History
 
-### v1.2.0 (01/19/26) ✨ Current
+### v1.3.0 (01/26/26) ✨ Current
+**Ontario Tax Consolidation & Actor Structure:**
+- ✨ **Ontario Tax Consolidation** - All item taxes combined into ONE tax record per transaction
+  - Province detection via `GetProvince()` method
+  - Transaction-level tax total calculation across all SKUs
+  - `TaxAuthCode`: "HON" (Full HST 13%) or "HON1" (Partial HST/GST 5%)
+  - `ExtendedValue` and `ItemSellPrice` contain combined tax amount
+  - Non-Ontario provinces maintain per-item tax records
+- ✨ **Actor/Cashier Structure** - Moved to root level of RetailEvent
+  - `actor.cashier.loginId` parsed from root instead of transaction
+  - Supports ACO (Assisted Checkout) salesperson logic
+- ✨ **SLFSPS (SalesPerson) Logic** - SCO vs ACO determination
+  - **SCO** (Self-Checkout): Register starts with "8" → uses `Workstation.RegisterID` padded to 5 digits
+  - **ACO** (Assisted Checkout): Register doesn't start with "8" → uses `actor.cashier.loginId` padded to 5 digits
+- ✨ **SLFTCD (TaxRateCode)** - Always blank ("") for transaction records
+- ✨ **All Date/Time Fields** - Timezone adjustment applied consistently
+  - `SLFTDT`, `SLFTTM`, `TNFTDT`, `TNFTTM` all use `ApplyTimezoneAdjustment()`
+  - Western region (BC, AB, SK, MB): -8 hours
+  - Eastern region (ON, QC): -5 hours
+
+**Tender Field Enhancements:**
+- ✨ **TNFRDC (ReferenceCode)** - Always blank ("") for all tender types
+- ✨ **TNFRDS (ReferenceDesc)** - Always blank for credit/debit/flexiti tenders
+  - Blank for: CREDIT, DEBIT, FLEXITI (case-insensitive)
+  - Uses `TenderId` (padded to 16 chars) for other tender types
+- ✨ **TNFCCD (CreditCardNumber)** - Last4 only, padded LEFT with asterisks
+  - Format: `************1234` (19 chars total)
+  - Security-enhanced format for PCI compliance
+- ✨ **TNFMSR (MagStripeFlag)** - Added from `card.emv.tags.magStrip`
+  - JSON path: `Transaction.Tenders[n].card.emv.tags.magStrip`
+  - Padded/truncated to 1 character
+  - Default: " " (1 space) when no card data
+
+**Bug Fixes:**
+- 🔧 **Pub/Sub Subscriber Async Fix** - Messages now received immediately
+  - Changed from awaiting `StartAsync` directly to storing Task
+  - Added 1-second initialization delay
+  - Resolves issue where messages weren't processed until Ctrl+C pressed
+- 🔧 **MapRetailEventToRecordSet** - Fixed missing closing braces
+  - Added missing brace in non-Ontario tax processing section
+  - Resolves "not all code paths return a value" compilation error
+- 🔧 **Indentation Error** - Fixed closing brace alignment on line 2004
+
+**Technical Improvements:**
+- Added `Actor` and `Cashier` classes to data model
+- Added `Emv` and `EmvTags` classes for EMV data
+- Enhanced `DetermineTaxAuthority()` for Ontario-specific logic
+- Province-based branching for tax record generation
+- Improved code structure and error handling
+
+### v1.2.0 (01/19/26)
 **Field Formatting & Validation Improvements:**
 - ✨ **SLFRFD (ReferenceDesc)** - Right justified with zeros to 16 characters using transaction number
 - ✨ **SLFUPC (UPCCode)** - Set to "0000000000000" (13 zeros) when blank
