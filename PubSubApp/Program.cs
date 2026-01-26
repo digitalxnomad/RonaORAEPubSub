@@ -2001,7 +2001,7 @@ public partial class Program
             }
 
             return recordSet;
-     }
+        }
 
         // Apply timezone adjustment based on store region
         // Western region (BC, AB, SK, MB): subtract 8 hours
