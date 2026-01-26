@@ -1856,14 +1856,14 @@ public partial class Program
 
                     // Map tender method to fund code
                     // Use card.scheme if available, otherwise use tender.method
-                    if (tender.Card != null && !string.IsNullOrEmpty(tender.Card.Scheme))
-                    {
-                        tenderRecord.FundCode = MapCardSchemeToFundCode(tender.Card.Scheme);
-                    }
-                    else
-                    {
+//                    if (tender.Card != null && !string.IsNullOrEmpty(tender.Card.Scheme))
+//                    {
+//                        tenderRecord.FundCode = MapCardSchemeToFundCode(tender.Card.Scheme);
+//                    }
+//                    else
+//                    {
                         tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
-                    }
+//                    }
 
                     // Tender amount with sign
                     if (tender.Amount?.Value != null)
