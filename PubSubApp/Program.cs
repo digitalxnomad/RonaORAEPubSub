@@ -69,8 +69,8 @@ public partial class Program
         SimpleLogger.LogInfo("✓ Publisher and Subscriber initialized");
         SimpleLogger.LogInfo("Listening for messages...");
 
-        // Start subscribing (don't await - it returns immediately and runs in background)
-        Task subscriberTask = subscriber.StartAsync(async (message, cancellationToken) =>
+        // Start subscribing
+        await subscriber.StartAsync(async (message, cancellationToken) =>
         {
             try
             {
@@ -206,22 +206,11 @@ public partial class Program
             }
         });
 
-        // Give the subscriber a moment to fully initialize
-        await Task.Delay(1000);
-
-        Console.WriteLine("✓ Subscriber is now actively listening for messages");
-        SimpleLogger.LogInfo("✓ Subscriber is now actively listening for messages");
         Console.WriteLine("Press Enter to stop...");
         Console.ReadLine();
 
-        Console.WriteLine("\n✓ Shutting down subscriber...");
-        SimpleLogger.LogInfo("✓ Shutting down subscriber...");
-
         await subscriber.StopAsync(CancellationToken.None);
         await publisher.ShutdownAsync(TimeSpan.FromSeconds(15));
-
-        Console.WriteLine("✓ Shutdown complete");
-        SimpleLogger.LogInfo("✓ Shutdown complete");
     }
 
     static Task TestJsonFile(string jsonPath)
