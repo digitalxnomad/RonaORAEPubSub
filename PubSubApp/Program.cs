@@ -159,7 +159,7 @@ public partial class Program
                         Directory.CreateDirectory(pubSubConfig.OutputSavePath);
                         string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
                             $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
-                        File.WriteAllText(outputFilePath, jsonString);
+                        await File.WriteAllTextAsync(outputFilePath, jsonString, cancellationToken);
                         Console.WriteLine($"✓ Saved output to: {outputFilePath}");
                         SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
                     }
