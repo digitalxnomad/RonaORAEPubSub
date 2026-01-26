@@ -15,7 +15,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/26/26 v1.0.28";
+    static string Version = "PubSubApp 01/26/26 v1.0.29";
 
     public static async Task Main(string[] args)
     {
@@ -1862,7 +1862,7 @@ public partial class Program
 //                    }
 //                    else
 //                    {
-                        tenderRecord.FundCode = MapTenderMethodToFundCode(tender.Method);
+                        tenderRecord.FundCode = tender.TenderId;
 //                    }
 
                     // Tender amount with sign
