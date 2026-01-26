@@ -1247,78 +1247,78 @@ public partial class Program
 
         }
 
-        public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
+    public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
+    {
+        // Check for employee discount (will set SLFPVC and affect SLFTTP/SLFLNT)
+        bool hasEmployeeDiscount = HasEmployeeDiscount(retailEvent);
+
+        // Check for gift card tender
+        bool hasGiftCardTender = HasGiftCardTender(retailEvent);
+
+        // Check for customer ID (currently always blank, but ready for future)
+        bool hasCustomerId = !string.IsNullOrEmpty(GetCustomerId(retailEvent));
+
+        string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ?
+            MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType, hasEmployeeDiscount) : null;
+        string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ?
+            MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType, hasEmployeeDiscount, hasGiftCardTender, hasCustomerId) : null;
+
+        // Parse storeId as integer for PolledStore fields
+        int? polledStoreInt = null;
+        if (int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out int storeId))
         {
-            // Check for employee discount (will set SLFPVC and affect SLFTTP/SLFLNT)
-            bool hasEmployeeDiscount = HasEmployeeDiscount(retailEvent);
+            polledStoreInt = storeId;
+        }
 
-            // Check for gift card tender
-            bool hasGiftCardTender = HasGiftCardTender(retailEvent);
+        // Apply timezone adjustment based on store region
+        DateTime transactionDateTime = ApplyTimezoneAdjustment(retailEvent.OccurredAt, retailEvent.BusinessContext?.Store?.StoreId);
 
-            // Check for customer ID (currently always blank, but ready for future)
-            bool hasCustomerId = !string.IsNullOrEmpty(GetCustomerId(retailEvent));
+        // Get date/time values from adjusted transaction time
+        int pollCen = 1;  // Always 1 per specification
+        int pollDate = GetDateAsInt(transactionDateTime); // SLFPDT - Use adjusted transaction date
+        int createCen = 1;  // Always 1 per specification
+        int createDate = pollDate;
+        int createTime = GetTimeAsInt(transactionDateTime);
 
-            string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ?
-                MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType, hasEmployeeDiscount) : null;
-            string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ?
-                MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType, hasEmployeeDiscount, hasGiftCardTender, hasCustomerId) : null;
+        // Calculate SLFSPS - SalesPerson ID: If register starts with 8 (SCO), use register ID; otherwise ACO uses "00000"
+        string? salesPersonId;
+        string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
+        if (registerId.StartsWith("8"))
+        {
+            // SCO (Self-Checkout) - use Workstation.RegisterID padded with zeros to 5 digits
+            salesPersonId = PadNumeric(registerId, 5);
+        }
+        else
+        {
+            // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
+            string cashierLoginId = retailEvent.Actor?.Cashier?.LoginId ?? "";
+            salesPersonId = PadNumeric(cashierLoginId, 5);
+        }
 
-            // Parse storeId as integer for PolledStore fields
-            int? polledStoreInt = null;
-            if (int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out int storeId))
+        var recordSet = new RecordSet
+        {
+            OrderRecords = new List<OrderRecord>(),
+            TenderRecords = new List<TenderRecord>()
+        };
+
+        // Temporary lists to group records by type
+        List<OrderRecord> itemRecords = new List<OrderRecord>();
+        List<OrderRecord> taxRecords = new List<OrderRecord>();
+
+        // Map ALL items (not just first one) - create one OrderRecord per item
+        if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
+        {
+            foreach (var item in retailEvent.Transaction.Items)
             {
-                polledStoreInt = storeId;
-            }
-
-            // Apply timezone adjustment based on store region
-            DateTime transactionDateTime = ApplyTimezoneAdjustment(retailEvent.OccurredAt, retailEvent.BusinessContext?.Store?.StoreId);
-
-            // Get date/time values from adjusted transaction time
-            int pollCen = 1;  // Always 1 per specification
-            int pollDate = GetDateAsInt(transactionDateTime); // SLFPDT - Use adjusted transaction date
-            int createCen = 1;  // Always 1 per specification
-            int createDate = pollDate;
-            int createTime = GetTimeAsInt(transactionDateTime);
-
-            // Calculate SLFSPS - SalesPerson ID: If register starts with 8 (SCO), use register ID; otherwise ACO uses "00000"
-            string? salesPersonId;
-            string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
-            if (registerId.StartsWith("8"))
-            {
-                // SCO (Self-Checkout) - use Workstation.RegisterID padded with zeros to 5 digits
-                salesPersonId = PadNumeric(registerId, 5);
-            }
-            else
-            {
-                // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
-                string cashierLoginId = retailEvent.Actor?.Cashier?.LoginId ?? "";
-                salesPersonId = PadNumeric(cashierLoginId, 5);
-            }
-
-            var recordSet = new RecordSet
-            {
-                OrderRecords = new List<OrderRecord>(),
-                TenderRecords = new List<TenderRecord>()
-            };
-
-            // Temporary lists to group records by type
-            List<OrderRecord> itemRecords = new List<OrderRecord>();
-            List<OrderRecord> taxRecords = new List<OrderRecord>();
-
-            // Map ALL items (not just first one) - create one OrderRecord per item
-            if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
-            {
-                foreach (var item in retailEvent.Transaction.Items)
+                var orderRecord = new OrderRecord
                 {
-                    var orderRecord = new OrderRecord
-                    {
-                        // Required Fields - per CSV specs
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = mappedTransactionTypeSLFLNT,
-                        TransDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        // Transaction Identification - with proper padding
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                    // Required Fields - per CSV specs
+                    TransType = mappedTransactionTypeSLFTTP,
+                    LineType = mappedTransactionTypeSLFLNT,
+                    TransDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
+                    TransTime = transactionDateTime.ToString("HHmmss"),
+                    // Transaction Identification - with proper padding
+                    TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
                     TransSeq = "00000", // Placeholder - will be updated after grouping
                     RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
 
@@ -1332,388 +1332,388 @@ public partial class Program
 
                     // Status - default to active (space for active)
                     Status = " "
-                };   
+                };
 
-                    // SKU Number - 9-digits with leading zeros
-                    orderRecord.SKUNumber = PadNumeric(item.Item?.Sku, 9);
+                // SKU Number - 9-digits with leading zeros
+                orderRecord.SKUNumber = PadNumeric(item.Item?.Sku, 9);
 
-                    // Quantity - 9-digits without decimal (multiply by 100)
-                    if (item.Quantity != null)
-                    {
-                        decimal qtyValue = item.Quantity.Value;
-                        bool isNegative = qtyValue < 0;
-                        int qtyCents = (int)(Math.Abs(qtyValue) * 100);
+                // Quantity - 9-digits without decimal (multiply by 100)
+                if (item.Quantity != null)
+                {
+                    decimal qtyValue = item.Quantity.Value;
+                    bool isNegative = qtyValue < 0;
+                    int qtyCents = (int)(Math.Abs(qtyValue) * 100);
 
-                        orderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
-                        // SLFQTN: "-" for Return, "" for all else
-                        orderRecord.QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "";
-                    }
-
-                    // Original Price - 9-digits without decimal
-                    if (item.Pricing?.OriginalUnitPrice?.Value != null)
-                    {
-                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.OriginalUnitPrice.Value, 9);
-                        orderRecord.OriginalPrice = amount;
-                        orderRecord.OriginalPriceNegativeSign = sign;
-                        orderRecord.OriginalRetail = amount; // SLFORT same as SLFORG
-                        orderRecord.OriginalRetailNegativeSign = sign;
-                    }
-
-                    // Sell Price (extended price) - 9-digits without decimal
-                    if (item.Pricing?.ExtendedPrice?.Value != null)
-                    {
-                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 9);
-                        orderRecord.ItemSellPrice = amount;
-                        orderRecord.SellPriceNegativeSign = sign;
-                    }
-
-                    // Extended Value (Quantity * Net Price) - 11-digits without decimal
-                    // Calculate: Quantity * Override (if exists), otherwise Quantity * UnitPrice
-                    decimal extendedValue = 0;
-                    if (item.Quantity?.Value != null)
-                    {
-                        decimal quantity = item.Quantity.Value;
-
-                        // Use override price if it exists, otherwise use unit price
-                        string? priceToUse = item.Pricing?.Override?.Value ?? item.Pricing?.UnitPrice?.Value;
-
-                        if (priceToUse != null && decimal.TryParse(priceToUse, out decimal priceValue))
-                        {
-                            extendedValue = quantity * priceValue;
-                        }
-                    }
-
-                    var (amountExt, signExt) = FormatCurrencyWithSign(extendedValue.ToString("F2"), 11);
-                    orderRecord.ExtendedValue = amountExt;
-                    orderRecord.ExtendedValueNegativeSign = signExt;
-
-                    // Override Price - default to zeros if not present
-                    orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
-                    orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
-
-                    // Calculate discount if unit price differs from original
-                    if (item.Pricing?.OriginalUnitPrice?.Value != null &&
-                        item.Pricing?.UnitPrice?.Value != null &&
-                        decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPrice) &&
-                        decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPrice))
-                    {
-                        decimal discountAmount = origPrice - unitPrice;
-                        if (discountAmount != 0)
-                        {
-                            var (amount, sign) = FormatCurrencyWithSign(discountAmount.ToString("F2"), 9);
-                            orderRecord.DiscountAmount = amount;
-                            orderRecord.DiscountAmountNegativeSign = sign;
-                            orderRecord.DiscountType = discountAmount > 0 ? "01" : "00";
-                        }
-                    }
-
-                    // Item Scanned Y/N
-                    orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
-
-                    // Price Vehicle Code (SLFPVC) and Reference (SLFREF) - parse from pricing.priceVehicle
-                    // Format: "LEFT:RIGHT" where LEFT goes to SLFPVC (4 chars) and RIGHT goes to SLFREF (12 chars)
-                    if (!string.IsNullOrEmpty(item.Pricing?.PriceVehicle))
-                    {
-                        string[] parts = item.Pricing.PriceVehicle.Split(':');
-                        if (parts.Length == 2)
-                        {
-                            orderRecord.PriceVehicleCode = PadOrTruncate(parts[0], 4); // Left side to SLFPVC
-                            orderRecord.PriceVehicleReference = PadOrTruncate(parts[1], 12); // Right side to SLFREF
-                        }
-                        else
-                        {
-                            // If format is incorrect, pad the whole value to SLFPVC
-                            orderRecord.PriceVehicleCode = PadOrTruncate(item.Pricing.PriceVehicle, 4);
-                            orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
-                        }
-                    }
-                    else
-                    {
-                        // Fallback: use "EMP" for employee discounts if priceVehicle not provided
-                        orderRecord.PriceVehicleCode = hasEmployeeDiscount ? PadOrTruncate("EMP", 4) : PadOrTruncate("", 4);
-                        orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
-                    }
-
-                    // SLFADC - Additional Code: "####" when POS price != regular retail, "0000" when regular price
-                    bool isRegularPrice = true;
-                    if (item.Pricing?.OriginalUnitPrice?.Value != null &&
-                        item.Pricing?.UnitPrice?.Value != null &&
-                        decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPriceAdc) &&
-                        decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPriceAdc))
-                    {
-                        isRegularPrice = (unitPriceAdc == origPriceAdc);
-                    }
-                    orderRecord.AdCode = isRegularPrice ? "0000" : "####";
-
-                    // SLFADP - Ad Price: "000000000" when PVCode is REG or MAN, otherwise unit price
-                    string pvCode = orderRecord.PriceVehicleCode?.Trim() ?? "";
-                    if (pvCode == "REG" || pvCode == "MAN")
-                    {
-                        orderRecord.AdPrice = "000000000"; // 9 zeros for REG or MAN
-                        orderRecord.AdPriceNegativeSign = ""; // Empty sign
-                    }
-                    else
-                    {
-                        // Use unit price formatted as 9-digit currency
-                        if (item.Pricing?.UnitPrice?.Value != null)
-                        {
-                            var (amount, sign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
-                            orderRecord.AdPrice = amount;
-                            orderRecord.AdPriceNegativeSign = sign;
-                        }
-                        else
-                        {
-                            orderRecord.AdPrice = "000000000";
-                            orderRecord.AdPriceNegativeSign = "";
-                        }
-                    }
-
-                    // Parse item-level taxes
-                    ParseItemTaxes(item, orderRecord, retailEvent);
-
-                    // Reference fields
-                    orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
-                    orderRecord.ReferenceDesc = ""; // SLFRFD - Always empty string
-
-                    // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
-                    if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04") // SALE or Employee SALE
-                    {
-                        orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
-                        orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
-                        orderRecord.OriginalTxRegister = "000"; // SLFOTR - 3 zeros for sales
-                        orderRecord.OriginalTxNumber = "00000"; // SLFOTT - 5 zeros for sales
-                    }
-                    else if (mappedTransactionTypeSLFTTP == "11") // VOID
-                    {
-                        orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
-                        orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for voids
-                        orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for voids
-                        orderRecord.OriginalTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5); // SLFOTT - transaction number for voids
-                    }
-
-                    // Map reference transaction if this is a return or void
-                    if (retailEvent.References?.SourceTransactionId != null &&
-                        (retailEvent.Transaction?.TransactionType == "RETURN" ||
-                         retailEvent.Transaction?.TransactionType == "VOID"))
-                    {
-                        string sourceId = retailEvent.References.SourceTransactionId;
-                        if (retailEvent.Transaction?.TransactionType == "RETURN")
-                        {
-                            orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
-                            orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for returns
-                            orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for returns
-                            orderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5); // SLFOTT - source transaction ID for returns
-                        }
-                    }
-
-                    // === CSV-specified field mappings ===
-
-                    // Customer fields - per CSV rules
-                    orderRecord.CustomerName = ""; // SLFCNM - Always blank
-                    orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
-
-                    // SLFZIP - Leave empty to omit validation (per validate:"omitempty,max=10")
-                    // Customer postal code data not available in ORAE Transaction structure
-                    orderRecord.ZipCode = "";
-
-                    // Till/Clerk - SLFCLK (from till number) - right justified with zeros
-                    orderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
-
-                    // Employee fields - per CSV rules
-                    orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
-
-                    // UPC Code - SLFUPC (SKU UPC if scanned, otherwise all zeros)
-                    orderRecord.UPCCode = "0000000000000"; // 13 zeros when not scanned
-
-                    // Email - SLFEML (for ereceipt)
-                    orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
-
-                    // Reason codes - SLFRSN (return/price override/post voided - left justified)
-                    orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
-
-                    // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
-                    orderRecord.TaxExemptId1 = ""; // SLFTE1 - Always empty
-                    orderRecord.TaxExemptId2 = ""; // SLFTE2 - Always empty
-                    orderRecord.TaxExemptionName = ""; // SLFTEN - Always empty
-
-                    // Required fields with fixed values - per validation spec
-                    orderRecord.OriginalSalesperson = "00000"; // SLFOSP - Required, must be "00000"
-                    orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
-                    orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
-                    orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
-                    orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
-
-                    // Discount fields - default to required values when no discount applied
-                    if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
-                    {
-                        orderRecord.DiscountAmount = "000000000"; // SLFDSA - Must be "000000000" per validation
-                        orderRecord.DiscountType = ""; // SLFDST - Must be empty string
-                        orderRecord.DiscountAmountNegativeSign = ""; // SLFDSN - Must be empty string
-                    }
-
-                    // Discount reasons - per CSV rules
-                    orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
-
-                    // SLFRDR - Set to 'I2' when PVC = 'MAN', otherwise '00'
-                    string pvCodeForRdr = orderRecord.PriceVehicleCode?.Trim() ?? "";
-                    orderRecord.RegDiscReason = (pvCodeForRdr == "MAN") ? "I2" : "00";
-
-                    // Blank fields - per CSV rules
-                    orderRecord.OrderNumber = ""; // SLFORD - Always blank
-                    orderRecord.ProjectNumber = ""; // ASFPRO - Always blank
-                    orderRecord.SalesStore = 0; // ASFSST - Always blank (0)
-                    orderRecord.InvStore = 0; // ASFIST - Always blank (0)
-
-                    // Add this OrderRecord to the item records list
-                    itemRecords.Add(orderRecord);
+                    orderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
+                    // SLFQTN: "-" for Return, "" for all else
+                    orderRecord.QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "";
                 }
 
-                // Determine if this is an Ontario transaction
-                string? province = GetProvince(retailEvent);
-                bool isOntario = province?.ToUpper() == "ON" || province?.ToUpper() == "ONTARIO";
-
-                // For Ontario: Create ONE combined tax record for entire transaction
-                // For Non-Ontario: Create per-item tax records (future enhancement)
-                if (isOntario)
+                // Original Price - 9-digits without decimal
+                if (item.Pricing?.OriginalUnitPrice?.Value != null)
                 {
-                    // Calculate total tax across ALL items in the transaction
-                    decimal transactionTaxTotal = 0;
-                    foreach (var item in retailEvent.Transaction.Items)
+                    var (amount, sign) = FormatCurrencyWithSign(item.Pricing.OriginalUnitPrice.Value, 9);
+                    orderRecord.OriginalPrice = amount;
+                    orderRecord.OriginalPriceNegativeSign = sign;
+                    orderRecord.OriginalRetail = amount; // SLFORT same as SLFORG
+                    orderRecord.OriginalRetailNegativeSign = sign;
+                }
+
+                // Sell Price (extended price) - 9-digits without decimal
+                if (item.Pricing?.ExtendedPrice?.Value != null)
+                {
+                    var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 9);
+                    orderRecord.ItemSellPrice = amount;
+                    orderRecord.SellPriceNegativeSign = sign;
+                }
+
+                // Extended Value (Quantity * Net Price) - 11-digits without decimal
+                // Calculate: Quantity * Override (if exists), otherwise Quantity * UnitPrice
+                decimal extendedValue = 0;
+                if (item.Quantity?.Value != null)
+                {
+                    decimal quantity = item.Quantity.Value;
+
+                    // Use override price if it exists, otherwise use unit price
+                    string? priceToUse = item.Pricing?.Override?.Value ?? item.Pricing?.UnitPrice?.Value;
+
+                    if (priceToUse != null && decimal.TryParse(priceToUse, out decimal priceValue))
                     {
-                        if (item.Taxes != null)
-                        {
-                            foreach (var tax in item.Taxes)
-                            {
-                                if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
-                                {
-                                    transactionTaxTotal += taxAmount;
-                                }
-                            }
-                        }
+                        extendedValue = quantity * priceValue;
                     }
+                }
 
-                    // Only create tax record if there's a non-zero tax amount
-                    if (transactionTaxTotal != 0)
+                var (amountExt, signExt) = FormatCurrencyWithSign(extendedValue.ToString("F2"), 11);
+                orderRecord.ExtendedValue = amountExt;
+                orderRecord.ExtendedValueNegativeSign = signExt;
+
+                // Override Price - default to zeros if not present
+                orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
+                orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
+
+                // Calculate discount if unit price differs from original
+                if (item.Pricing?.OriginalUnitPrice?.Value != null &&
+                    item.Pricing?.UnitPrice?.Value != null &&
+                    decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPrice) &&
+                    decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPrice))
+                {
+                    decimal discountAmount = origPrice - unitPrice;
+                    if (discountAmount != 0)
                     {
-                        string taxAuthority = DetermineTaxAuthority(retailEvent, transactionTaxTotal);
+                        var (amount, sign) = FormatCurrencyWithSign(discountAmount.ToString("F2"), 9);
+                        orderRecord.DiscountAmount = amount;
+                        orderRecord.DiscountAmountNegativeSign = sign;
+                        orderRecord.DiscountType = discountAmount > 0 ? "01" : "00";
+                    }
+                }
 
-                        var taxRecord = new OrderRecord
-                        {
-                            // Same transaction identifiers as parent item
-                            TransType = mappedTransactionTypeSLFTTP,
-                            LineType = "XH", // Tax line type per spec
-                            TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted date
-                            TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted time
-                            TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                            TransSeq = "00000", // Placeholder - will be updated after grouping
-                            RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                // Item Scanned Y/N
+                orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
 
-                            // Store Information
-                            PolledStore = polledStoreInt,
-                            PollCen = pollCen,
-                            PollDate = pollDate,
-                            CreateCen = createCen,
-                            CreateDate = createDate,
-                            CreateTime = createTime,
-                            Status = " ",
-
-                            // Tax-specific fields - all tax flags set to N per spec
-                            ChargedTax1 = "N",
-                            ChargedTax2 = "N",
-                            ChargedTax3 = "N",
-                            ChargedTax4 = "N",
-                            TaxAuthCode = PadOrTruncate(taxAuthority, 6),
-
-                            // Tax amount in ExtendedValue and ItemSellPrice - COMBINED TOTAL for Ontario
-                            ExtendedValue = FormatCurrency(transactionTaxTotal.ToString("F2"), 11),
-                            ExtendedValueNegativeSign = transactionTaxTotal < 0 ? "-" : "",
-                            ItemSellPrice = FormatCurrency(transactionTaxTotal.ToString("F2"), 9),
-                            SellPriceNegativeSign = transactionTaxTotal < 0 ? "-" : "",
-
-                            // Blank fields for tax line
-                            SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
-                            Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
-                            QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "", // SLFQTN: "-" for Return, "" for all else
-                            OriginalPrice = "000000000", // SLFORG - 9 zeros for tax record
-                            OriginalPriceNegativeSign = "",
-                            OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
-                            OverridePriceNegativeSign = "", // SLFOVN - Empty string
-                            OriginalRetail = "000000000", // SLFORT - 9 zeros for tax record
-                            OriginalRetailNegativeSign = "",
-                            ReferenceCode = "", // SLFRFC - Always empty string
-                            ReferenceDesc = "", // SLFRFD - Always empty string
-
-                            // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type (same logic as regular items)
-                            OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
-                                             (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                            OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? transactionDateTime.ToString("yyMMdd") : null),
-                            OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000" :
-                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                            OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
-                                              (mappedTransactionTypeSLFTTP == "11" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                              (mappedTransactionTypeSLFTTP == "02" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) : null)),
-
-                            CustomerName = "",
-                            CustomerNumber = "",
-                            ZipCode = "",
-                            Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                            EmployeeCardNumber = 0,
-                            UPCCode = "0000000000000", // SLFUPC - 13 zeros
-                            EReceiptEmail = "",
-                            ReasonCode = "",
-                            TaxExemptId1 = "", // SLFTE1 - Always empty
-                            TaxExemptId2 = "", // SLFTE2 - Always empty
-                            TaxExemptionName = "", // SLFTEN - Always empty
-                            AdCode = "0000", // SLFADC - Always "0000" for tax records
-                            AdPrice = "000000000", // SLFADP - Always "000000000" for tax records
-                            AdPriceNegativeSign = "", // SLFADN - Empty string for tax records
-                            PriceVehicleCode = "", // SLFPVC - Empty string for tax records
-                            PriceVehicleReference = "", // SLFREF - Empty string for tax records
-
-                            // Required fields with fixed values - per validation spec
-                            OriginalSalesperson = "00000", // SLFOSP - Required
-                            OriginalStore = "00000", // SLFOST - Required
-                            GroupDiscAmount = "000000000", // SLFGDA - Required
-                            GroupDiscSign = "", // SLFGDS - Empty string
-                            SalesPerson = salesPersonId, // SLFSPS - SCO uses register ID, ACO uses cashier loginId
-                            DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
-                            DiscountType = "", // SLFDST - Empty string
-                            DiscountAmountNegativeSign = "", // SLFDSN - Empty string
-
-                            GroupDiscReason = "00",
-                            RegDiscReason = "00",
-                            OrderNumber = "",
-                            ProjectNumber = "",
-                            SalesStore = 0,
-                            InvStore = 0,
-                            ItemScanned = "N"
-                        };
-
-                        taxRecords.Add(taxRecord);
+                // Price Vehicle Code (SLFPVC) and Reference (SLFREF) - parse from pricing.priceVehicle
+                // Format: "LEFT:RIGHT" where LEFT goes to SLFPVC (4 chars) and RIGHT goes to SLFREF (12 chars)
+                if (!string.IsNullOrEmpty(item.Pricing?.PriceVehicle))
+                {
+                    string[] parts = item.Pricing.PriceVehicle.Split(':');
+                    if (parts.Length == 2)
+                    {
+                        orderRecord.PriceVehicleCode = PadOrTruncate(parts[0], 4); // Left side to SLFPVC
+                        orderRecord.PriceVehicleReference = PadOrTruncate(parts[1], 12); // Right side to SLFREF
+                    }
+                    else
+                    {
+                        // If format is incorrect, pad the whole value to SLFPVC
+                        orderRecord.PriceVehicleCode = PadOrTruncate(item.Pricing.PriceVehicle, 4);
+                        orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
                     }
                 }
                 else
                 {
-                    // Non-Ontario: Create per-item tax records (original logic)
-                    foreach (var item in retailEvent.Transaction.Items)
+                    // Fallback: use "EMP" for employee discounts if priceVehicle not provided
+                    orderRecord.PriceVehicleCode = hasEmployeeDiscount ? PadOrTruncate("EMP", 4) : PadOrTruncate("", 4);
+                    orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
+                }
+
+                // SLFADC - Additional Code: "####" when POS price != regular retail, "0000" when regular price
+                bool isRegularPrice = true;
+                if (item.Pricing?.OriginalUnitPrice?.Value != null &&
+                    item.Pricing?.UnitPrice?.Value != null &&
+                    decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPriceAdc) &&
+                    decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPriceAdc))
+                {
+                    isRegularPrice = (unitPriceAdc == origPriceAdc);
+                }
+                orderRecord.AdCode = isRegularPrice ? "0000" : "####";
+
+                // SLFADP - Ad Price: "000000000" when PVCode is REG or MAN, otherwise unit price
+                string pvCode = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                if (pvCode == "REG" || pvCode == "MAN")
+                {
+                    orderRecord.AdPrice = "000000000"; // 9 zeros for REG or MAN
+                    orderRecord.AdPriceNegativeSign = ""; // Empty sign
+                }
+                else
+                {
+                    // Use unit price formatted as 9-digit currency
+                    if (item.Pricing?.UnitPrice?.Value != null)
                     {
-                        if (item.Taxes != null)
+                        var (amount, sign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
+                        orderRecord.AdPrice = amount;
+                        orderRecord.AdPriceNegativeSign = sign;
+                    }
+                    else
+                    {
+                        orderRecord.AdPrice = "000000000";
+                        orderRecord.AdPriceNegativeSign = "";
+                    }
+                }
+
+                // Parse item-level taxes
+                ParseItemTaxes(item, orderRecord, retailEvent);
+
+                // Reference fields
+                orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
+                orderRecord.ReferenceDesc = ""; // SLFRFD - Always empty string
+
+                // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
+                if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04") // SALE or Employee SALE
+                {
+                    orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
+                    orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
+                    orderRecord.OriginalTxRegister = "000"; // SLFOTR - 3 zeros for sales
+                    orderRecord.OriginalTxNumber = "00000"; // SLFOTT - 5 zeros for sales
+                }
+                else if (mappedTransactionTypeSLFTTP == "11") // VOID
+                {
+                    orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
+                    orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for voids
+                    orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for voids
+                    orderRecord.OriginalTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5); // SLFOTT - transaction number for voids
+                }
+
+                // Map reference transaction if this is a return or void
+                if (retailEvent.References?.SourceTransactionId != null &&
+                    (retailEvent.Transaction?.TransactionType == "RETURN" ||
+                     retailEvent.Transaction?.TransactionType == "VOID"))
+                {
+                    string sourceId = retailEvent.References.SourceTransactionId;
+                    if (retailEvent.Transaction?.TransactionType == "RETURN")
+                    {
+                        orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
+                        orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for returns
+                        orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for returns
+                        orderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5); // SLFOTT - source transaction ID for returns
+                    }
+                }
+
+                // === CSV-specified field mappings ===
+
+                // Customer fields - per CSV rules
+                orderRecord.CustomerName = ""; // SLFCNM - Always blank
+                orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
+
+                // SLFZIP - Leave empty to omit validation (per validate:"omitempty,max=10")
+                // Customer postal code data not available in ORAE Transaction structure
+                orderRecord.ZipCode = "";
+
+                // Till/Clerk - SLFCLK (from till number) - right justified with zeros
+                orderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
+
+                // Employee fields - per CSV rules
+                orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
+
+                // UPC Code - SLFUPC (SKU UPC if scanned, otherwise all zeros)
+                orderRecord.UPCCode = "0000000000000"; // 13 zeros when not scanned
+
+                // Email - SLFEML (for ereceipt)
+                orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
+
+                // Reason codes - SLFRSN (return/price override/post voided - left justified)
+                orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
+
+                // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
+                orderRecord.TaxExemptId1 = ""; // SLFTE1 - Always empty
+                orderRecord.TaxExemptId2 = ""; // SLFTE2 - Always empty
+                orderRecord.TaxExemptionName = ""; // SLFTEN - Always empty
+
+                // Required fields with fixed values - per validation spec
+                orderRecord.OriginalSalesperson = "00000"; // SLFOSP - Required, must be "00000"
+                orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
+                orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
+                orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
+                orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
+
+                // Discount fields - default to required values when no discount applied
+                if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
+                {
+                    orderRecord.DiscountAmount = "000000000"; // SLFDSA - Must be "000000000" per validation
+                    orderRecord.DiscountType = ""; // SLFDST - Must be empty string
+                    orderRecord.DiscountAmountNegativeSign = ""; // SLFDSN - Must be empty string
+                }
+
+                // Discount reasons - per CSV rules
+                orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
+
+                // SLFRDR - Set to 'I2' when PVC = 'MAN', otherwise '00'
+                string pvCodeForRdr = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                orderRecord.RegDiscReason = (pvCodeForRdr == "MAN") ? "I2" : "00";
+
+                // Blank fields - per CSV rules
+                orderRecord.OrderNumber = ""; // SLFORD - Always blank
+                orderRecord.ProjectNumber = ""; // ASFPRO - Always blank
+                orderRecord.SalesStore = 0; // ASFSST - Always blank (0)
+                orderRecord.InvStore = 0; // ASFIST - Always blank (0)
+
+                // Add this OrderRecord to the item records list
+                itemRecords.Add(orderRecord);
+            }
+
+            // Determine if this is an Ontario transaction
+            string? province = GetProvince(retailEvent);
+            bool isOntario = province?.ToUpper() == "ON" || province?.ToUpper() == "ONTARIO";
+
+            // For Ontario: Create ONE combined tax record for entire transaction
+            // For Non-Ontario: Create per-item tax records (future enhancement)
+            if (isOntario)
+            {
+                // Calculate total tax across ALL items in the transaction
+                decimal transactionTaxTotal = 0;
+                foreach (var item in retailEvent.Transaction.Items)
+                {
+                    if (item.Taxes != null)
+                    {
+                        foreach (var tax in item.Taxes)
                         {
-                            // Calculate total tax for this item
-                            decimal itemTaxTotal = 0;
-                            foreach (var tax in item.Taxes)
+                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
                             {
-                                if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
-                                {
-                                    itemTaxTotal += taxAmount;
+                                transactionTaxTotal += taxAmount;
+                            }
+                        }
+                    }
+                }
+
+                // Only create tax record if there's a non-zero tax amount
+                if (transactionTaxTotal != 0)
+                {
+                    string taxAuthority = DetermineTaxAuthority(retailEvent, transactionTaxTotal);
+
+                    var taxRecord = new OrderRecord
+                    {
+                        // Same transaction identifiers as parent item
+                        TransType = mappedTransactionTypeSLFTTP,
+                        LineType = "XH", // Tax line type per spec
+                        TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted date
+                        TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted time
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransSeq = "00000", // Placeholder - will be updated after grouping
+                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+
+                        // Store Information
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+                        Status = " ",
+
+                        // Tax-specific fields - all tax flags set to N per spec
+                        ChargedTax1 = "N",
+                        ChargedTax2 = "N",
+                        ChargedTax3 = "N",
+                        ChargedTax4 = "N",
+                        TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+
+                        // Tax amount in ExtendedValue and ItemSellPrice - COMBINED TOTAL for Ontario
+                        ExtendedValue = FormatCurrency(transactionTaxTotal.ToString("F2"), 11),
+                        ExtendedValueNegativeSign = transactionTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(transactionTaxTotal.ToString("F2"), 9),
+                        SellPriceNegativeSign = transactionTaxTotal < 0 ? "-" : "",
+
+                        // Blank fields for tax line
+                        SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
+                        Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
+                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "", // SLFQTN: "-" for Return, "" for all else
+                        OriginalPrice = "000000000", // SLFORG - 9 zeros for tax record
+                        OriginalPriceNegativeSign = "",
+                        OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
+                        OverridePriceNegativeSign = "", // SLFOVN - Empty string
+                        OriginalRetail = "000000000", // SLFORT - 9 zeros for tax record
+                        OriginalRetailNegativeSign = "",
+                        ReferenceCode = "", // SLFRFC - Always empty string
+                        ReferenceDesc = "", // SLFRFD - Always empty string
+
+                        // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type (same logic as regular items)
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
+                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000000" :
+                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? transactionDateTime.ToString("yyMMdd") : null),
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000" :
+                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
+                                          (mappedTransactionTypeSLFTTP == "11" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
+                                          (mappedTransactionTypeSLFTTP == "02" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) : null)),
+
+                        CustomerName = "",
+                        CustomerNumber = "",
+                        ZipCode = "",
+                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                        EmployeeCardNumber = 0,
+                        UPCCode = "0000000000000", // SLFUPC - 13 zeros
+                        EReceiptEmail = "",
+                        ReasonCode = "",
+                        TaxExemptId1 = "", // SLFTE1 - Always empty
+                        TaxExemptId2 = "", // SLFTE2 - Always empty
+                        TaxExemptionName = "", // SLFTEN - Always empty
+                        AdCode = "0000", // SLFADC - Always "0000" for tax records
+                        AdPrice = "000000000", // SLFADP - Always "000000000" for tax records
+                        AdPriceNegativeSign = "", // SLFADN - Empty string for tax records
+                        PriceVehicleCode = "", // SLFPVC - Empty string for tax records
+                        PriceVehicleReference = "", // SLFREF - Empty string for tax records
+
+                        // Required fields with fixed values - per validation spec
+                        OriginalSalesperson = "00000", // SLFOSP - Required
+                        OriginalStore = "00000", // SLFOST - Required
+                        GroupDiscAmount = "000000000", // SLFGDA - Required
+                        GroupDiscSign = "", // SLFGDS - Empty string
+                        SalesPerson = salesPersonId, // SLFSPS - SCO uses register ID, ACO uses cashier loginId
+                        DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
+                        DiscountType = "", // SLFDST - Empty string
+                        DiscountAmountNegativeSign = "", // SLFDSN - Empty string
+
+                        GroupDiscReason = "00",
+                        RegDiscReason = "00",
+                        OrderNumber = "",
+                        ProjectNumber = "",
+                        SalesStore = 0,
+                        InvStore = 0,
+                        ItemScanned = "N"
+                    };
+
+                    taxRecords.Add(taxRecord);
+                }
+            }
+            else
+            {
+                // Non-Ontario: Create per-item tax records (original logic)
+                foreach (var item in retailEvent.Transaction.Items)
+                {
+                    if (item.Taxes != null)
+                    {
+                        // Calculate total tax for this item
+                        decimal itemTaxTotal = 0;
+                        foreach (var tax in item.Taxes)
+                        {
+                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
+                            {
+                                itemTaxTotal += taxAmount;
                             }
                         }
 
                         // Only create tax line if there's a non-zero tax amount
                         if (itemTaxTotal != 0)
                         {
-                        string taxAuthority = DetermineTaxAuthority(retailEvent, itemTaxTotal);
+                            string taxAuthority = DetermineTaxAuthority(retailEvent, itemTaxTotal);
 
                             var taxRecord = new OrderRecord
                             {
@@ -2003,7 +2003,7 @@ public partial class Program
 
             return recordSet;
         }
-
+    }
         // Apply timezone adjustment based on store region
         // Western region (BC, AB, SK, MB): subtract 8 hours
         // Eastern region (ON, QC): subtract 5 hours
