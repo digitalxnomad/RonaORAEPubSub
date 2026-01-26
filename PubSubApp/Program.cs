@@ -1742,7 +1742,7 @@ public partial class Program
                                 ChargedTax4 = "N",
 
                                 TaxAuthCode = PadOrTruncate(taxAuthority, 6),
-                                TaxRateCode = "HST   ",
+                                TaxRateCode = "", // SLFTCD - Always blank for tax records
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
                                 ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
@@ -1917,7 +1917,7 @@ public partial class Program
                     {
                         // TNFCCD - Credit card number: last4 only, padded left with * to 19 chars
                         string cardNumber = tender.Card.Last4 ?? "";
-                        tenderRecord.CreditCardNumber = "***************" + cardNumber;
+                        tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
 
                         // TNFAUT - Authorization code, padded to 6 chars
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
