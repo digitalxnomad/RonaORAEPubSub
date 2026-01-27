@@ -2,7 +2,7 @@
   "profiles": {
     "PubSubApp": {
       "commandName": "Project",
-      "commandLineArgs": "--test c:\\temp18\\012326_Test1.json"
+      "commandLineArgs": "--test c:\\temp18\\test3.json"
     }
   }
 }
