@@ -166,30 +166,11 @@ public partial class Program
                         Console.WriteLine("✓ RecordSet output validation passed");
                         SimpleLogger.LogInfo("✓ RecordSet output validation passed");
 
-                // Save output RecordSet to file
-                if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
-                {
-                    try
-                    {
-                        Directory.CreateDirectory(pubSubConfig.OutputSavePath);
-                        string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
-                            $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
-                        await File.WriteAllTextAsync(outputFilePath, jsonString, cancellationToken);
-                        Console.WriteLine($"✓ Saved output to: {outputFilePath}");
-                        SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
-                    }
-                    catch (Exception ex)
-                    {
-                        string errorMsg = $"✗ Failed to save output file: {ex.Message}";
-                        Console.WriteLine(errorMsg);
-                        SimpleLogger.LogError(errorMsg, ex);
-                        // Don't throw - continue with publishing
-                    }
-                }
-                else
-                {
-                    SimpleLogger.LogWarning("⚠ OutputSavePath not configured - output file not saved");
-                }
+                        var options = new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                        };
 
                         string jsonString = JsonSerializer.Serialize(recordSet, options);
 
@@ -2053,7 +2034,7 @@ public partial class Program
 
             return recordSet;
         }
-    }
+
         // Apply timezone adjustment based on store region
         // Western region (BC, AB, SK, MB): subtract 8 hours
         // Eastern region (ON, QC): subtract 5 hours
