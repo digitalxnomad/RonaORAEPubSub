@@ -1343,6 +1343,8 @@ public partial class Program
         // Temporary lists to group records by type
         List<OrderRecord> itemRecords = new List<OrderRecord>();
         List<OrderRecord> taxRecords = new List<OrderRecord>();
+        // Store computed TaxRateCode per item (for use by tax records)
+        string lastComputedTaxRateCode = "";
 
         // Map ALL items (not just first one) - create one OrderRecord per item
         if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
@@ -1507,8 +1509,8 @@ public partial class Program
                     }
                 }
 
-                // Parse item-level taxes
-                ParseItemTaxes(item, orderRecord, retailEvent);
+                // Parse item-level taxes (returns computed TaxRateCode for tax records)
+                lastComputedTaxRateCode = ParseItemTaxes(item, orderRecord, retailEvent);
 
                 // Reference fields
                 orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
@@ -1662,6 +1664,7 @@ public partial class Program
                         ChargedTax3 = "N",
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+                        TaxRateCode = lastComputedTaxRateCode,
 
                         // Tax amount in ExtendedValue and ItemSellPrice - COMBINED TOTAL for Ontario
                         ExtendedValue = FormatCurrency(transactionTaxTotal.ToString("F2"), 11),
@@ -1781,7 +1784,7 @@ public partial class Program
                                 ChargedTax4 = "N",
 
                                 TaxAuthCode = PadOrTruncate(taxAuthority, 6),
-                                TaxRateCode = "", // SLFTCD - Always blank for tax records
+                                TaxRateCode = lastComputedTaxRateCode, // SLFTCD - Use computed TaxRateCode from order record
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
                                 ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
@@ -2215,7 +2218,7 @@ public partial class Program
         }
 
         // Parse item-level taxes and map to OrderRecord tax fields
-        private void ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
+        private string ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
         {
             // Detect province/state for tax logic
             string? province = GetProvince(retailEvent);
@@ -2377,8 +2380,13 @@ public partial class Program
                 }
             }
 
-            // SLFTCD - TaxRateCode should always be blank for transaction records
+            // Capture computed TaxRateCode for use by tax records
+            string computedTaxRateCode = orderRecord.TaxRateCode ?? "";
+
+            // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
+
+            return computedTaxRateCode;
         }
 
         // Helper method to format currency values to fixed-length strings
