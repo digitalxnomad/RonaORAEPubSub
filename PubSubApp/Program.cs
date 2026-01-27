@@ -2380,12 +2380,24 @@ public partial class Program
                 }
             }
 
-            // Capture computed TaxRateCode for use by tax records
-            // SLFTCD is only populated on tax records when the tax code is "HST"
-            string computedTaxRateCode = orderRecord.TaxRateCode ?? "";
-            string taxRateCodeForTaxRecords = computedTaxRateCode.Trim().Equals("HST", StringComparison.OrdinalIgnoreCase)
-                ? computedTaxRateCode
-                : "";
+            // Check if any tax on this item has "HST" in TaxType, TaxCategory, or TaxCode
+            bool hasHst = false;
+            if (item.Taxes != null)
+            {
+                foreach (var tax in item.Taxes)
+                {
+                    if (string.Equals(tax.TaxType, "HST", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(tax.TaxCategory, "HST", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(tax.TaxCode, "HST", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasHst = true;
+                        break;
+                    }
+                }
+            }
+
+            // SLFTCD on tax records: "HST   " (padded to 6) when HST found, otherwise blank
+            string taxRateCodeForTaxRecords = hasHst ? PadOrTruncate("HST", 6) ?? "" : "";
 
             // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
