@@ -53,8 +53,20 @@ public partial class Program
         var topicName = TopicName.FromProjectTopic(projectId, topicId);
         var subscriptionName = SubscriptionName.FromProjectSubscription(projectId, subscriptionId);
 
-        // Create publisher
-        var publisher = await PublisherClient.CreateAsync(topicName);
+        // Create publisher with immediate publish (no batching delay)
+        var publisherBuilder = new PublisherClientBuilder
+        {
+            TopicName = topicName,
+            Settings = new PublisherClient.Settings
+            {
+                BatchingSettings = new Google.Api.Gax.BatchingSettings(
+                    elementCountThreshold: 1,
+                    byteCountThreshold: null,
+                    delayThreshold: TimeSpan.FromMilliseconds(100)
+                )
+            }
+        };
+        var publisher = await publisherBuilder.BuildAsync();
 
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
