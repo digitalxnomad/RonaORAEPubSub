@@ -11,11 +11,12 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http;
 using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/26/26 v1.0.29";
+    static string Version = "PubSubApp 01/27/26 v1.0.30";
 
     public static async Task Main(string[] args)
     {
@@ -52,165 +53,214 @@ public partial class Program
         var topicName = TopicName.FromProjectTopic(projectId, topicId);
         var subscriptionName = SubscriptionName.FromProjectSubscription(projectId, subscriptionId);
 
-        // Create publisher and subscriber directly
+        // Create publisher
         var publisher = await PublisherClient.CreateAsync(topicName);
-        var subscriber = await SubscriberClient.CreateAsync(subscriptionName);
 
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
         Console.WriteLine(Version);
-        Console.WriteLine("✓ Publisher and Subscriber initialized\n");
+        Console.WriteLine("✓ Publisher initialized\n");
         Console.WriteLine("ProjectId: " + projectId);
         Console.WriteLine("TopicId: " + topicId + "\n");
-        Console.WriteLine("Listening for messages...\n");
         SimpleLogger.LogInfo(Version);
         SimpleLogger.LogInfo("ProjectId: " + projectId);
         SimpleLogger.LogInfo("TopicId: " + topicId);
-        SimpleLogger.LogInfo("✓ Publisher and Subscriber initialized");
-        SimpleLogger.LogInfo("Listening for messages...");
+        SimpleLogger.LogInfo("✓ Publisher initialized");
 
-        // Start subscribing
-        await subscriber.StartAsync(async (message, cancellationToken) =>
+        // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
+        while (true)
         {
+            SubscriberClient subscriber = null;
             try
             {
-                // Process the message
-                string data = message.Data.ToStringUtf8();
-                Console.WriteLine($"\n✓ Received: {message.MessageId}");
-                SimpleLogger.LogInfo($"✓ Received: {message.MessageId}");
-                Console.WriteLine($"Data: {data.Substring(0, Math.Min(50, data.Length))}...");
-                SimpleLogger.LogInfo($"Data: {data}");
-
-                MainClass mainClass = new MainClass();
-
-                RetailEvent retailEvent;
-                try
+                // Create a fresh subscriber with gRPC keepalive to prevent idle disconnects
+                var subscriberBuilder = new SubscriberClientBuilder
                 {
-                    retailEvent = mainClass.ReadRecordSetFromString(data);
-                }
-                catch (JsonException jsonEx)
-                {
-                    // Invalid JSON - log and ACK to prevent redelivery
-                    string errorMessage = $"JSON parsing error: {jsonEx.Message}";
-                    Console.WriteLine($"✗ {errorMessage}");
-                    SimpleLogger.LogError(errorMessage);
-                    Console.WriteLine($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
-                    SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
-                    return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
-                }
-
-                // Validate ORAE v2.0.0 compliance (if not disabled)
-                if (!pubSubConfig.DisableOraeValidation)
-                {
-                    var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
-                    if (validationErrors.Count > 0)
+                    SubscriptionName = subscriptionName,
+                    Settings = new SubscriberClient.Settings
                     {
-                        string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
-                                            string.Join("\n", validationErrors);
-                        Console.WriteLine($"✗ {errorMessage}");
-                        SimpleLogger.LogError(errorMessage);
-                        Console.WriteLine($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
-                        SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
-                        return SubscriberClient.Reply.Ack; // ACK to prevent redelivery of invalid ORAE data
-                    }
-                    Console.WriteLine("✓ ORAE v2.0.0 validation passed");
-                    SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
-                }
-                else
-                {
-                    Console.WriteLine("⚠ ORAE validation skipped (disabled in configuration)");
-                    SimpleLogger.LogWarning("⚠ ORAE validation skipped (disabled in configuration)");
-                }
-
-                // Map to RecordSet
-                RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
-
-                // Validate output RecordSet
-                var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
-                if (outputErrors.Count > 0)
-                {
-                    string errorMessage = $"RecordSet validation failed with {outputErrors.Count} error(s):\n" +
-                                        string.Join("\n", outputErrors);
-                    Console.WriteLine($"✗ {errorMessage}");
-                    SimpleLogger.LogError(errorMessage);
-                    throw new Exception(errorMessage);
-                }
-                Console.WriteLine("✓ RecordSet output validation passed");
-                SimpleLogger.LogInfo("✓ RecordSet output validation passed");
-
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                        AckExtensionWindow = TimeSpan.FromSeconds(30)
+                    },
+                    GrpcAdapter = Google.Api.Gax.Grpc.GrpcNetClientAdapter.Default
+                        .WithAdditionalOptions(options =>
+                        {
+                            options.HttpHandler = new SocketsHttpHandler
+                            {
+                                KeepAlivePingDelay = TimeSpan.FromSeconds(60),
+                                KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
+                                EnableMultipleHttp2Connections = true
+                            };
+                        })
                 };
+                subscriber = await subscriberBuilder.BuildAsync();
 
-                string jsonString = JsonSerializer.Serialize(recordSet, options);
+                Console.WriteLine("✓ Subscriber started. Listening for messages...\n");
+                SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
 
-                // Log summary instead of full JSON (can be very large)
-                int orderCount = recordSet.OrderRecords?.Count ?? 0;
-                int tenderCount = recordSet.TenderRecords?.Count ?? 0;
-                SimpleLogger.LogInfo($"✓ Mapped to RecordSet: {orderCount} OrderRecords, {tenderCount} TenderRecords");
-
-                // Save output RecordSet to file
-                if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
+                // Start subscribing - this Task completes when the subscriber stops
+                await subscriber.StartAsync(async (message, cancellationToken) =>
                 {
                     try
                     {
-                        Directory.CreateDirectory(pubSubConfig.OutputSavePath);
-                        string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
-                            $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
-                        File.WriteAllText(outputFilePath, jsonString);
-                        Console.WriteLine($"✓ Saved output to: {outputFilePath}");
-                        SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
+                        // Process the message
+                        string data = message.Data.ToStringUtf8();
+                        Console.WriteLine($"\n✓ Received: {message.MessageId}");
+                        SimpleLogger.LogInfo($"✓ Received: {message.MessageId}");
+                        Console.WriteLine($"Data: {data.Substring(0, Math.Min(50, data.Length))}...");
+                        SimpleLogger.LogInfo($"Data: {data}");
+
+                        MainClass mainClass = new MainClass();
+
+                        RetailEvent retailEvent;
+                        try
+                        {
+                            retailEvent = mainClass.ReadRecordSetFromString(data);
+                        }
+                        catch (JsonException jsonEx)
+                        {
+                            // Invalid JSON - log and ACK to prevent redelivery
+                            string errorMessage = $"JSON parsing error: {jsonEx.Message}";
+                            Console.WriteLine($"✗ {errorMessage}");
+                            SimpleLogger.LogError(errorMessage);
+                            Console.WriteLine($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
+                            SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
+                            return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
+                        }
+
+                        // Validate ORAE v2.0.0 compliance (if not disabled)
+                        if (!pubSubConfig.DisableOraeValidation)
+                        {
+                            var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
+                            if (validationErrors.Count > 0)
+                            {
+                                string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
+                                                    string.Join("\n", validationErrors);
+                                Console.WriteLine($"✗ {errorMessage}");
+                                SimpleLogger.LogError(errorMessage);
+                                Console.WriteLine($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
+                                SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
+                                return SubscriberClient.Reply.Ack; // ACK to prevent redelivery of invalid ORAE data
+                            }
+                            Console.WriteLine("✓ ORAE v2.0.0 validation passed");
+                            SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
+                        }
+                        else
+                        {
+                            Console.WriteLine("⚠ ORAE validation skipped (disabled in configuration)");
+                            SimpleLogger.LogWarning("⚠ ORAE validation skipped (disabled in configuration)");
+                        }
+
+                        // Map to RecordSet
+                        RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
+
+                        // Validate output RecordSet
+                        var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
+                        if (outputErrors.Count > 0)
+                        {
+                            string errorMessage = $"RecordSet validation failed with {outputErrors.Count} error(s):\n" +
+                                                string.Join("\n", outputErrors);
+                            Console.WriteLine($"✗ {errorMessage}");
+                            SimpleLogger.LogError(errorMessage);
+                            throw new Exception(errorMessage);
+                        }
+                        Console.WriteLine("✓ RecordSet output validation passed");
+                        SimpleLogger.LogInfo("✓ RecordSet output validation passed");
+
+                        var options = new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                        };
+
+                        string jsonString = JsonSerializer.Serialize(recordSet, options);
+
+                        // Log summary instead of full JSON (can be very large)
+                        int orderCount = recordSet.OrderRecords?.Count ?? 0;
+                        int tenderCount = recordSet.TenderRecords?.Count ?? 0;
+                        SimpleLogger.LogInfo($"✓ Mapped to RecordSet: {orderCount} OrderRecords, {tenderCount} TenderRecords");
+
+                        // Save output RecordSet to file
+                        if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
+                        {
+                            try
+                            {
+                                Directory.CreateDirectory(pubSubConfig.OutputSavePath);
+                                string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
+                                    $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
+                                File.WriteAllText(outputFilePath, jsonString);
+                                Console.WriteLine($"✓ Saved output to: {outputFilePath}");
+                                SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
+                            }
+                            catch (Exception ex)
+                            {
+                                string errorMsg = $"✗ Failed to save output file: {ex.Message}";
+                                Console.WriteLine(errorMsg);
+                                SimpleLogger.LogError(errorMsg, ex);
+                                // Don't throw - continue with publishing
+                            }
+                        }
+                        else
+                        {
+                            SimpleLogger.LogWarning("⚠ OutputSavePath not configured - output file not saved");
+                        }
+
+                        // Publish response with attributes
+                        var responseMessage = new PubsubMessage
+                        {
+                            Data = ByteString.CopyFromUtf8(jsonString)
+                        };
+
+                        // Forward all original message attributes
+                        foreach (var attr in message.Attributes)
+                        {
+                            responseMessage.Attributes[attr.Key] = attr.Value;
+                        }
+
+                        // Add response-specific attributes
+                        responseMessage.Attributes["responseFor"] = message.MessageId;
+                        responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
+
+                        string publishedId = await publisher.PublishAsync(responseMessage);
+                        Console.WriteLine($"✓ Published response: {publishedId}");
+                        SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
+
+                        return SubscriberClient.Reply.Ack;
                     }
                     catch (Exception ex)
                     {
-                        string errorMsg = $"✗ Failed to save output file: {ex.Message}";
-                        Console.WriteLine(errorMsg);
-                        SimpleLogger.LogError(errorMsg, ex);
-                        // Don't throw - continue with publishing
+                        Console.WriteLine($"✗ Error: {ex.Message}");
+                        SimpleLogger.LogError($"✗ Error: {ex.Message}");
+                        return SubscriberClient.Reply.Nack;
                     }
-                }
-                else
-                {
-                    SimpleLogger.LogWarning("⚠ OutputSavePath not configured - output file not saved");
-                }
+                });
 
-                // Publish response with attributes
-                var responseMessage = new PubsubMessage
-                {
-                    Data = ByteString.CopyFromUtf8(jsonString)
-                };
-
-                // Forward all original message attributes
-                foreach (var attr in message.Attributes)
-                {
-                    responseMessage.Attributes[attr.Key] = attr.Value;
-                }
-
-                // Add response-specific attributes
-                responseMessage.Attributes["responseFor"] = message.MessageId;
-                responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
-
-                string publishedId = await publisher.PublishAsync(responseMessage);
-                Console.WriteLine($"✓ Published response: {publishedId}");
-                SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
-
-                return SubscriberClient.Reply.Ack;
+                // If StartAsync completes, the subscriber has stopped unexpectedly
+                Console.WriteLine("⚠ Subscriber stopped unexpectedly. Reconnecting...");
+                SimpleLogger.LogWarning("⚠ Subscriber stopped unexpectedly. Reconnecting...");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ Error: {ex.Message}");
-                SimpleLogger.LogError($"✗ Error: {ex.Message}");
-                return SubscriberClient.Reply.Nack;
+                Console.WriteLine($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...");
+                SimpleLogger.LogError($"Subscriber error: {ex.Message}", ex);
+                await Task.Delay(TimeSpan.FromSeconds(5));
             }
-        });
+            finally
+            {
+                // Clean up the old subscriber before creating a new one
+                if (subscriber != null)
+                {
+                    try
+                    {
+                        await subscriber.StopAsync(CancellationToken.None);
+                    }
+                    catch { }
+                }
+            }
+        }
 
-        Console.WriteLine("Press Enter to stop...");
-        Console.ReadLine();
-
-        await subscriber.StopAsync(CancellationToken.None);
-        await publisher.ShutdownAsync(TimeSpan.FromSeconds(15));
+        // Note: publisher.ShutdownAsync is no longer reachable in normal flow
+        // since the while(true) loop runs until the process is terminated.
+        // Graceful shutdown is handled by the OS/container runtime.
     }
 
     static Task TestJsonFile(string jsonPath)
