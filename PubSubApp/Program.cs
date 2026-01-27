@@ -2381,12 +2381,16 @@ public partial class Program
             }
 
             // Capture computed TaxRateCode for use by tax records
+            // SLFTCD is only populated on tax records when the tax code is "HST"
             string computedTaxRateCode = orderRecord.TaxRateCode ?? "";
+            string taxRateCodeForTaxRecords = computedTaxRateCode.Trim().Equals("HST", StringComparison.OrdinalIgnoreCase)
+                ? computedTaxRateCode
+                : "";
 
             // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
 
-            return computedTaxRateCode;
+            return taxRateCodeForTaxRecords;
         }
 
         // Helper method to format currency values to fixed-length strings
