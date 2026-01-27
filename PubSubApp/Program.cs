@@ -212,6 +212,42 @@ public partial class Program
         Console.WriteLine("✓ Subscriber is now actively listening for messages");
         SimpleLogger.LogInfo("✓ Subscriber is now actively listening for messages");
         Console.WriteLine("Press Enter to stop...");
+
+        // Monitor the subscriber task for unexpected completion
+        var monitorTask = Task.Run(async () =>
+        {
+            while (!subscriberTask.IsCompleted)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1)); // Check every minute
+
+                if (!subscriberTask.IsCompleted)
+                {
+                    SimpleLogger.LogInfo($"✓ Subscriber heartbeat: Still active at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                }
+            }
+
+            // Subscriber stopped unexpectedly
+            string errorMsg = "⚠ WARNING: Subscriber task completed unexpectedly!";
+            Console.WriteLine($"\n{errorMsg}");
+            SimpleLogger.LogError(errorMsg);
+
+            if (subscriberTask.IsFaulted && subscriberTask.Exception != null)
+            {
+                Console.WriteLine($"✗ Subscriber failed with error: {subscriberTask.Exception.GetBaseException().Message}");
+                SimpleLogger.LogError($"✗ Subscriber failed with error: {subscriberTask.Exception.GetBaseException().Message}", subscriberTask.Exception);
+            }
+            else if (subscriberTask.IsCanceled)
+            {
+                Console.WriteLine("⚠ Subscriber was canceled");
+                SimpleLogger.LogWarning("⚠ Subscriber was canceled");
+            }
+            else
+            {
+                Console.WriteLine("⚠ Subscriber completed normally (unexpected for long-running service)");
+                SimpleLogger.LogWarning("⚠ Subscriber completed normally (unexpected for long-running service)");
+            }
+        });
+
         Console.ReadLine();
 
         Console.WriteLine("\n✓ Shutting down subscriber...");
