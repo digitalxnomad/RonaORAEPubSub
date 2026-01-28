@@ -86,28 +86,34 @@ public partial class Program
             try
             {
                 // Create a fresh subscriber with gRPC keepalive to prevent idle disconnects
+                var keepAlivePingDelay = TimeSpan.FromSeconds(60);
+                var keepAlivePingTimeout = TimeSpan.FromSeconds(30);
+                var ackExtensionWindow = TimeSpan.FromSeconds(30);
+
                 var subscriberBuilder = new SubscriberClientBuilder
                 {
                     SubscriptionName = subscriptionName,
                     Settings = new SubscriberClient.Settings
                     {
-                        AckExtensionWindow = TimeSpan.FromSeconds(30)
+                        AckExtensionWindow = ackExtensionWindow
                     },
                     GrpcAdapter = Google.Api.Gax.Grpc.GrpcNetClientAdapter.Default
                         .WithAdditionalOptions(options =>
                         {
                             options.HttpHandler = new SocketsHttpHandler
                             {
-                                KeepAlivePingDelay = TimeSpan.FromSeconds(60),
-                                KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
+                                KeepAlivePingDelay = keepAlivePingDelay,
+                                KeepAlivePingTimeout = keepAlivePingTimeout,
                                 EnableMultipleHttp2Connections = true
                             };
                         })
                 };
                 subscriber = await subscriberBuilder.BuildAsync();
 
-                Console.WriteLine("✓ Subscriber started. Listening for messages...\n");
+                Console.WriteLine("✓ Subscriber started. Listening for messages...");
+                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s\n");
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
+                SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
 
                 // Start subscribing - this Task completes when the subscriber stops
                 await subscriber.StartAsync(async (message, cancellationToken) =>
