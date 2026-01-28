@@ -1450,21 +1450,11 @@ public partial class Program
                 orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
                 orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
 
-                // Calculate discount if unit price differs from original
-                if (item.Pricing?.OriginalUnitPrice?.Value != null &&
-                    item.Pricing?.UnitPrice?.Value != null &&
-                    decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal origPrice) &&
-                    decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPrice))
-                {
-                    decimal discountAmount = origPrice - unitPrice;
-                    if (discountAmount != 0)
-                    {
-                        var (amount, sign) = FormatCurrencyWithSign(discountAmount.ToString("F2"), 9);
-                        orderRecord.DiscountAmount = amount;
-                        orderRecord.DiscountAmountNegativeSign = sign;
-                        orderRecord.DiscountType = discountAmount > 0 ? "01" : "00";
-                    }
-                }
+                // SLFDSA - Discount Amount should always be 9 zeros for order records
+                // SLFDST - Discount Type should always be blank for order records
+                orderRecord.DiscountAmount = "000000000";
+                orderRecord.DiscountType = "";
+                orderRecord.DiscountAmountNegativeSign = "";
 
                 // Item Scanned Y/N
                 orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
@@ -1601,14 +1591,6 @@ public partial class Program
                 orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                 orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
                 orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
-
-                // Discount fields - default to required values when no discount applied
-                if (string.IsNullOrEmpty(orderRecord.DiscountAmount))
-                {
-                    orderRecord.DiscountAmount = "000000000"; // SLFDSA - Must be "000000000" per validation
-                    orderRecord.DiscountType = ""; // SLFDST - Must be empty string
-                    orderRecord.DiscountAmountNegativeSign = ""; // SLFDSN - Must be empty string
-                }
 
                 // Discount reasons - per CSV rules
                 orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
