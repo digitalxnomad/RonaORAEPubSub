@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix subscriber idle disconnect with resilient reconnection loop and gRPC keepalive\n\nWraps subscriber.StartAsync in a while\\(true\\) loop that recreates the\nSubscriberClient when the connection drops after idle time. Adds gRPC\nkeepalive pings \\(60s interval, 30s timeout\\) via SocketsHttpHandler to\nprevent idle disconnects. Cleans up old subscriber in finally block.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr create --base master --head latest1 --title \"Fix subscriber idle disconnect with resilient reconnection loop and gRPC keepalive\" --body \"$\\(cat <<''EOF''\n## Summary\n- Wraps `subscriber.StartAsync` in a resilient `while\\(true\\)` loop that recreates the `SubscriberClient` when the gRPC streaming connection drops after idle time\n- Adds gRPC keepalive pings \\(60s interval, 30s timeout\\) via `SocketsHttpHandler` to prevent idle disconnects\n- Cleans up old subscriber in `finally` block before reconnecting to avoid resource leaks\n- Bumps version to v1.0.30\n\n## Test plan\n- [ ] Deploy and verify subscriber starts and processes messages normally\n- [ ] Let the subscriber sit idle for an extended period and confirm it reconnects automatically\n- [ ] Verify log output shows reconnection warnings when the subscriber restarts\n- [ ] Confirm no duplicate message processing during reconnection\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(where gh:*)",
+      "Bash(where.exe gh)",
+      "Bash(powershell -Command \"$content = Get-Content PubSubApp/Program.cs -Raw; $open = \\($content.ToCharArray\\(\\) | Where-Object {$_-eq ''{''}\\).Count; $close = \\($content.ToCharArray\\(\\) | Where-Object {$_-eq ''}''}\\).Count; Write-Output \"\"Open braces: $open, Close braces: $close\"\"\")",
+      "Bash(powershell -Command:*)",
+      "Bash(python -c:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

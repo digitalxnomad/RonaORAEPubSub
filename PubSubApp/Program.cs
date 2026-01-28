@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/27/26 v1.0.30";
+    static string Version = "PubSubApp 01/27/26 v1.0.31";
 
     public static async Task Main(string[] args)
     {
@@ -53,8 +53,20 @@ public partial class Program
         var topicName = TopicName.FromProjectTopic(projectId, topicId);
         var subscriptionName = SubscriptionName.FromProjectSubscription(projectId, subscriptionId);
 
-        // Create publisher
-        var publisher = await PublisherClient.CreateAsync(topicName);
+        // Create publisher with immediate publish (no batching delay)
+        var publisherBuilder = new PublisherClientBuilder
+        {
+            TopicName = topicName,
+            Settings = new PublisherClient.Settings
+            {
+                BatchingSettings = new Google.Api.Gax.BatchingSettings(
+                    elementCountThreshold: 1,
+                    byteCountThreshold: null,
+                    delayThreshold: TimeSpan.FromMilliseconds(100)
+                )
+            }
+        };
+        var publisher = await publisherBuilder.BuildAsync();
 
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
@@ -74,28 +86,34 @@ public partial class Program
             try
             {
                 // Create a fresh subscriber with gRPC keepalive to prevent idle disconnects
+                var keepAlivePingDelay = TimeSpan.FromSeconds(60);
+                var keepAlivePingTimeout = TimeSpan.FromSeconds(30);
+                var ackExtensionWindow = TimeSpan.FromSeconds(30);
+
                 var subscriberBuilder = new SubscriberClientBuilder
                 {
                     SubscriptionName = subscriptionName,
                     Settings = new SubscriberClient.Settings
                     {
-                        AckExtensionWindow = TimeSpan.FromSeconds(30)
+                        AckExtensionWindow = ackExtensionWindow
                     },
                     GrpcAdapter = Google.Api.Gax.Grpc.GrpcNetClientAdapter.Default
                         .WithAdditionalOptions(options =>
                         {
                             options.HttpHandler = new SocketsHttpHandler
                             {
-                                KeepAlivePingDelay = TimeSpan.FromSeconds(60),
-                                KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
+                                KeepAlivePingDelay = keepAlivePingDelay,
+                                KeepAlivePingTimeout = keepAlivePingTimeout,
                                 EnableMultipleHttp2Connections = true
                             };
                         })
                 };
                 subscriber = await subscriberBuilder.BuildAsync();
 
-                Console.WriteLine("✓ Subscriber started. Listening for messages...\n");
+                Console.WriteLine("✓ Subscriber started. Listening for messages...");
+                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s\n");
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
+                SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
 
                 // Start subscribing - this Task completes when the subscriber stops
                 await subscriber.StartAsync(async (message, cancellationToken) =>
@@ -166,30 +184,11 @@ public partial class Program
                         Console.WriteLine("✓ RecordSet output validation passed");
                         SimpleLogger.LogInfo("✓ RecordSet output validation passed");
 
-                // Save output RecordSet to file
-                if (!string.IsNullOrEmpty(pubSubConfig.OutputSavePath))
-                {
-                    try
-                    {
-                        Directory.CreateDirectory(pubSubConfig.OutputSavePath);
-                        string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
-                            $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
-                        await File.WriteAllTextAsync(outputFilePath, jsonString, cancellationToken);
-                        Console.WriteLine($"✓ Saved output to: {outputFilePath}");
-                        SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
-                    }
-                    catch (Exception ex)
-                    {
-                        string errorMsg = $"✗ Failed to save output file: {ex.Message}";
-                        Console.WriteLine(errorMsg);
-                        SimpleLogger.LogError(errorMsg, ex);
-                        // Don't throw - continue with publishing
-                    }
-                }
-                else
-                {
-                    SimpleLogger.LogWarning("⚠ OutputSavePath not configured - output file not saved");
-                }
+                        var options = new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                        };
 
                         string jsonString = JsonSerializer.Serialize(recordSet, options);
 
@@ -1362,6 +1361,8 @@ public partial class Program
         // Temporary lists to group records by type
         List<OrderRecord> itemRecords = new List<OrderRecord>();
         List<OrderRecord> taxRecords = new List<OrderRecord>();
+        // Store computed TaxRateCode per item (for use by tax records)
+        string lastComputedTaxRateCode = "";
 
         // Map ALL items (not just first one) - create one OrderRecord per item
         if (retailEvent.Transaction?.Items != null && retailEvent.Transaction.Items.Count > 0)
@@ -1526,8 +1527,8 @@ public partial class Program
                     }
                 }
 
-                // Parse item-level taxes
-                ParseItemTaxes(item, orderRecord, retailEvent);
+                // Parse item-level taxes (returns computed TaxRateCode for tax records)
+                lastComputedTaxRateCode = ParseItemTaxes(item, orderRecord, retailEvent);
 
                 // Reference fields
                 orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
@@ -1681,6 +1682,7 @@ public partial class Program
                         ChargedTax3 = "N",
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+                        TaxRateCode = lastComputedTaxRateCode,
 
                         // Tax amount in ExtendedValue and ItemSellPrice - COMBINED TOTAL for Ontario
                         ExtendedValue = FormatCurrency(transactionTaxTotal.ToString("F2"), 11),
@@ -1800,7 +1802,7 @@ public partial class Program
                                 ChargedTax4 = "N",
 
                                 TaxAuthCode = PadOrTruncate(taxAuthority, 6),
-                                TaxRateCode = "", // SLFTCD - Always blank for tax records
+                                TaxRateCode = lastComputedTaxRateCode, // SLFTCD - Use computed TaxRateCode from order record
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
                                 ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
@@ -2053,7 +2055,7 @@ public partial class Program
 
             return recordSet;
         }
-    }
+
         // Apply timezone adjustment based on store region
         // Western region (BC, AB, SK, MB): subtract 8 hours
         // Eastern region (ON, QC): subtract 5 hours
@@ -2234,7 +2236,7 @@ public partial class Program
         }
 
         // Parse item-level taxes and map to OrderRecord tax fields
-        private void ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
+        private string ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
         {
             // Detect province/state for tax logic
             string? province = GetProvince(retailEvent);
@@ -2396,8 +2398,29 @@ public partial class Program
                 }
             }
 
-            // SLFTCD - TaxRateCode should always be blank for transaction records
+            // Check if any tax on this item has "HST" in TaxType, TaxCategory, or TaxCode
+            bool hasHst = false;
+            if (item.Taxes != null)
+            {
+                foreach (var tax in item.Taxes)
+                {
+                    if (string.Equals(tax.TaxType, "HST", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(tax.TaxCategory, "HST", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(tax.TaxCode, "HST", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasHst = true;
+                        break;
+                    }
+                }
+            }
+
+            // SLFTCD on tax records: "HST   " (padded to 6) when HST found, otherwise blank
+            string taxRateCodeForTaxRecords = hasHst ? PadOrTruncate("HST", 6) ?? "" : "";
+
+            // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
+
+            return taxRateCodeForTaxRecords;
         }
 
         // Helper method to format currency values to fixed-length strings
