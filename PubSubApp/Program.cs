@@ -1418,27 +1418,39 @@ public partial class Program
                     orderRecord.OriginalRetailNegativeSign = sign;
                 }
 
-                // Sell Price (extended price) - 9-digits without decimal
-                if (item.Pricing?.ExtendedPrice?.Value != null)
+                // SLFSEL - Item Sell Price - 9-digits without decimal
+                // Use override price if it exists and is non-zero; otherwise use UnitPrice
+                decimal overridePrice = 0;
+                bool hasOverride = item.Pricing?.Override?.Value != null &&
+                    decimal.TryParse(item.Pricing.Override.Value, out overridePrice) &&
+                    overridePrice != 0;
+
+                string? sellPriceSource = hasOverride
+                    ? item.Pricing?.Override?.Value
+                    : item.Pricing?.UnitPrice?.Value;
+
+                if (sellPriceSource != null)
                 {
-                    var (amount, sign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 9);
+                    var (amount, sign) = FormatCurrencyWithSign(sellPriceSource, 9);
                     orderRecord.ItemSellPrice = amount;
                     orderRecord.SellPriceNegativeSign = sign;
                 }
 
-                // Extended Value (Quantity * Net Price) - 11-digits without decimal
-                // Calculate: Quantity * Override (if exists), otherwise Quantity * UnitPrice
+                // SLFEXT - Extended Value - 11-digits without decimal
+                // Quantity * Override (if exists and non-zero), otherwise Quantity * UnitPrice
                 decimal extendedValue = 0;
                 if (item.Quantity?.Value != null)
                 {
                     decimal quantity = item.Quantity.Value;
 
-                    // Use override price if it exists, otherwise use unit price
-                    string? priceToUse = item.Pricing?.Override?.Value ?? item.Pricing?.UnitPrice?.Value;
-
-                    if (priceToUse != null && decimal.TryParse(priceToUse, out decimal priceValue))
+                    if (hasOverride)
                     {
-                        extendedValue = quantity * priceValue;
+                        extendedValue = quantity * overridePrice;
+                    }
+                    else if (item.Pricing?.UnitPrice?.Value != null &&
+                             decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal unitPriceVal))
+                    {
+                        extendedValue = quantity * unitPriceVal;
                     }
                 }
 
