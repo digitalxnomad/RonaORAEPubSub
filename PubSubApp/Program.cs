@@ -79,6 +79,13 @@ public partial class Program
         SimpleLogger.LogInfo("TopicId: " + topicId);
         SimpleLogger.LogInfo("✓ Publisher initialized");
 
+        bool debugLog = pubSubConfig.EnableDebugLogging;
+        if (debugLog)
+        {
+            Console.WriteLine("DEBUG: Debug logging is ENABLED");
+            SimpleLogger.LogInfo("DEBUG: Debug logging is ENABLED");
+        }
+
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
         while (true)
         {
@@ -89,6 +96,8 @@ public partial class Program
                 var keepAlivePingDelay = TimeSpan.FromSeconds(60);
                 var keepAlivePingTimeout = TimeSpan.FromSeconds(30);
                 var ackExtensionWindow = TimeSpan.FromSeconds(30);
+
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Building SubscriberClient..."); SimpleLogger.LogInfo("DEBUG: Building SubscriberClient..."); }
 
                 var subscriberBuilder = new SubscriberClientBuilder
                 {
@@ -115,6 +124,8 @@ public partial class Program
                 };
                 subscriber = await subscriberBuilder.BuildAsync();
 
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: SubscriberClient built successfully"); SimpleLogger.LogInfo("DEBUG: SubscriberClient built successfully"); }
+
                 Console.WriteLine("✓ Subscriber started. Listening for messages...");
                 Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
                 Console.WriteLine($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1\n");
@@ -122,17 +133,23 @@ public partial class Program
                 SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
                 SimpleLogger.LogInfo("FlowControl config: MaxElements=100, MaxBytes=10MB, ClientCount=1");
 
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling subscriber.StartAsync - waiting for messages..."); SimpleLogger.LogInfo("DEBUG: Calling subscriber.StartAsync - waiting for messages..."); }
+
                 // Start subscribing - this Task completes when the subscriber stops
                 await subscriber.StartAsync(async (message, cancellationToken) =>
                 {
                     try
                     {
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: >>> Message callback invoked for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: >>> Message callback invoked for MessageId={message.MessageId}"); }
+
                         // Process the message
                         string data = message.Data.ToStringUtf8();
                         Console.WriteLine($"\n✓ Received: {message.MessageId}");
                         SimpleLogger.LogInfo($"✓ Received: {message.MessageId}");
                         Console.WriteLine($"Data: {data.Substring(0, Math.Min(50, data.Length))}...");
                         SimpleLogger.LogInfo($"Data: {data}");
+
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Parsing JSON ({data.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Parsing JSON ({data.Length} bytes)..."); }
 
                         MainClass mainClass = new MainClass();
 
@@ -151,6 +168,8 @@ public partial class Program
                             SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
                             return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
                         }
+
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: JSON parsed successfully"); SimpleLogger.LogInfo("DEBUG: JSON parsed successfully"); }
 
                         // Validate ORAE v2.0.0 compliance (if not disabled)
                         if (!pubSubConfig.DisableOraeValidation)
@@ -176,7 +195,9 @@ public partial class Program
                         }
 
                         // Map to RecordSet
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Mapping RetailEvent to RecordSet..."); SimpleLogger.LogInfo("DEBUG: Mapping RetailEvent to RecordSet..."); }
                         RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: RecordSet mapping complete"); SimpleLogger.LogInfo("DEBUG: RecordSet mapping complete"); }
 
                         // Validate output RecordSet
                         var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
@@ -230,6 +251,7 @@ public partial class Program
                         }
 
                         // Publish response with attributes
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Publishing response ({jsonString.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Publishing response ({jsonString.Length} bytes)..."); }
                         var responseMessage = new PubsubMessage
                         {
                             Data = ByteString.CopyFromUtf8(jsonString)
@@ -245,19 +267,25 @@ public partial class Program
                         responseMessage.Attributes["responseFor"] = message.MessageId;
                         responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
 
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling publisher.PublishAsync..."); SimpleLogger.LogInfo("DEBUG: Calling publisher.PublishAsync..."); }
                         string publishedId = await publisher.PublishAsync(responseMessage);
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: PublishAsync returned, MessageId={publishedId}"); SimpleLogger.LogInfo($"DEBUG: PublishAsync returned, MessageId={publishedId}"); }
                         Console.WriteLine($"✓ Published response: {publishedId}");
                         SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
 
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Returning Ack for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: Returning Ack for MessageId={message.MessageId}"); }
                         return SubscriberClient.Reply.Ack;
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"✗ Error: {ex.Message}");
                         SimpleLogger.LogError($"✗ Error: {ex.Message}");
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); SimpleLogger.LogInfo($"DEBUG: Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); }
                         return SubscriberClient.Reply.Nack;
                     }
                 });
+
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: subscriber.StartAsync has returned (subscriber stopped)"); SimpleLogger.LogInfo("DEBUG: subscriber.StartAsync has returned (subscriber stopped)"); }
 
                 // If StartAsync completes, the subscriber has stopped unexpectedly
                 Console.WriteLine("⚠ Subscriber stopped unexpectedly. Reconnecting...");
