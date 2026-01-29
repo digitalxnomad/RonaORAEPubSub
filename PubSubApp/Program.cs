@@ -1666,7 +1666,7 @@ public partial class Program
             {
                 // Calculate total tax across ALL items in the transaction
                 decimal transactionTaxTotal = 0;
-                foreach (var item in retailEvent.Transaction.Items)
+                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
                 {
                     if (item.Taxes != null)
                     {
@@ -1785,7 +1785,7 @@ public partial class Program
             else
             {
                 // Non-Ontario: Create per-item tax records (original logic)
-                foreach (var item in retailEvent.Transaction.Items)
+                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
                 {
                     if (item.Taxes != null)
                     {
