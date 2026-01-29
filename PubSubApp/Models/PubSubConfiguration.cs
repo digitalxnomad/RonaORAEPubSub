@@ -9,4 +9,5 @@ public class PubSubConfiguration
     public string OutputSavePath { get; set; } = string.Empty;
     public string LogPath { get; set; } = string.Empty;
     public bool DisableOraeValidation { get; set; } = false;
+    public bool EnableDebugLogging { get; set; } = false;
 }
