@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Google Cloud credentials
+*.json.key
+*credentials*.json
+*service-account*.json
+rona_pubsub_dev.json
