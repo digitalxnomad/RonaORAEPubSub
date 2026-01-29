@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/27/26 v1.0.31";
+    static string Version = "PubSubApp 01/28/26 v1.0.32";
 
     public static async Task Main(string[] args)
     {
@@ -62,7 +62,7 @@ public partial class Program
                 BatchingSettings = new Google.Api.Gax.BatchingSettings(
                     elementCountThreshold: 1,
                     byteCountThreshold: null,
-                    delayThreshold: TimeSpan.FromMilliseconds(100)
+                    delayThreshold: TimeSpan.FromMilliseconds(10)
                 )
             }
         };
@@ -95,8 +95,13 @@ public partial class Program
                     SubscriptionName = subscriptionName,
                     Settings = new SubscriberClient.Settings
                     {
-                        AckExtensionWindow = ackExtensionWindow
+                        AckExtensionWindow = ackExtensionWindow,
+                        FlowControlSettings = new Google.Api.Gax.FlowControlSettings(
+                            maxOutstandingElementCount: 100,
+                            maxOutstandingByteCount: 10_000_000 // 10MB
+                        )
                     },
+                    ClientCount = 1,
                     GrpcAdapter = Google.Api.Gax.Grpc.GrpcNetClientAdapter.Default
                         .WithAdditionalOptions(options =>
                         {
@@ -111,9 +116,11 @@ public partial class Program
                 subscriber = await subscriberBuilder.BuildAsync();
 
                 Console.WriteLine("✓ Subscriber started. Listening for messages...");
-                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s\n");
+                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
+                Console.WriteLine($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1\n");
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
                 SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
+                SimpleLogger.LogInfo("FlowControl config: MaxElements=100, MaxBytes=10MB, ClientCount=1");
 
                 // Start subscribing - this Task completes when the subscriber stops
                 await subscriber.StartAsync(async (message, cancellationToken) =>
@@ -2731,7 +2738,8 @@ public partial class Program
             // Employee sales get SLFTTP = "04"
             if (input == "SALE" && hasEmployeeDiscount)
             {
-                return "04";
+            return "01";  // JCW 01/28/26 Temp
+                // return "04";
             }
 
             return input switch
@@ -2753,7 +2761,9 @@ public partial class Program
                 // Employee sales → SLFLNT = "04"
                 if (hasEmployeeDiscount)
                 {
-                    return "04";
+                    //JCW 01/28/26
+                    return "01";  // JCW 01/28/26 Temp
+                // return "04";
                 }
 
                 // Gift card sales → SLFLNT = "45"
