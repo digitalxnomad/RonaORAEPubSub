@@ -89,7 +89,7 @@ public partial class Program
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
         while (true)
         {
-            SubscriberClient subscriber = null;
+            SubscriberClient? subscriber = null;
             try
             {
                 // Create a fresh subscriber with gRPC keepalive to prevent idle disconnects
