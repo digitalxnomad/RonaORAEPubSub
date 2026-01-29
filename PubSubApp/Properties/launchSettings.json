@@ -2,7 +2,7 @@
   "profiles": {
     "PubSubApp": {
       "commandName": "Project",
-      "commandLineArgs": "--test \"c:\\temp18\\18005601628316686.bq-transaction-tree-input.json\""
+      "commandLineArgs": "--test1 \"C:\\temp18\\Clearance\\input.json\""
     }
   }
 }
