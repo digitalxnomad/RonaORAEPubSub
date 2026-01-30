@@ -1232,6 +1232,9 @@ public partial class Program
 
         [JsonPropertyName("sku")]
         public string? Sku { get; set; }
+
+        [JsonPropertyName("gtin")]
+        public string? Gtin { get; set; }
     }
 
     public class Pricing
@@ -1625,8 +1628,10 @@ public partial class Program
                 // Employee fields - per CSV rules
                 orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
 
-                // UPC Code - SLFUPC (SKU UPC if scanned, otherwise all zeros)
-                orderRecord.UPCCode = "0000000000000"; // 13 zeros when not scanned
+                // UPC Code - SLFUPC - from item.gtin if available, otherwise 13 zeros
+                orderRecord.UPCCode = !string.IsNullOrEmpty(item.Item?.Gtin)
+                    ? item.Item.Gtin.PadLeft(13, '0')
+                    : "0000000000000";
 
                 // Email - SLFEML (for ereceipt)
                 orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
