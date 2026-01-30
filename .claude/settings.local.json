@@ -11,11 +11,7 @@
       "Bash(powershell -Command \"$content = Get-Content PubSubApp/Program.cs -Raw; $open = \\($content.ToCharArray\\(\\) | Where-Object {$_-eq ''{''}\\).Count; $close = \\($content.ToCharArray\\(\\) | Where-Object {$_-eq ''}''}\\).Count; Write-Output \"\"Open braces: $open, Close braces: $close\"\"\")",
       "Bash(powershell -Command:*)",
       "Bash(python -c:*)",
-      "Bash(git commit:*)",
-      "Bash(git rm:*)",
-      "Bash(git filter-branch:*)",
-      "Bash(git stash:*)",
-      "Bash(gh pr list:*)"
+      "Bash(git commit:*)"
     ]
   }
 }
