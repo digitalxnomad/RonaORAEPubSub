@@ -1514,7 +1514,10 @@ public partial class Program
                 orderRecord.DiscountAmountNegativeSign = "";
 
                 // Item Scanned Y/N
-                orderRecord.ItemScanned = item.Quantity?.Uom == "EA" ? "Y" : "N";
+                // SLFSCN - "Y" if item.gtin > 0, otherwise "N"
+                bool hasGtin = !string.IsNullOrEmpty(item.Item?.Gtin) &&
+                    decimal.TryParse(item.Item.Gtin, out decimal gtinVal) && gtinVal > 0;
+                orderRecord.ItemScanned = hasGtin ? "Y" : "N";
 
                 // Price Vehicle Code (SLFPVC) and Reference (SLFREF) - parse from pricing.priceVehicle
                 // Format: "LEFT:RIGHT" where LEFT goes to SLFPVC (4 chars) and RIGHT goes to SLFREF (12 chars)
