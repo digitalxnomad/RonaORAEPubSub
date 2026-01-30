@@ -367,3 +367,4 @@ FodyWeavers.xsd
 *credentials*.json
 *service-account*.json
 rona_pubsub_dev.json
+rona_pubsub_qa.json
