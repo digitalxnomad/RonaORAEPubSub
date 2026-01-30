@@ -207,7 +207,10 @@ public partial class Program
                                                 string.Join("\n", outputErrors);
                             Console.WriteLine($"✗ {errorMessage}");
                             SimpleLogger.LogError(errorMessage);
-                            throw new Exception(errorMessage);
+                            // ACK the message to prevent infinite redelivery, but skip publishing
+                            Console.WriteLine($"⚠ ACK-ing invalid message {message.MessageId} to prevent redelivery");
+                            SimpleLogger.LogWarning($"⚠ ACK-ing invalid message {message.MessageId} to prevent redelivery");
+                            return SubscriberClient.Reply.Ack;
                         }
                         Console.WriteLine("✓ RecordSet output validation passed");
                         SimpleLogger.LogInfo("✓ RecordSet output validation passed");
@@ -394,7 +397,8 @@ public partial class Program
             Console.WriteLine("Validating RecordSet output...");
             SimpleLogger.LogInfo("Validating RecordSet output...");
             var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
-                        
+
+
             if (outputErrors.Count > 0)
             {
                 string errorMessage = $"✗ RecordSet validation failed with {outputErrors.Count} error(s):\n" +
@@ -1629,7 +1633,7 @@ public partial class Program
 
                 // Reason codes - SLFRSN (16 chars, left justified)
                 // RRT0 = Return, POV0 = Price Override, IDS0 = Manual Discount, VOD0 = Post Voided
-                string reasonCode = "";
+                string reasonCode = "                "; // 16 blank spaces default
                 string transType = retailEvent.Transaction?.TransactionType ?? "";
                 string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
                 if (transType == "RETURN")
@@ -1791,7 +1795,7 @@ public partial class Program
                         ProjectNumber = "",
                         SalesStore = 0,
                         InvStore = 0,
-                        ItemScanned = "N"
+                        ItemScanned = "" // SLFSCN - Always blank for tax records
                     };
 
                     taxRecords.Add(taxRecord);
@@ -1911,7 +1915,7 @@ public partial class Program
                                 ProjectNumber = "",
                                 SalesStore = 0,
                                 InvStore = 0,
-                                ItemScanned = "N"
+                                ItemScanned = "" // SLFSCN - Always blank for tax records
                             };
 
                             taxRecords.Add(taxRecord);
@@ -1984,27 +1988,8 @@ public partial class Program
                     // TNFRDC - Always blank
                     tenderRecord.ReferenceCode = ""; // TNFRDC - Always blank
 
-                    // TNFRDS - Always blank for credit, debit, and flexiti tender types
-                    string tenderMethod = tender.Method?.ToUpper() ?? "";
-                    bool isBlankReferenceType = tenderMethod.Contains("CREDIT") ||
-                                                tenderMethod.Contains("DEBIT") ||
-                                                tenderMethod == "FLEXITI";
-
-                    if (isBlankReferenceType)
-                    {
-                        // Always blank for credit/debit/flexiti regardless of TenderId
-                        tenderRecord.ReferenceDesc = ""; // TNFRDS - Always blank for credit/debit/flexiti
-                    }
-                    else if (!string.IsNullOrEmpty(tender.TenderId))
-                    {
-                        // Use TenderId for other tender types
-                        tenderRecord.ReferenceDesc = PadOrTruncate(tender.TenderId, 16); // TNFRDS - Use TenderId for other types
-                    }
-                    else
-                    {
-                        // Blank when no TenderId
-                        tenderRecord.ReferenceDesc = "";
-                    }
+                    // TNFRDS - Reference Desc - Always blank
+                    tenderRecord.ReferenceDesc = "";
 
                     // === CSV-specified tender field mappings ===
 
