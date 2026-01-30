@@ -1216,6 +1216,9 @@ public partial class Program
 
         [JsonPropertyName("taxes")]
         public List<TaxDetail>? Taxes { get; set; }
+
+        [JsonPropertyName("attributes")]
+        public Dictionary<string, string>? Attributes { get; set; }
     }
 
     public class Item
@@ -1494,8 +1497,8 @@ public partial class Program
                 orderRecord.ExtendedValueNegativeSign = signExt;
 
                 // Override Price - default to zeros if not present
-                orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
-                orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
+               orderRecord.OverridePrice = overridePrice.ToString().PadLeft(9, '0'); 
+               orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
 
                 // SLFDSA - Discount Amount should always be 9 zeros for order records
                 // SLFDST - Discount Type should always be blank for order records
@@ -1608,9 +1611,9 @@ public partial class Program
                 orderRecord.CustomerName = ""; // SLFCNM - Always blank
                 orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
 
-                // SLFZIP - Leave empty to omit validation (per validate:"omitempty,max=10")
-                // Customer postal code data not available in ORAE Transaction structure
-                orderRecord.ZipCode = "";
+                // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
+                string eppDigit = DetermineEPPEligibility(item, retailEvent);
+                orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
                 orderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
@@ -1624,8 +1627,20 @@ public partial class Program
                 // Email - SLFEML (for ereceipt)
                 orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
 
-                // Reason codes - SLFRSN (return/price override/post voided - left justified)
-                orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
+                // Reason codes - SLFRSN (16 chars, left justified)
+                // RRT0 = Return, POV0 = Price Override, IDS0 = Manual Discount, VOD0 = Post Voided
+                string reasonCode = "";
+                string transType = retailEvent.Transaction?.TransactionType ?? "";
+                string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                if (transType == "RETURN")
+                    reasonCode = "RRT0";
+                else if (transType == "VOID")
+                    reasonCode = "VOD0";
+                else if (hasOverride)
+                    reasonCode = "POV0";
+                else if (pvCodeForRsn == "MAN")
+                    reasonCode = "IDS0";
+                orderRecord.ReasonCode = reasonCode.PadRight(16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
                 orderRecord.TaxExemptId1 = ""; // SLFTE1 - Always empty
@@ -1745,7 +1760,7 @@ public partial class Program
 
                         CustomerName = "",
                         CustomerNumber = "",
-                        ZipCode = "",
+                        ZipCode = "         0", // SLFZIP - 9 spaces + 0 for tax records
                         Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                         EmployeeCardNumber = 0,
                         UPCCode = "0000000000000", // SLFUPC - 13 zeros
@@ -1865,7 +1880,7 @@ public partial class Program
 
                                 CustomerName = "",
                                 CustomerNumber = "",
-                                ZipCode = "",
+                                ZipCode = "         0", // SLFZIP - 9 spaces + 0 for tax records
                                 Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                                 EmployeeCardNumber = 0,
                                 UPCCode = "0000000000000", // SLFUPC - 13 zeros
@@ -2449,6 +2464,9 @@ public partial class Program
             // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
 
+            // SLFACD - TaxAuthCode should always be blank for order records
+            orderRecord.TaxAuthCode = "";
+
             return taxRateCodeForTaxRecords;
         }
 
@@ -2579,91 +2597,57 @@ public partial class Program
         // Check if item is an EPP (Extended Protection Plan)
         private bool IsEPPItem(TransactionItem item)
         {
-            // Check if SKU indicates EPP
-            if (item.Item?.Sku != null)
-            {
-                string sku = item.Item.Sku.ToUpper();
-                if (sku.StartsWith("EPP") || sku.Contains("PROTECT") ||
-                    sku.Contains("WARRANTY") || sku.StartsWith("WTY") ||
-                    sku.StartsWith("WARR"))
-                    return true;
-            }
-
-            // Check item description
-            if (item.Item?.Description != null)
-            {
-                string desc = item.Item.Description.ToUpper();
-                if (desc.Contains("PROTECTION PLAN") || desc.Contains("WARRANTY") ||
-                    desc.Contains("EXTENDED PROTECTION") || desc.Contains("EPP"))
-                    return true;
-            }
-
-            return false;
+            // EPP item is identified by having the x-epp-coverage-identifier attribute
+            return item.Attributes != null &&
+                   item.Attributes.ContainsKey("x-epp-coverage-identifier");
         }
 
-        // Check if SKU is eligible for EPP coverage
-        private bool IsSKUEligibleForEPP(string? sku)
+        // Get the EPP coverage identifier value from an EPP item
+        private string? GetEPPCoverageIdentifier(TransactionItem item)
         {
-            // Business logic to determine if SKU can have EPP
-            // For now, assume most items are eligible (this would be configured per business rules)
-            // TODO: Implement SKU category lookup or eligibility table
-
-            if (string.IsNullOrEmpty(sku))
-                return false;
-
-            // EPP items themselves are not eligible for EPP
-            string skuUpper = sku.ToUpper();
-            if (skuUpper.StartsWith("EPP") || skuUpper.StartsWith("WTY") || skuUpper.StartsWith("WARR"))
-                return false;
-
-            // Most merchandise items are eligible
-            return true;
-        }
-
-        // Determine how many items an EPP covers
-        private int DetermineEPPCoveredItemCount(TransactionItem eppItem, RetailEvent retailEvent)
-        {
-            // Business logic to determine coverage count
-            // This could be based on:
-            // - EPP quantity
-            // - EPP metadata/description
-            // - Transaction-level EPP associations
-
-            // For now, use quantity as indicator
-            if (eppItem.Quantity != null && eppItem.Quantity.Value > 1)
+            if (item.Attributes != null &&
+                item.Attributes.TryGetValue("x-epp-coverage-identifier", out string? value))
             {
-                return (int)eppItem.Quantity.Value;
+                return value;
             }
-
-            // Default to single item coverage
-            return 1;
+            return null;
         }
 
-        // Determine EPP eligibility digit for SLFZIP (last character)
+        // Determine EPP eligibility digit for SLFZIP (10th character)
+        // 0 = EPP not eligible for this SKU
+        // 1 = EPP covering one item included, merchandise SKU on this line
+        // 2 = EPP covering more than one item included for this SKU
+        // 3 = EPP requested but denied for this SKU
+        // 9 = This line item IS the EPP
         private string DetermineEPPEligibility(TransactionItem item, RetailEvent retailEvent)
         {
-            // Check if this item IS the EPP
+            // Check if this item IS the EPP (has x-epp-coverage-identifier attribute)
             if (IsEPPItem(item))
                 return "9";
 
-            // Check if EPP exists in transaction
-            bool hasEPP = retailEvent.Transaction?.Items?.Any(i => IsEPPItem(i)) ?? false;
+            // Find all EPP items in the transaction
+            var eppItems = retailEvent.Transaction?.Items?
+                .Where(i => IsEPPItem(i))
+                .ToList() ?? new List<TransactionItem>();
 
-            if (!hasEPP)
+            if (eppItems.Count == 0)
+                return "0"; // No EPP in transaction
+
+            // Check if any EPP covers this item's SKU
+            string? itemSku = item.Item?.Sku;
+            if (string.IsNullOrEmpty(itemSku))
+                return "0";
+
+            // Count how many merchandise items are covered by EPP(s) that match this item
+            foreach (var epp in eppItems)
             {
-                // No EPP in transaction - check if this SKU is eligible
-                if (IsSKUEligibleForEPP(item.Item?.Sku))
-                    return "0"; // Eligible but no EPP
-                else
-                    return "0"; // Not eligible
-            }
+                string? coverageId = GetEPPCoverageIdentifier(epp);
+                if (string.IsNullOrEmpty(coverageId))
+                    continue;
 
-            // EPP exists - determine if this item is covered
-            var eppItem = retailEvent.Transaction?.Items?.FirstOrDefault(i => IsEPPItem(i));
-
-            if (eppItem != null)
-            {
-                int coveredItemCount = DetermineEPPCoveredItemCount(eppItem, retailEvent);
+                // Count merchandise items (non-EPP) in the transaction that could be covered
+                int coveredItemCount = retailEvent.Transaction?.Items?
+                    .Count(i => !IsEPPItem(i)) ?? 0;
 
                 if (coveredItemCount == 1)
                     return "1"; // Single item coverage
@@ -2671,7 +2655,6 @@ public partial class Program
                     return "2"; // Multi-item coverage
             }
 
-            // Default
             return "0";
         }
 
