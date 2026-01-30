@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/27/26 v1.0.31";
+    static string Version = "PubSubApp 01/29/26 v1.0.33";
 
     public static async Task Main(string[] args)
     {
@@ -62,7 +62,7 @@ public partial class Program
                 BatchingSettings = new Google.Api.Gax.BatchingSettings(
                     elementCountThreshold: 1,
                     byteCountThreshold: null,
-                    delayThreshold: TimeSpan.FromMilliseconds(100)
+                    delayThreshold: TimeSpan.FromMilliseconds(10)
                 )
             }
         };
@@ -79,10 +79,17 @@ public partial class Program
         SimpleLogger.LogInfo("TopicId: " + topicId);
         SimpleLogger.LogInfo("✓ Publisher initialized");
 
+        bool debugLog = pubSubConfig.EnableDebugLogging;
+        if (debugLog)
+        {
+            Console.WriteLine("DEBUG: Debug logging is ENABLED");
+            SimpleLogger.LogInfo("DEBUG: Debug logging is ENABLED");
+        }
+
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
         while (true)
         {
-            SubscriberClient subscriber = null;
+            SubscriberClient? subscriber = null;
             try
             {
                 // Create a fresh subscriber with gRPC keepalive to prevent idle disconnects
@@ -90,13 +97,20 @@ public partial class Program
                 var keepAlivePingTimeout = TimeSpan.FromSeconds(30);
                 var ackExtensionWindow = TimeSpan.FromSeconds(30);
 
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Building SubscriberClient..."); SimpleLogger.LogInfo("DEBUG: Building SubscriberClient..."); }
+
                 var subscriberBuilder = new SubscriberClientBuilder
                 {
                     SubscriptionName = subscriptionName,
                     Settings = new SubscriberClient.Settings
                     {
-                        AckExtensionWindow = ackExtensionWindow
+                        AckExtensionWindow = ackExtensionWindow,
+                        FlowControlSettings = new Google.Api.Gax.FlowControlSettings(
+                            maxOutstandingElementCount: 100,
+                            maxOutstandingByteCount: 10_000_000 // 10MB
+                        )
                     },
+                    ClientCount = 1,
                     GrpcAdapter = Google.Api.Gax.Grpc.GrpcNetClientAdapter.Default
                         .WithAdditionalOptions(options =>
                         {
@@ -110,22 +124,32 @@ public partial class Program
                 };
                 subscriber = await subscriberBuilder.BuildAsync();
 
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: SubscriberClient built successfully"); SimpleLogger.LogInfo("DEBUG: SubscriberClient built successfully"); }
+
                 Console.WriteLine("✓ Subscriber started. Listening for messages...");
-                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s\n");
+                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
+                Console.WriteLine($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1\n");
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
                 SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
+                SimpleLogger.LogInfo("FlowControl config: MaxElements=100, MaxBytes=10MB, ClientCount=1");
+
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling subscriber.StartAsync - waiting for messages..."); SimpleLogger.LogInfo("DEBUG: Calling subscriber.StartAsync - waiting for messages..."); }
 
                 // Start subscribing - this Task completes when the subscriber stops
                 await subscriber.StartAsync(async (message, cancellationToken) =>
                 {
                     try
                     {
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: >>> Message callback invoked for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: >>> Message callback invoked for MessageId={message.MessageId}"); }
+
                         // Process the message
                         string data = message.Data.ToStringUtf8();
                         Console.WriteLine($"\n✓ Received: {message.MessageId}");
                         SimpleLogger.LogInfo($"✓ Received: {message.MessageId}");
                         Console.WriteLine($"Data: {data.Substring(0, Math.Min(50, data.Length))}...");
                         SimpleLogger.LogInfo($"Data: {data}");
+
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Parsing JSON ({data.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Parsing JSON ({data.Length} bytes)..."); }
 
                         MainClass mainClass = new MainClass();
 
@@ -144,6 +168,8 @@ public partial class Program
                             SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
                             return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
                         }
+
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: JSON parsed successfully"); SimpleLogger.LogInfo("DEBUG: JSON parsed successfully"); }
 
                         // Validate ORAE v2.0.0 compliance (if not disabled)
                         if (!pubSubConfig.DisableOraeValidation)
@@ -169,7 +195,9 @@ public partial class Program
                         }
 
                         // Map to RecordSet
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Mapping RetailEvent to RecordSet..."); SimpleLogger.LogInfo("DEBUG: Mapping RetailEvent to RecordSet..."); }
                         RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: RecordSet mapping complete"); SimpleLogger.LogInfo("DEBUG: RecordSet mapping complete"); }
 
                         // Validate output RecordSet
                         var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
@@ -223,6 +251,7 @@ public partial class Program
                         }
 
                         // Publish response with attributes
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Publishing response ({jsonString.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Publishing response ({jsonString.Length} bytes)..."); }
                         var responseMessage = new PubsubMessage
                         {
                             Data = ByteString.CopyFromUtf8(jsonString)
@@ -238,19 +267,25 @@ public partial class Program
                         responseMessage.Attributes["responseFor"] = message.MessageId;
                         responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
 
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling publisher.PublishAsync..."); SimpleLogger.LogInfo("DEBUG: Calling publisher.PublishAsync..."); }
                         string publishedId = await publisher.PublishAsync(responseMessage);
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: PublishAsync returned, MessageId={publishedId}"); SimpleLogger.LogInfo($"DEBUG: PublishAsync returned, MessageId={publishedId}"); }
                         Console.WriteLine($"✓ Published response: {publishedId}");
                         SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
 
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Returning Ack for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: Returning Ack for MessageId={message.MessageId}"); }
                         return SubscriberClient.Reply.Ack;
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"✗ Error: {ex.Message}");
                         SimpleLogger.LogError($"✗ Error: {ex.Message}");
+                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); SimpleLogger.LogInfo($"DEBUG: Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); }
                         return SubscriberClient.Reply.Nack;
                     }
                 });
+
+                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: subscriber.StartAsync has returned (subscriber stopped)"); SimpleLogger.LogInfo("DEBUG: subscriber.StartAsync has returned (subscriber stopped)"); }
 
                 // If StartAsync completes, the subscriber has stopped unexpectedly
                 Console.WriteLine("⚠ Subscriber stopped unexpectedly. Reconnecting...");
@@ -1181,6 +1216,9 @@ public partial class Program
 
         [JsonPropertyName("taxes")]
         public List<TaxDetail>? Taxes { get; set; }
+
+        [JsonPropertyName("attributes")]
+        public Dictionary<string, string>? Attributes { get; set; }
     }
 
     public class Item
@@ -1459,8 +1497,8 @@ public partial class Program
                 orderRecord.ExtendedValueNegativeSign = signExt;
 
                 // Override Price - default to zeros if not present
-                orderRecord.OverridePrice = "000000000"; // SLFOVR - 9 zeros when no override
-                orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
+               orderRecord.OverridePrice = overridePrice.ToString().PadLeft(9, '0'); 
+               orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
 
                 // SLFDSA - Discount Amount should always be 9 zeros for order records
                 // SLFDST - Discount Type should always be blank for order records
@@ -1573,9 +1611,9 @@ public partial class Program
                 orderRecord.CustomerName = ""; // SLFCNM - Always blank
                 orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
 
-                // SLFZIP - Leave empty to omit validation (per validate:"omitempty,max=10")
-                // Customer postal code data not available in ORAE Transaction structure
-                orderRecord.ZipCode = "";
+                // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
+                string eppDigit = DetermineEPPEligibility(item, retailEvent);
+                orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
                 orderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
@@ -1589,8 +1627,20 @@ public partial class Program
                 // Email - SLFEML (for ereceipt)
                 orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
 
-                // Reason codes - SLFRSN (return/price override/post voided - left justified)
-                orderRecord.ReasonCode = ""; // Default blank, TODO: populate based on transaction type
+                // Reason codes - SLFRSN (16 chars, left justified)
+                // RRT0 = Return, POV0 = Price Override, IDS0 = Manual Discount, VOD0 = Post Voided
+                string reasonCode = "";
+                string transType = retailEvent.Transaction?.TransactionType ?? "";
+                string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                if (transType == "RETURN")
+                    reasonCode = "RRT0";
+                else if (transType == "VOID")
+                    reasonCode = "VOD0";
+                else if (hasOverride)
+                    reasonCode = "POV0";
+                else if (pvCodeForRsn == "MAN")
+                    reasonCode = "IDS0";
+                orderRecord.ReasonCode = reasonCode.PadRight(16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
                 orderRecord.TaxExemptId1 = ""; // SLFTE1 - Always empty
@@ -1631,7 +1681,7 @@ public partial class Program
             {
                 // Calculate total tax across ALL items in the transaction
                 decimal transactionTaxTotal = 0;
-                foreach (var item in retailEvent.Transaction.Items)
+                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
                 {
                     if (item.Taxes != null)
                     {
@@ -1710,7 +1760,7 @@ public partial class Program
 
                         CustomerName = "",
                         CustomerNumber = "",
-                        ZipCode = "",
+                        ZipCode = "         0", // SLFZIP - 9 spaces + 0 for tax records
                         Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                         EmployeeCardNumber = 0,
                         UPCCode = "0000000000000", // SLFUPC - 13 zeros
@@ -1750,7 +1800,7 @@ public partial class Program
             else
             {
                 // Non-Ontario: Create per-item tax records (original logic)
-                foreach (var item in retailEvent.Transaction.Items)
+                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
                 {
                     if (item.Taxes != null)
                     {
@@ -1830,7 +1880,7 @@ public partial class Program
 
                                 CustomerName = "",
                                 CustomerNumber = "",
-                                ZipCode = "",
+                                ZipCode = "         0", // SLFZIP - 9 spaces + 0 for tax records
                                 Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
                                 EmployeeCardNumber = 0,
                                 UPCCode = "0000000000000", // SLFUPC - 13 zeros
@@ -2414,6 +2464,9 @@ public partial class Program
             // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
 
+            // SLFACD - TaxAuthCode should always be blank for order records
+            orderRecord.TaxAuthCode = "";
+
             return taxRateCodeForTaxRecords;
         }
 
@@ -2544,91 +2597,57 @@ public partial class Program
         // Check if item is an EPP (Extended Protection Plan)
         private bool IsEPPItem(TransactionItem item)
         {
-            // Check if SKU indicates EPP
-            if (item.Item?.Sku != null)
-            {
-                string sku = item.Item.Sku.ToUpper();
-                if (sku.StartsWith("EPP") || sku.Contains("PROTECT") ||
-                    sku.Contains("WARRANTY") || sku.StartsWith("WTY") ||
-                    sku.StartsWith("WARR"))
-                    return true;
-            }
-
-            // Check item description
-            if (item.Item?.Description != null)
-            {
-                string desc = item.Item.Description.ToUpper();
-                if (desc.Contains("PROTECTION PLAN") || desc.Contains("WARRANTY") ||
-                    desc.Contains("EXTENDED PROTECTION") || desc.Contains("EPP"))
-                    return true;
-            }
-
-            return false;
+            // EPP item is identified by having the x-epp-coverage-identifier attribute
+            return item.Attributes != null &&
+                   item.Attributes.ContainsKey("x-epp-coverage-identifier");
         }
 
-        // Check if SKU is eligible for EPP coverage
-        private bool IsSKUEligibleForEPP(string? sku)
+        // Get the EPP coverage identifier value from an EPP item
+        private string? GetEPPCoverageIdentifier(TransactionItem item)
         {
-            // Business logic to determine if SKU can have EPP
-            // For now, assume most items are eligible (this would be configured per business rules)
-            // TODO: Implement SKU category lookup or eligibility table
-
-            if (string.IsNullOrEmpty(sku))
-                return false;
-
-            // EPP items themselves are not eligible for EPP
-            string skuUpper = sku.ToUpper();
-            if (skuUpper.StartsWith("EPP") || skuUpper.StartsWith("WTY") || skuUpper.StartsWith("WARR"))
-                return false;
-
-            // Most merchandise items are eligible
-            return true;
-        }
-
-        // Determine how many items an EPP covers
-        private int DetermineEPPCoveredItemCount(TransactionItem eppItem, RetailEvent retailEvent)
-        {
-            // Business logic to determine coverage count
-            // This could be based on:
-            // - EPP quantity
-            // - EPP metadata/description
-            // - Transaction-level EPP associations
-
-            // For now, use quantity as indicator
-            if (eppItem.Quantity != null && eppItem.Quantity.Value > 1)
+            if (item.Attributes != null &&
+                item.Attributes.TryGetValue("x-epp-coverage-identifier", out string? value))
             {
-                return (int)eppItem.Quantity.Value;
+                return value;
             }
-
-            // Default to single item coverage
-            return 1;
+            return null;
         }
 
-        // Determine EPP eligibility digit for SLFZIP (last character)
+        // Determine EPP eligibility digit for SLFZIP (10th character)
+        // 0 = EPP not eligible for this SKU
+        // 1 = EPP covering one item included, merchandise SKU on this line
+        // 2 = EPP covering more than one item included for this SKU
+        // 3 = EPP requested but denied for this SKU
+        // 9 = This line item IS the EPP
         private string DetermineEPPEligibility(TransactionItem item, RetailEvent retailEvent)
         {
-            // Check if this item IS the EPP
+            // Check if this item IS the EPP (has x-epp-coverage-identifier attribute)
             if (IsEPPItem(item))
                 return "9";
 
-            // Check if EPP exists in transaction
-            bool hasEPP = retailEvent.Transaction?.Items?.Any(i => IsEPPItem(i)) ?? false;
+            // Find all EPP items in the transaction
+            var eppItems = retailEvent.Transaction?.Items?
+                .Where(i => IsEPPItem(i))
+                .ToList() ?? new List<TransactionItem>();
 
-            if (!hasEPP)
+            if (eppItems.Count == 0)
+                return "0"; // No EPP in transaction
+
+            // Check if any EPP covers this item's SKU
+            string? itemSku = item.Item?.Sku;
+            if (string.IsNullOrEmpty(itemSku))
+                return "0";
+
+            // Count how many merchandise items are covered by EPP(s) that match this item
+            foreach (var epp in eppItems)
             {
-                // No EPP in transaction - check if this SKU is eligible
-                if (IsSKUEligibleForEPP(item.Item?.Sku))
-                    return "0"; // Eligible but no EPP
-                else
-                    return "0"; // Not eligible
-            }
+                string? coverageId = GetEPPCoverageIdentifier(epp);
+                if (string.IsNullOrEmpty(coverageId))
+                    continue;
 
-            // EPP exists - determine if this item is covered
-            var eppItem = retailEvent.Transaction?.Items?.FirstOrDefault(i => IsEPPItem(i));
-
-            if (eppItem != null)
-            {
-                int coveredItemCount = DetermineEPPCoveredItemCount(eppItem, retailEvent);
+                // Count merchandise items (non-EPP) in the transaction that could be covered
+                int coveredItemCount = retailEvent.Transaction?.Items?
+                    .Count(i => !IsEPPItem(i)) ?? 0;
 
                 if (coveredItemCount == 1)
                     return "1"; // Single item coverage
@@ -2636,7 +2655,6 @@ public partial class Program
                     return "2"; // Multi-item coverage
             }
 
-            // Default
             return "0";
         }
 
@@ -2731,7 +2749,8 @@ public partial class Program
             // Employee sales get SLFTTP = "04"
             if (input == "SALE" && hasEmployeeDiscount)
             {
-                return "04";
+            return "01";  // JCW 01/28/26 Temp
+                // return "04";
             }
 
             return input switch
@@ -2753,7 +2772,9 @@ public partial class Program
                 // Employee sales → SLFLNT = "04"
                 if (hasEmployeeDiscount)
                 {
-                    return "04";
+                    //JCW 01/28/26
+                    return "01";  // JCW 01/28/26 Temp
+                // return "04";
                 }
 
                 // Gift card sales → SLFLNT = "45"
