@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 01/30/26 v1.0.35";
+    static string Version = "PubSubApp 02/02/26 v1.0.36";
 
     public static async Task Main(string[] args)
     {
@@ -1154,6 +1154,15 @@ public partial class Program
     {
         [JsonPropertyName("cashier")]
         public Cashier? Cashier { get; set; }
+
+        [JsonPropertyName("customer")]
+        public Customer? Customer { get; set; }
+    }
+
+    public class Customer
+    {
+        [JsonPropertyName("customerIdToken")]
+        public string? CustomerIdToken { get; set; }
     }
 
     public class Cashier
@@ -1272,6 +1281,9 @@ public partial class Program
 
     public class TaxDetail
     {
+        [JsonPropertyName("jurisdiction")]
+        public TaxJurisdiction? Jurisdiction { get; set; }
+
         [JsonPropertyName("taxType")]
         public string? TaxType { get; set; }
 
@@ -1298,6 +1310,24 @@ public partial class Program
 
         [JsonPropertyName("exemptReason")]
         public string? ExemptReason { get; set; }
+    }
+
+    public class TaxJurisdiction
+    {
+        [JsonPropertyName("country")]
+        public string? Country { get; set; }
+
+        [JsonPropertyName("region")]
+        public string? Region { get; set; }
+
+        [JsonPropertyName("locality")]
+        public string? Locality { get; set; }
+
+        [JsonPropertyName("authorityId")]
+        public string? AuthorityId { get; set; }
+
+        [JsonPropertyName("authorityName")]
+        public string? AuthorityName { get; set; }
     }
 
     public class Totals
@@ -1585,41 +1615,40 @@ public partial class Program
                 orderRecord.ReferenceDesc = ""; // SLFRFD - Always empty string
 
                 // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
-                if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04") // SALE or Employee SALE
+                if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43") // SALE, Employee SALE, AR Payment
                 {
                     orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
                     orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
                     orderRecord.OriginalTxRegister = "000"; // SLFOTR - 3 zeros for sales
                     orderRecord.OriginalTxNumber = "00000"; // SLFOTT - 5 zeros for sales
                 }
-                else if (mappedTransactionTypeSLFTTP == "11") // VOID
+                else if (mappedTransactionTypeSLFTTP == "11") // RETURN
                 {
-                    orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for voids
-                    orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for voids
-                    orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for voids
-                    orderRecord.OriginalTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5); // SLFOTT - transaction number for voids
+                    orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
+                    orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd");
+                    orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
+                    // Use sourceTransactionId if available for returns
+                    orderRecord.OriginalTxNumber = retailEvent.References?.SourceTransactionId != null
+                        ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5)
+                        : PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5);
                 }
-
-                // Map reference transaction if this is a return or void
-                if (retailEvent.References?.SourceTransactionId != null &&
-                    (retailEvent.Transaction?.TransactionType == "RETURN" ||
-                     retailEvent.Transaction?.TransactionType == "VOID"))
+                else if (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88") // Current VOID or Post VOID
                 {
-                    string sourceId = retailEvent.References.SourceTransactionId;
-                    if (retailEvent.Transaction?.TransactionType == "RETURN")
-                    {
-                        orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5); // StoreId for returns
-                        orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd"); // SLFOTD - timezone-adjusted date for returns
-                        orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3); // SLFOTR - register number for returns
-                        orderRecord.OriginalTxNumber = PadOrTruncate(sourceId, 5); // SLFOTT - source transaction ID for returns
-                    }
+                    orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
+                    orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd");
+                    orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
+                    orderRecord.OriginalTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5);
                 }
 
                 // === CSV-specified field mappings ===
 
                 // Customer fields - per CSV rules
                 orderRecord.CustomerName = ""; // SLFCNM - Always blank
-                orderRecord.CustomerNumber = ""; // SLFNUM - Default blank
+                // SLFNUM - 10-digit customer number with leading zeros, blank if no customer
+                string customerId = GetCustomerId(retailEvent);
+                orderRecord.CustomerNumber = !string.IsNullOrEmpty(customerId)
+                    ? customerId.PadLeft(10, '0')
+                    : "";
 
                 // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
                 string eppDigit = DetermineEPPEligibility(item, retailEvent);
@@ -1711,12 +1740,31 @@ public partial class Program
                 if (transactionTaxTotal != 0)
                 {
                     string taxAuthority = DetermineTaxAuthority(retailEvent, transactionTaxTotal);
+                    string taxLineType = MapTaxAuthToLineType(taxAuthority);
+
+                    // SLFACD - from taxes.jurisdiction.region for tax records
+                    string taxAuthCodeForTaxRecord = "";
+                    foreach (var txItem in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
+                    {
+                        if (txItem.Taxes != null)
+                        {
+                            foreach (var tax in txItem.Taxes)
+                            {
+                                if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                                {
+                                    taxAuthCodeForTaxRecord = PadOrTruncate(tax.Jurisdiction.Region, 6) ?? "";
+                                    break;
+                                }
+                            }
+                        }
+                        if (!string.IsNullOrEmpty(taxAuthCodeForTaxRecord)) break;
+                    }
 
                     var taxRecord = new OrderRecord
                     {
                         // Same transaction identifiers as parent item
                         TransType = mappedTransactionTypeSLFTTP,
-                        LineType = "XH", // Tax line type per spec
+                        LineType = taxLineType, // SLFLNT from TBLFLD TAXTXC mapping
                         TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted date
                         TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted time
                         TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
@@ -1737,7 +1785,7 @@ public partial class Program
                         ChargedTax2 = "N",
                         ChargedTax3 = "N",
                         ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+                        TaxAuthCode = taxAuthCodeForTaxRecord, // SLFACD from taxes.jurisdiction.region
                         TaxRateCode = lastComputedTaxRateCode,
 
                         // Tax amount in ExtendedValue and ItemSellPrice - COMBINED TOTAL for Ontario
@@ -1759,16 +1807,17 @@ public partial class Program
                         ReferenceCode = "", // SLFRFC - Always empty string
                         ReferenceDesc = "", // SLFRFD - Always empty string
 
-                        // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type (same logic as regular items)
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
-                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000000" :
-                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? transactionDateTime.ToString("yyMMdd") : null),
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
-                                          (mappedTransactionTypeSLFTTP == "11" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                          (mappedTransactionTypeSLFTTP == "02" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) : null)),
+                        // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
+                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
+                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
+                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
+                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
+                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
+                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
 
                         CustomerName = "",
                         CustomerNumber = "",
@@ -1830,12 +1879,24 @@ public partial class Program
                         if (itemTaxTotal != 0)
                         {
                             string taxAuthority = DetermineTaxAuthority(retailEvent, itemTaxTotal);
+                            string taxLineType = MapTaxAuthToLineType(taxAuthority);
+
+                            // SLFACD - from taxes.jurisdiction.region for tax records
+                            string itemTaxAuthCode = "";
+                            foreach (var tax in item.Taxes)
+                            {
+                                if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                                {
+                                    itemTaxAuthCode = PadOrTruncate(tax.Jurisdiction.Region, 6) ?? "";
+                                    break;
+                                }
+                            }
 
                             var taxRecord = new OrderRecord
                             {
                                 // Same transaction identifiers as parent item
                                 TransType = mappedTransactionTypeSLFTTP,
-                                LineType = "XH", // Tax line type per spec
+                                LineType = taxLineType, // SLFLNT from TBLFLD TAXTXC mapping
                                 TransDate = transactionDateTime.ToString("yyMMdd"), // SLFTDT - Use timezone-adjusted date
                                 TransTime = transactionDateTime.ToString("HHmmss"), // SLFTTM - Use timezone-adjusted time
                                 TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
@@ -1857,7 +1918,7 @@ public partial class Program
                                 ChargedTax3 = "N",
                                 ChargedTax4 = "N",
 
-                                TaxAuthCode = PadOrTruncate(taxAuthority, 6),
+                                TaxAuthCode = itemTaxAuthCode, // SLFACD from taxes.jurisdiction.region
                                 TaxRateCode = lastComputedTaxRateCode, // SLFTCD - Use computed TaxRateCode from order record
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
@@ -1879,16 +1940,17 @@ public partial class Program
                                 ReferenceCode = "", // SLFRFC - Always empty string
                                 ReferenceDesc = "", // SLFRFD - Always empty string
 
-                                // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type (same logic as regular items)
-                                OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
-                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                                OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000000" :
-                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? transactionDateTime.ToString("yyMMdd") : null),
-                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "000" :
-                                                    (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "02" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                                OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" ? "00000" :
-                                                  (mappedTransactionTypeSLFTTP == "11" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                                  (mappedTransactionTypeSLFTTP == "02" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) : null)),
+                                // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
+                                OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
+                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+                                OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
+                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
+                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
+                                                    (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
+                                OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
+                                                  (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
+                                                  (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
+                                                  PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
 
                                 CustomerName = "",
                                 CustomerNumber = "",
@@ -2165,9 +2227,7 @@ public partial class Program
         // Ready for future enhancement when customer data is available
         private string GetCustomerId(RetailEvent retailEvent)
         {
-            // TODO: When customer data is added to Transaction, extract customer ID here
-            // For now, return empty string
-            return "";
+            return retailEvent.Actor?.Customer?.CustomerIdToken ?? "";
         }
 
         // Determine if store is in western region (BC, AB, SK, MB) based on store ID
@@ -2435,24 +2495,19 @@ public partial class Program
                 }
             }
 
-            // Check if any tax on this item has "HST" in TaxType, TaxCategory, or TaxCode
-            bool hasHst = false;
+            // SLFTCD on tax records: use taxCode from the first tax that has a jurisdiction
+            string taxRateCodeForTaxRecords = "";
             if (item.Taxes != null)
             {
                 foreach (var tax in item.Taxes)
                 {
-                    if (string.Equals(tax.TaxType, "HST", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(tax.TaxCategory, "HST", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(tax.TaxCode, "HST", StringComparison.OrdinalIgnoreCase))
+                    if (tax.Jurisdiction != null && !string.IsNullOrEmpty(tax.TaxCode))
                     {
-                        hasHst = true;
+                        taxRateCodeForTaxRecords = PadOrTruncate(tax.TaxCode, 6) ?? "";
                         break;
                     }
                 }
             }
-
-            // SLFTCD on tax records: "HST   " (padded to 6) when HST found, otherwise blank
-            string taxRateCodeForTaxRecords = hasHst ? PadOrTruncate("HST", 6) ?? "" : "";
 
             // SLFTCD - TaxRateCode should always be blank for order records
             orderRecord.TaxRateCode = "";
@@ -2737,88 +2792,91 @@ public partial class Program
             return "HON";
         }
  
+        // Map Tax Authority Code to Sales Transaction Line Type (SLFLNT) for tax records
+        // Based on TBLFLD TAXTXC mapping table
+        private string MapTaxAuthToLineType(string taxAuthCode)
+        {
+            string code = taxAuthCode.Trim().ToUpper();
+            return code switch
+            {
+                "BC"   => "XR", // BC PST
+                "FED"  => "XG", // Goods and Services Tax (GST)
+                "HNB"  => "XN", // HST New Brunswick
+                "HNF"  => "XF", // HST Newfoundland
+                "HNS"  => "XV", // HST Nova Scotia
+                "HON"  => "XH", // HST Ontario
+                "HON1" => "XI", // HST Partial Ontario
+                "HPE"  => "XP", // HST Prince Edward Island
+                "MB"   => "XM", // Manitoba PST
+                "PQ"   => "XQ", // Quebec Provincial Tax
+                "SK"   => "XS", // Saskatchewan PST
+                _      => "XH"  // Default to HST Ontario
+            };
+        }
+
         private string MapTransTypeSLFTTP(string input, bool hasEmployeeDiscount)
         {
-            // Employee sales get SLFTTP = "04"
+            // Employee sales get SLFTTP = "04" (when SLFPVC = EMP)
             if (input == "SALE" && hasEmployeeDiscount)
-            {
-            return "01";  // JCW 01/28/26 Temp
-                // return "04";
-            }
+                return "04";
 
             return input switch
             {
-                "SALE" => "01",    // Regular sale (no employee discount)
-                "RETURN" => "02",  // Return transactions
-                "VOID" => "11",    // Void transactions
-                "OPEN" => "87",
-                "CLOSE" => "88",
-                _ => "Unknown: " + input
+                "SALE" => "01",          // Regular sale (no employee discount)
+                "RETURN" => "11",        // Return transactions
+                "AR_PAYMENT" => "43",    // AR Payment
+                "VOID" => "87",          // Current transaction void
+                "POST_VOID" => "88",     // Post void transaction
+                _ => "01"                // Default to regular sale
             };
         }
 
         private string MapTransTypeSLFLNT(string input, bool hasEmployeeDiscount, bool hasGiftCardTender, bool hasCustomerId)
         {
-            // Handle SALE transactions
+            // Handle SALE transactions (SLFTTP = 01 or 04)
             if (input == "SALE")
             {
-                // Employee sales → SLFLNT = "04"
+                // Employee sales (PVCode = EMP) → SLFLNT = "04"
                 if (hasEmployeeDiscount)
-                {
-                    //JCW 01/28/26
-                    return "01";  // JCW 01/28/26 Temp
-                // return "04";
-                }
+                    return "04";
 
-                // Gift card sales → SLFLNT = "45"
+                // Gift card activation → SLFLNT = "45"
                 if (hasGiftCardTender)
-                {
                     return "45";
-                }
 
-                // Regular trade (with customer) → SLFLNT = "02"
+                // Regular trade (Customer ID exists) → SLFLNT = "02"
                 if (hasCustomerId)
-                {
                     return "02";
-                }
 
-                // Regular sales (no customer) → SLFLNT = "01"
+                // Regular sales (no Customer ID) → SLFLNT = "01"
                 return "01";
             }
 
-            // Handle RETURN transactions
+            // Handle RETURN transactions (SLFTTP = 11)
             if (input == "RETURN")
             {
-                // Gift card return → SLFLNT = "45"
+                // Return in gift card → SLFLNT = "45"
                 if (hasGiftCardTender)
-                {
                     return "45";
-                }
 
-                // Trade return (with customer) → SLFLNT = "12"
+                // Trade return (Customer ID exists) → SLFLNT = "12"
                 if (hasCustomerId)
-                {
                     return "12";
-                }
 
-                // Regular return (no customer) → SLFLNT = "11"
+                // Regular return (no Customer ID) → SLFLNT = "11"
                 return "11";
             }
 
-            // Handle other transaction types
-            return input switch
-            {
-                "AR_PAYMENT" => "43",
-                "LAYAWAY_PAYMENT" => "45",
-                "LAYAWAY_SALE" => "50",
-                "LAYAWAY_PICKUP" => "51",
-                "LAYAWAY_DELETE" => "52",
-                "LAYAWAY_FORFEIT" => "53",
-                "SPECIAL_ORDER" => "69",
-                "NO_SALE" => "98",
-                "PAID_OUT" => "90",
-                _ => "01" // Default to regular sale
-            };
+            // Current transaction void (SLFTTP = 87) → SLFLNT = "87"
+            if (input == "VOID")
+                return "87";
+
+            // Post void transaction (SLFTTP = 88) → SLFLNT = "01"
+            if (input == "POST_VOID")
+                return "01";
+
+            // Default to regular sale
+            return "01";
     }
 
 
@@ -2866,11 +2924,13 @@ public partial class Program
     }
 
     // ORAE v2.0.0 Compliance Validation
+    // Validates incoming RetailEvent against ORAE v2.0.0 schema required fields
+    // Schema: https://transactiontree.com/schemas/orae/orae-2-0-0.json
     public static List<string> ValidateOraeCompliance(RetailEvent retailEvent)
     {
         var errors = new List<string>();
 
-        // Required root fields
+        // ── Required root fields (schema: required[]) ──
         if (string.IsNullOrEmpty(retailEvent.SchemaVersion))
             errors.Add("Missing required field: schemaVersion");
         else if (retailEvent.SchemaVersion != "2.0.0")
@@ -2884,7 +2944,7 @@ public partial class Program
         if (string.IsNullOrEmpty(retailEvent.EventType))
             errors.Add("Missing required field: eventType");
         else if (!IsValidEnum(retailEvent.EventType, new[] { "ORIGINAL", "CORRECTION", "CANCELLATION", "SNAPSHOT" }))
-            errors.Add($"Invalid eventType: {retailEvent.EventType}");
+            errors.Add($"Invalid eventType: {retailEvent.EventType}. Must be one of: ORIGINAL, CORRECTION, CANCELLATION, SNAPSHOT");
 
         if (string.IsNullOrEmpty(retailEvent.EventCategory))
             errors.Add("Missing required field: eventCategory");
@@ -2903,58 +2963,98 @@ public partial class Program
         if (retailEvent.IngestedAt == default(DateTime))
             errors.Add("Missing required field: ingestedAt");
 
-        // BusinessContext validation
+        // ── businessContext (schema: required) ──
         if (retailEvent.BusinessContext == null)
         {
             errors.Add("Missing required object: businessContext");
         }
         else
         {
+            // businessContext.businessDay (required, format: date)
             if (retailEvent.BusinessContext.BusinessDay == default(DateTime))
                 errors.Add("Missing required field: businessContext.businessDay");
 
+            // businessContext.store (required)
             if (retailEvent.BusinessContext.Store == null)
                 errors.Add("Missing required object: businessContext.store");
-            else if (string.IsNullOrEmpty(retailEvent.BusinessContext.Store.StoreId))
-                errors.Add("Missing required field: businessContext.store.storeId");
+            else
+            {
+                // store.storeId (required)
+                if (string.IsNullOrEmpty(retailEvent.BusinessContext.Store.StoreId))
+                    errors.Add("Missing required field: businessContext.store.storeId");
 
+                // store.currency format validation (optional but if present must be 3 uppercase letters)
+                if (!string.IsNullOrEmpty(retailEvent.BusinessContext.Store.Currency) &&
+                    !System.Text.RegularExpressions.Regex.IsMatch(retailEvent.BusinessContext.Store.Currency, @"^[A-Z]{3}$"))
+                    errors.Add($"Invalid businessContext.store.currency: '{retailEvent.BusinessContext.Store.Currency}'. Must be ISO-4217 (3 uppercase letters)");
+            }
+
+            // businessContext.workstation (required)
             if (retailEvent.BusinessContext.Workstation == null)
                 errors.Add("Missing required object: businessContext.workstation");
-            else if (string.IsNullOrEmpty(retailEvent.BusinessContext.Workstation.RegisterId))
-                errors.Add("Missing required field: businessContext.workstation.registerId");
+            else
+            {
+                // workstation.registerId (required)
+                if (string.IsNullOrEmpty(retailEvent.BusinessContext.Workstation.RegisterId))
+                    errors.Add("Missing required field: businessContext.workstation.registerId");
 
+                // workstation.sequenceNumber (optional but must be >= 0 if present)
+                if (retailEvent.BusinessContext.Workstation.SequenceNumber.HasValue &&
+                    retailEvent.BusinessContext.Workstation.SequenceNumber.Value < 0)
+                    errors.Add("Invalid businessContext.workstation.sequenceNumber: must be >= 0");
+            }
+
+            // businessContext.channel (required)
             if (string.IsNullOrEmpty(retailEvent.BusinessContext.Channel))
                 errors.Add("Missing required field: businessContext.channel");
         }
 
-        // Category-specific payload validation
+        // ── Category-specific payload validation (schema: anyOf) ──
+        // At least one typed payload object must be present
         if (retailEvent.EventCategory == "TRANSACTION" && retailEvent.Transaction == null)
             errors.Add("eventCategory 'TRANSACTION' requires transaction object");
 
-        // Transaction validation
+        // ── transaction (schema: $defs/Transaction) ──
         if (retailEvent.Transaction != null)
         {
+            // transaction.transactionType (required, enum)
             if (string.IsNullOrEmpty(retailEvent.Transaction.TransactionType))
                 errors.Add("Missing required field: transaction.transactionType");
             else if (!IsValidEnum(retailEvent.Transaction.TransactionType, new[] {
                 "SALE", "RETURN", "EXCHANGE", "VOID", "CANCEL", "ADJUSTMENT", "NONMERCH", "SERVICE" }))
-                errors.Add($"Invalid transaction.transactionType: {retailEvent.Transaction.TransactionType}");
+                errors.Add($"Invalid transaction.transactionType: {retailEvent.Transaction.TransactionType}. Must be one of: SALE, RETURN, EXCHANGE, VOID, CANCEL, ADJUSTMENT, NONMERCH, SERVICE");
 
+            // transaction.totals (required)
             if (retailEvent.Transaction.Totals == null)
                 errors.Add("Missing required object: transaction.totals");
             else
             {
+                // totals.gross (required Money)
                 if (retailEvent.Transaction.Totals.Gross == null)
                     errors.Add("Missing required field: transaction.totals.gross");
+                else
+                    ValidateMoney(retailEvent.Transaction.Totals.Gross, "transaction.totals.gross", errors);
+
+                // totals.discounts (required Money)
                 if (retailEvent.Transaction.Totals.Discounts == null)
                     errors.Add("Missing required field: transaction.totals.discounts");
+                else
+                    ValidateMoney(retailEvent.Transaction.Totals.Discounts, "transaction.totals.discounts", errors);
+
+                // totals.tax (required Money)
                 if (retailEvent.Transaction.Totals.Tax == null)
                     errors.Add("Missing required field: transaction.totals.tax");
+                else
+                    ValidateMoney(retailEvent.Transaction.Totals.Tax, "transaction.totals.tax", errors);
+
+                // totals.net (required Money)
                 if (retailEvent.Transaction.Totals.Net == null)
                     errors.Add("Missing required field: transaction.totals.net");
+                else
+                    ValidateMoney(retailEvent.Transaction.Totals.Net, "transaction.totals.net", errors);
             }
 
-            // Items validation (must have at least 1 unless CANCEL/VOID)
+            // Items validation: must have at least 1 unless CANCEL/VOID (schema: allOf conditional)
             if (retailEvent.Transaction.TransactionType != "CANCEL" &&
                 retailEvent.Transaction.TransactionType != "VOID" &&
                 (retailEvent.Transaction.Items == null || retailEvent.Transaction.Items.Count == 0))
@@ -2962,59 +3062,109 @@ public partial class Program
                 errors.Add("transaction.items[] must have at least one item for non-CANCEL/VOID transactions");
             }
 
-            // Line item validation
+            // ── LineItem validation (schema: $defs/LineItem) ──
             if (retailEvent.Transaction.Items != null)
             {
                 for (int i = 0; i < retailEvent.Transaction.Items.Count; i++)
                 {
                     var item = retailEvent.Transaction.Items[i];
+                    string prefix = $"transaction.items[{i}]";
+
+                    // lineId (required)
                     if (string.IsNullOrEmpty(item.LineId))
-                        errors.Add($"Missing required field: transaction.items[{i}].lineId");
+                        errors.Add($"Missing required field: {prefix}.lineId");
+
+                    // item (required object with required sku + description)
                     if (item.Item == null)
-                        errors.Add($"Missing required object: transaction.items[{i}].item");
+                        errors.Add($"Missing required object: {prefix}.item");
                     else
                     {
                         if (string.IsNullOrEmpty(item.Item.Sku))
-                            errors.Add($"Missing required field: transaction.items[{i}].item.sku");
+                            errors.Add($"Missing required field: {prefix}.item.sku");
                         if (string.IsNullOrEmpty(item.Item.Description))
-                            errors.Add($"Missing required field: transaction.items[{i}].item.description");
+                            errors.Add($"Missing required field: {prefix}.item.description");
                     }
+
+                    // quantity (required object with required value + uom)
                     if (item.Quantity == null)
-                        errors.Add($"Missing required object: transaction.items[{i}].quantity");
+                        errors.Add($"Missing required object: {prefix}.quantity");
                     else
                     {
                         if (string.IsNullOrEmpty(item.Quantity.Uom))
-                            errors.Add($"Missing required field: transaction.items[{i}].quantity.uom");
+                            errors.Add($"Missing required field: {prefix}.quantity.uom");
                     }
+
+                    // pricing (required object with required unitPrice + extendedPrice)
                     if (item.Pricing == null)
-                        errors.Add($"Missing required object: transaction.items[{i}].pricing");
+                        errors.Add($"Missing required object: {prefix}.pricing");
                     else
                     {
                         if (item.Pricing.UnitPrice == null)
-                            errors.Add($"Missing required field: transaction.items[{i}].pricing.unitPrice");
+                            errors.Add($"Missing required field: {prefix}.pricing.unitPrice");
+                        else
+                            ValidateMoney(item.Pricing.UnitPrice, $"{prefix}.pricing.unitPrice", errors);
+
                         if (item.Pricing.ExtendedPrice == null)
-                            errors.Add($"Missing required field: transaction.items[{i}].pricing.extendedPrice");
+                            errors.Add($"Missing required field: {prefix}.pricing.extendedPrice");
+                        else
+                            ValidateMoney(item.Pricing.ExtendedPrice, $"{prefix}.pricing.extendedPrice", errors);
+                    }
+
+                    // taxes[] - each TaxComponent requires amount (schema: $defs/TaxComponent)
+                    if (item.Taxes != null)
+                    {
+                        for (int t = 0; t < item.Taxes.Count; t++)
+                        {
+                            var tax = item.Taxes[t];
+                            if (tax.TaxAmount == null)
+                                errors.Add($"Missing required field: {prefix}.taxes[{t}].amount");
+                            else
+                                ValidateMoney(tax.TaxAmount, $"{prefix}.taxes[{t}].amount", errors);
+                        }
                     }
                 }
             }
 
-            // Tender validation
+            // ── Tender validation (schema: $defs/Tender) ──
             if (retailEvent.Transaction.Tenders != null)
             {
                 for (int i = 0; i < retailEvent.Transaction.Tenders.Count; i++)
                 {
                     var tender = retailEvent.Transaction.Tenders[i];
+                    string prefix = $"transaction.tenders[{i}]";
+
+                    // tenderId (required)
                     if (string.IsNullOrEmpty(tender.TenderId))
-                        errors.Add($"Missing required field: transaction.tenders[{i}].tenderId");
+                        errors.Add($"Missing required field: {prefix}.tenderId");
+
+                    // method (required)
                     if (string.IsNullOrEmpty(tender.Method))
-                        errors.Add($"Missing required field: transaction.tenders[{i}].method");
+                        errors.Add($"Missing required field: {prefix}.method");
+
+                    // amount (required Money)
                     if (tender.Amount == null)
-                        errors.Add($"Missing required field: transaction.tenders[{i}].amount");
+                        errors.Add($"Missing required field: {prefix}.amount");
+                    else
+                        ValidateMoney(tender.Amount, $"{prefix}.amount", errors);
                 }
             }
         }
 
         return errors;
+    }
+
+    // Validates a Money object per ORAE schema: both currency (ISO-4217) and value are required
+    private static void ValidateMoney(CurrencyAmount money, string path, List<string> errors)
+    {
+        if (string.IsNullOrEmpty(money.Currency))
+            errors.Add($"Missing required field: {path}.currency");
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(money.Currency, @"^[A-Z]{3}$"))
+            errors.Add($"Invalid {path}.currency: '{money.Currency}'. Must be ISO-4217 (3 uppercase letters)");
+
+        if (string.IsNullOrEmpty(money.Value))
+            errors.Add($"Missing required field: {path}.value");
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(money.Value, @"^-?[0-9]{1,18}(\.[0-9]{1,4})?$"))
+            errors.Add($"Invalid {path}.value: '{money.Value}'. Must be signed decimal string (e.g., '12.34', '-5.00')");
     }
 
     private static bool IsValidEnum(string value, string[] validValues)
