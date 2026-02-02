@@ -1660,9 +1660,11 @@ public partial class Program
                 // Employee fields - per CSV rules
                 orderRecord.EmployeeCardNumber = 0; // SLFECN - Set to zero
 
-                // UPC Code - SLFUPC - from item.gtin if available, otherwise 13 zeros
+                // UPC Code - SLFUPC - from item.gtin, rightmost 13 chars (chop left if longer), pad left with zeros if shorter
                 orderRecord.UPCCode = !string.IsNullOrEmpty(item.Item?.Gtin)
-                    ? item.Item.Gtin.PadLeft(13, '0')
+                    ? item.Item.Gtin.Length > 13
+                        ? item.Item.Gtin.Substring(item.Item.Gtin.Length - 13)
+                        : item.Item.Gtin.PadLeft(13, '0')
                     : "0000000000000";
 
                 // Email - SLFEML (for ereceipt)
