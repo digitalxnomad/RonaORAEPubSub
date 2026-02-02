@@ -63,6 +63,7 @@ Retail transaction event from Google Cloud Pub/Sub containing:
 
 **Actor (Root Level):** ✨ NEW
 - actor.cashier.loginId (cashier login identifier for ACO transactions)
+- actor.customer.customerIdToken (customer number for SLFNUM) ✨ NEW
 
 **Transaction Details:**
 - transactionType (SALE, RETURN, VOID, etc.)
@@ -77,6 +78,7 @@ Retail transaction event from Google Cloud Pub/Sub containing:
     - taxCode (rate code)
     - taxExempt (boolean flag)
     - exemptReason (exemption description)
+    - **jurisdiction** ✨ NEW (country, region, locality, authorityId, authorityName)
 - tenders[] (payment methods: CASH, CARD, etc.)
   - tenderId, method, amount
   - card.scheme, card.last4, card.authCode ✨
@@ -179,42 +181,44 @@ The application now supports comprehensive item-level tax parsing from ORAE v2.0
 
 **Ontario Transactions:**
 One consolidated tax line item per transaction:
-- **LineType**: "XH" (tax record)
+- **LineType**: From TBLFLD TAXTXC mapping (e.g., "XH" for HON, "XI" for HON1)
 - **Tax Flags**: All set to "N" (`SLFTX1-4=N`)
-- **Tax Authority**: "HON" (13% HST) or "HON1" (5% GST)
+- **Tax Authority (SLFACD)**: From `taxes.jurisdiction.region`
+- **Tax Rate Code (SLFTCD)**: From `taxes.taxCode` (first with jurisdiction)
 - **ExtendedValue**: Sum of all item taxes in transaction
 - **Sequence**: Gets its own sequence number after all item lines
 
 **Non-Ontario Transactions:**
 Per-item tax line items:
-- **LineType**: "XH" (tax record)
+- **LineType**: From TBLFLD TAXTXC mapping (province-specific)
 - **Tax Flags**: Province-specific flags
+- **Tax Authority (SLFACD)**: From `taxes.jurisdiction.region`
+- **Tax Rate Code (SLFTCD)**: From `taxes.taxCode` (first with jurisdiction)
 - **ExtendedValue**: Individual item tax amount
 - **Sequence**: One per item with taxes
 
 **Example Ontario Transaction Structure:**
 ```
 OrderRecords:
-  [1] Item 1 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFEXT="$50.00"
-  [2] Item 2 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFEXT="$30.00"
-  [3] Tax    - SLFLNT="XH", SLFTX2="N", SLFTX3="N", SLFACD="HON", SLFEXT="$10.40" (combined)
+  [1] Item 1 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFACD="", SLFTCD="", SLFEXT="$50.00"
+  [2] Item 2 - SLFLNT="01", SLFTX2="N", SLFTX3="Y", SLFACD="", SLFTCD="", SLFEXT="$30.00"
+  [3] Tax    - SLFLNT="XH", SLFACD="ON", SLFTCD="HST13", SLFEXT="$10.40" (combined)
 ```
 
 **Example Non-Ontario Transaction Structure:**
 ```
 OrderRecords:
-  [1] Item 1 - SLFLNT="01", SLFTX1="Y", SLFEXT="$50.00"
-  [2] Tax    - SLFLNT="XH", SLFACD="...", SLFEXT="$6.50" (item 1 tax)
-  [3] Item 2 - SLFLNT="01", SLFTX1="Y", SLFEXT="$30.00"
-  [4] Tax    - SLFLNT="XH", SLFACD="...", SLFEXT="$3.90" (item 2 tax)
+  [1] Item 1 - SLFLNT="01", SLFTX1="Y", SLFACD="", SLFTCD="", SLFEXT="$50.00"
+  [2] Tax    - SLFLNT="XR", SLFACD="BC", SLFTCD="PST07", SLFEXT="$6.50" (item 1 tax)
+  [3] Item 2 - SLFLNT="01", SLFTX1="Y", SLFACD="", SLFTCD="", SLFEXT="$30.00"
+  [4] Tax    - SLFLNT="XR", SLFACD="BC", SLFTCD="PST07", SLFEXT="$3.90" (item 2 tax)
 ```
 
 ## EPP (Extended Protection Plan) ✨ NEW
 
 ### EPP Detection
-The application automatically detects EPP items based on:
-- **SKU patterns**: Starts with "EPP", "WTY", "WARR"
-- **Description keywords**: "PROTECTION PLAN", "WARRANTY", "EXTENDED PROTECTION"
+The application detects EPP items using:
+- **Item attribute**: `x-epp-coverage-identifier` in `transaction.items[i].attributes`
 
 ### EPP Eligibility Tracking (SLFZIP)
 The last digit of the `SLFZIP` field indicates EPP eligibility:
@@ -315,29 +319,43 @@ Log entries include:
 ## Transaction Type Mapping
 
 ### SLFTTP (Transaction Type) Codes
-| Input Type | Code | Description      |
-|------------|------|------------------|
-| SALE       | 01   | Sales            |
-| RETURN     | 04   | Return           |
-| VOID       | 11   | Void             |
-| OPEN       | 87   | Open             |
-| CLOSE      | 88   | Close            |
+| Input Type      | Code | Description        |
+|-----------------|------|--------------------|
+| SALE            | 01   | Regular Sale       |
+| SALE (Employee) | 04   | Employee Sale      |
+| RETURN          | 11   | Return             |
+| AR_PAYMENT      | 43   | AR Payment         |
+| VOID            | 87   | Current Void       |
+| POST_VOID       | 88   | Post Void          |
 
 ### SLFLNT (Line Type) Codes
-| Input Type        | Code | Description         |
-|-------------------|------|---------------------|
-| SALE              | 01   | Regular Sales       |
-| RETURN            | 02   | Regular Trade       |
-| AR_PAYMENT        | 43   | AR Payment          |
-| LAYAWAY_PAYMENT   | 45   | Layaway Payment     |
-| LAYAWAY_SALE      | 50   | Layaway Sale        |
-| LAYAWAY_PICKUP    | 51   | Layaway Pickup      |
-| LAYAWAY_DELETE    | 52   | Layaway Delete      |
-| LAYAWAY_FORFEIT   | 53   | Layaway Forfeit     |
-| SPECIAL_ORDER     | 69   | Special Order       |
-| NO_SALE           | 98   | No Sale             |
-| PAID_OUT          | 90   | Paid Out            |
-| **TAX LINE** ✨   | **XH** | **Tax Record** (auto-generated) |
+| Input Type                     | Code   | Description              |
+|--------------------------------|--------|--------------------------|
+| SALE                           | 01     | Regular Sale             |
+| SALE (Customer)                | 02     | Customer Sale            |
+| SALE (Employee)                | 04     | Employee Sale            |
+| RETURN                         | 11     | Regular Return           |
+| RETURN (Customer)              | 12     | Customer Return          |
+| SALE/RETURN (Gift Card)        | 45     | Gift Card Transaction    |
+| VOID                           | 87     | Current Void             |
+| POST_VOID                      | 01     | Post Void                |
+| **TAX LINE (TBLFLD TAXTXC)** ✨ | **varies** | **Tax Record** (auto-generated) |
+
+### Tax Line Type Mapping (TBLFLD TAXTXC) ✨ NEW
+| Tax Authority | Line Type | Description          |
+|---------------|-----------|----------------------|
+| BC            | XR        | British Columbia     |
+| FED           | XG        | Federal GST          |
+| HNB           | XN        | New Brunswick HST    |
+| HNF           | XF        | Newfoundland HST     |
+| HNS           | XV        | Nova Scotia HST      |
+| HON           | XH        | Ontario HST          |
+| HON1          | XI        | Ontario GST Portion  |
+| HPE           | XP        | PEI HST              |
+| MB            | XM        | Manitoba PST         |
+| PQ            | XQ        | Quebec QST           |
+| SK            | XS        | Saskatchewan PST     |
+| (default)     | XH        | Default              |
 
 ### Tender Fund Codes (TNFFCD)
 | Method            | Code | Description         |
@@ -357,7 +375,36 @@ Log entries include:
 
 ## Version History
 
-### v1.3.0 (01/26/26) ✨ Current
+### v1.0.36 (02/02/26) ✨ Current
+**SLFTTP/SLFLNT Mapping Corrections & New Model Enhancements:**
+- ✨ **SLFTTP Corrected** - Proper transaction type codes:
+  - RETURN → "11" (was "02"), VOID → "87" (was "11"), POST_VOID → "88", AR_PAYMENT → "43"
+  - Employee SALE → "04" (restored from temporary "01")
+- ✨ **SLFLNT Corrected** - Line type mappings updated:
+  - Employee → "04", VOID → "87", POST_VOID → "01"
+  - Gift card tender → "45", Customer → "02"/"12"
+- ✨ **MapTaxAuthToLineType** - Tax line types from TBLFLD TAXTXC mapping table
+  - BC→XR, FED→XG, HNB→XN, HNF→XF, HNS→XV, HON→XH, HON1→XI, HPE→XP, MB→XM, PQ→XQ, SK→XS
+- ✨ **SLFNUM (Customer Number)** - 10-digit padded from `actor.customer.customerIdToken`
+- ✨ **SLFACD** - Blank for order records; `taxes.jurisdiction.region` for tax records
+- ✨ **SLFTCD** - Blank for order records; `taxes.taxCode` (first with jurisdiction) for tax records
+- ✨ **SLFRSN (Reason Code)** - Default 16 blank spaces; RRT0 (return), VOD0 (void), POV0 (override), IDS0 (manual discount)
+- ✨ **SLFSCN (Item Scanned)** - Y if item.gtin > 0, N otherwise; blank for tax records
+- ✨ **SLFUPC** - Populated from `item.gtin` (13-digit padded), all zeros if no value
+- ✨ **TNFRDS** - Always blank for all tender types
+
+**New Model Classes:**
+- ✨ **Customer** - `customerIdToken` property for customer number
+- ✨ **TaxJurisdiction** - `country`, `region`, `locality`, `authorityId`, `authorityName`
+- ✨ **Item.Gtin** - UPC code from ORAE item data
+- ✨ **TransactionItem.Attributes** - Dictionary for EPP detection via `x-epp-coverage-identifier`
+
+**Validation & Error Handling:**
+- ✨ **ValidateOraeCompliance** - Updated for ORAE 2.0.0 schema with Money validation, ISO-4217 currency check
+- ✨ **ACK on validation failure** - Invalid messages now ACKed to prevent redelivery loops
+- ✨ **Original tx fields** - Updated references to use corrected SLFTTP codes (01/04/43 → zeros, 11/87/88 → populated)
+
+### v1.3.0 (01/26/26)
 **Ontario Tax Consolidation & Actor Structure:**
 - ✨ **Ontario Tax Consolidation** - All item taxes combined into ONE tax record per transaction
   - Province detection via `GetProvince()` method
@@ -371,7 +418,7 @@ Log entries include:
 - ✨ **SLFSPS (SalesPerson) Logic** - SCO vs ACO determination
   - **SCO** (Self-Checkout): Register starts with "8" → uses `Workstation.RegisterID` padded to 5 digits
   - **ACO** (Assisted Checkout): Register doesn't start with "8" → uses `actor.cashier.loginId` padded to 5 digits
-- ✨ **SLFTCD (TaxRateCode)** - Always blank ("") for transaction records
+- ✨ **SLFTCD (TaxRateCode)** - Blank for order records; maps from `taxes.taxCode` (first with jurisdiction) for tax records
 - ✨ **All Date/Time Fields** - Timezone adjustment applied consistently
   - `SLFTDT`, `SLFTTM`, `TNFTDT`, `TNFTTM` all use `ApplyTimezoneAdjustment()`
   - Western region (BC, AB, SK, MB): -8 hours
@@ -379,9 +426,7 @@ Log entries include:
 
 **Tender Field Enhancements:**
 - ✨ **TNFRDC (ReferenceCode)** - Always blank ("") for all tender types
-- ✨ **TNFRDS (ReferenceDesc)** - Always blank for credit/debit/flexiti tenders
-  - Blank for: CREDIT, DEBIT, FLEXITI (case-insensitive)
-  - Uses `TenderId` (padded to 16 chars) for other tender types
+- ✨ **TNFRDS (ReferenceDesc)** - Always blank for all tender types
 - ✨ **TNFCCD (CreditCardNumber)** - Last4 only, padded LEFT with asterisks
   - Format: `************1234` (19 chars total)
   - Security-enhanced format for PCI compliance
