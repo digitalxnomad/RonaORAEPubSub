@@ -70,6 +70,9 @@ public partial class Program
 
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
+        // Set console window title with project ID and version
+        Console.Title = $"{projectId} - {Version}";
+
         Console.WriteLine(Version);
         Console.WriteLine("✓ Publisher initialized\n");
         Console.WriteLine("ProjectId: " + projectId);
