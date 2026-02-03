@@ -1265,6 +1265,24 @@ public partial class Program
 
         [JsonPropertyName("priceVehicle")]
         public string? PriceVehicle { get; set; }
+
+        [JsonPropertyName("priceOverride")]
+        public PriceOverride? PriceOverride { get; set; }
+    }
+
+    public class PriceOverride
+    {
+        [JsonPropertyName("approvedBy")]
+        public string? ApprovedBy { get; set; }
+
+        [JsonPropertyName("overridden")]
+        public bool? Overridden { get; set; }
+
+        [JsonPropertyName("overrideUnitPrice")]
+        public CurrencyAmount? OverrideUnitPrice { get; set; }
+
+        [JsonPropertyName("reason")]
+        public string? Reason { get; set; }
     }
 
     public class Quantity
@@ -1498,13 +1516,30 @@ public partial class Program
 
                 // SLFSEL - Item Sell Price - 9-digits without decimal
                 // Use override price if it exists and is non-zero; otherwise use UnitPrice
+                // Check both pricing.override and pricing.priceOverride.overrideUnitPrice
                 decimal overridePrice = 0;
-                bool hasOverride = item.Pricing?.Override?.Value != null &&
+                bool hasOverride = false;
+                string? overridePriceValue = null;
+
+                // First check priceOverride.overrideUnitPrice (new structure)
+                if (item.Pricing?.PriceOverride?.OverrideUnitPrice?.Value != null &&
+                    decimal.TryParse(item.Pricing.PriceOverride.OverrideUnitPrice.Value, out overridePrice) &&
+                    overridePrice != 0)
+                {
+                    hasOverride = true;
+                    overridePriceValue = item.Pricing.PriceOverride.OverrideUnitPrice.Value;
+                }
+                // Fallback to pricing.override (legacy structure)
+                else if (item.Pricing?.Override?.Value != null &&
                     decimal.TryParse(item.Pricing.Override.Value, out overridePrice) &&
-                    overridePrice != 0;
+                    overridePrice != 0)
+                {
+                    hasOverride = true;
+                    overridePriceValue = item.Pricing.Override.Value;
+                }
 
                 string? sellPriceSource = hasOverride
-                    ? item.Pricing?.Override?.Value
+                    ? overridePriceValue
                     : item.Pricing?.UnitPrice?.Value;
 
                 if (sellPriceSource != null)
@@ -1676,18 +1711,28 @@ public partial class Program
                 orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
 
                 // Reason codes - SLFRSN (16 chars, left justified)
+                // Use priceOverride.reason if available, otherwise fallback to transaction type logic
                 // RRT0 = Return, POV0 = Price Override, IDS0 = Manual Discount, VOD0 = Post Voided
                 string reasonCode = "                "; // 16 blank spaces default
-                string transType = retailEvent.Transaction?.TransactionType ?? "";
-                string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
-                if (transType == "RETURN")
-                    reasonCode = "RRT0";
-                else if (transType == "VOID")
-                    reasonCode = "VOD0";
-                else if (hasOverride)
-                    reasonCode = "POV0";
-                else if (pvCodeForRsn == "MAN")
-                    reasonCode = "IDS0";
+                if (!string.IsNullOrEmpty(item.Pricing?.PriceOverride?.Reason))
+                {
+                    // Use reason from priceOverride if available
+                    reasonCode = item.Pricing.PriceOverride.Reason;
+                }
+                else
+                {
+                    // Fallback to transaction type logic
+                    string transType = retailEvent.Transaction?.TransactionType ?? "";
+                    string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                    if (transType == "RETURN")
+                        reasonCode = "RRT0";
+                    else if (transType == "VOID")
+                        reasonCode = "VOD0";
+                    else if (hasOverride)
+                        reasonCode = "POV0";
+                    else if (pvCodeForRsn == "MAN")
+                        reasonCode = "IDS0";
+                }
                 orderRecord.ReasonCode = reasonCode.PadRight(16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
