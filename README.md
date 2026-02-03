@@ -390,7 +390,10 @@ Log entries include:
 - ✨ **SLFTCD** - Blank for order records; `taxes.taxCode` (first with jurisdiction) for tax records
 - ✨ **SLFRSN (Reason Code)** - Default 16 blank spaces; RRT0 (return), VOD0 (void), POV0 (override), IDS0 (manual discount)
 - ✨ **SLFSCN (Item Scanned)** - Y if item.gtin > 0, N otherwise; blank for tax records
-- ✨ **SLFUPC** - Populated from `item.gtin` (13-digit padded), all zeros if no value
+- ✨ **SLFUPC** - Populated from `item.gtin`:
+  - If GTIN > 13 digits: take rightmost 13 characters (chop left)
+  - If GTIN ≤ 13 digits: pad left with zeros to 13 characters
+  - If no GTIN: "0000000000000" (13 zeros)
 - ✨ **TNFRDS** - Always blank for all tender types
 
 **New Model Classes:**
