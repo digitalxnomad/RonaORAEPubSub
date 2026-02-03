@@ -29,6 +29,9 @@ public partial class Program
         var pubSubConfig = new PubSubConfiguration();
         configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
 
+        // Set console window title with project ID and version
+        Console.Title = $"{pubSubConfig.ProjectId} - {Version}";
+
         // Check for test mode
         if (args.Length > 0 && args[0] == "--test")
         {
@@ -69,9 +72,6 @@ public partial class Program
         var publisher = await publisherBuilder.BuildAsync();
 
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
-
-        // Set console window title with project ID and version
-        Console.Title = $"{projectId} - {Version}";
 
         Console.WriteLine(Version);
         Console.WriteLine("✓ Publisher initialized\n");
