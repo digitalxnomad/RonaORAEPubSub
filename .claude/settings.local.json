@@ -12,7 +12,10 @@
       "Bash(powershell -Command:*)",
       "Bash(python -c:*)",
       "Bash(git commit:*)",
-      "Bash(gh pr create:*)"
+      "Bash(gh pr create:*)",
+      "Bash(\"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\" --headless --disable-gpu --no-sandbox --print-to-pdf=\"C:\\\\Projects_2017\\\\RonaORAEPubSub\\\\v1.0.36_changes.pdf\" --print-to-pdf-no-header \"C:\\\\Projects_2017\\\\RonaORAEPubSub\\\\v1.0.36_changes.html\")",
+      "Bash(git -C C:/Projects_2017/RonaORAEPubSub status)",
+      "Bash(git -C C:/Projects_2017/RonaORAEPubSub log origin/master..HEAD --oneline)"
     ]
   }
 }

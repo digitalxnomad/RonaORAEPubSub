@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 02/02/26 v1.0.36";
+    static string Version = "PubSubApp 02/03/26 v1.0.37";
 
     public static async Task Main(string[] args)
     {
@@ -1744,8 +1744,8 @@ public partial class Program
                 // Only create tax record if there's a non-zero tax amount
                 if (transactionTaxTotal != 0)
                 {
-                    string taxAuthority = DetermineTaxAuthority(retailEvent, transactionTaxTotal);
-                    string taxLineType = MapTaxAuthToLineType(taxAuthority);
+//                    string taxAuthority = DetermineTaxAuthority(retailEvent, transactionTaxTotal);
+//                    string taxLineType = MapTaxAuthToLineType(taxAuthority);
 
                     // SLFACD - from taxes.jurisdiction.region for tax records
                     string taxAuthCodeForTaxRecord = "";
@@ -1764,6 +1764,10 @@ public partial class Program
                         }
                         if (!string.IsNullOrEmpty(taxAuthCodeForTaxRecord)) break;
                     }
+
+                    string taxLineType = MapTaxAuthToLineType(taxAuthCodeForTaxRecord);
+
+
 
                     var taxRecord = new OrderRecord
                     {
