@@ -2176,35 +2176,18 @@ public partial class Program
         }
 
         // Check if transaction has employee discount
-        // Employee discounts are indicated by specific price vehicle codes or discount patterns
+        // Employee discounts are indicated by priceVehicle containing "EMP"
         private bool HasEmployeeDiscount(RetailEvent retailEvent)
         {
-            // Check if any item has a discount that indicates employee pricing
-            // For now, we'll detect this by checking for specific discount patterns
-            // This can be enhanced based on actual employee discount indicators in the data
             if (retailEvent.Transaction?.Items != null)
             {
                 foreach (var item in retailEvent.Transaction.Items)
                 {
-                    // Check if item has pricing with discount that might indicate employee sale
-                    // This is a placeholder - actual logic should be based on business rules
-                    // Common indicators: specific SKU patterns, discount codes, price vehicle codes
-                    if (item.Pricing?.OriginalUnitPrice?.Value != null &&
-                        item.Pricing?.UnitPrice?.Value != null)
+                    // Check if priceVehicle contains "EMP" (case-insensitive)
+                    if (!string.IsNullOrEmpty(item.Pricing?.PriceVehicle) &&
+                        item.Pricing.PriceVehicle.ToUpperInvariant().Contains("EMP"))
                     {
-                        decimal originalPrice;
-                        decimal unitPrice;
-                        if (decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out originalPrice) &&
-                            decimal.TryParse(item.Pricing.UnitPrice.Value, out unitPrice))
-                        {
-                            // If discount is greater than 30%, might be employee discount
-                            // This threshold can be adjusted based on business rules
-                            decimal discountPercent = originalPrice > 0 ? ((originalPrice - unitPrice) / originalPrice) * 100 : 0;
-                            if (discountPercent >= 30)
-                            {
-                                return true;
-                            }
-                        }
+                        return true;
                     }
                 }
             }
