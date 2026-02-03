@@ -1654,7 +1654,9 @@ public partial class Program
                     : "";
 
                 // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
-                string eppDigit = DetermineEPPEligibility(item, retailEvent);
+                // 9 = This line item IS the EPP (has x-epp-coverage-identifier attribute)
+                // 0 = Not an EPP item
+                string eppDigit = GetEPPCoverageIdentifier(item) != null ? "9" : "0";
                 orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
@@ -2630,14 +2632,6 @@ public partial class Program
             return null;
         }
 
-        // Check if item is an EPP (Extended Protection Plan)
-        private bool IsEPPItem(TransactionItem item)
-        {
-            // EPP item is identified by having the x-epp-coverage-identifier attribute
-            return item.Attributes != null &&
-                   item.Attributes.ContainsKey("x-epp-coverage-identifier");
-        }
-
         // Get the EPP coverage identifier value from an EPP item
         private string? GetEPPCoverageIdentifier(TransactionItem item)
         {
@@ -2647,51 +2641,6 @@ public partial class Program
                 return value;
             }
             return null;
-        }
-
-        // Determine EPP eligibility digit for SLFZIP (10th character)
-        // 0 = EPP not eligible for this SKU
-        // 1 = EPP covering one item included, merchandise SKU on this line
-        // 2 = EPP covering more than one item included for this SKU
-        // 3 = EPP requested but denied for this SKU
-        // 9 = This line item IS the EPP
-        private string DetermineEPPEligibility(TransactionItem item, RetailEvent retailEvent)
-        {
-            // Check if this item IS the EPP (has x-epp-coverage-identifier attribute)
-            if (IsEPPItem(item))
-                return "9";
-
-            // Find all EPP items in the transaction
-            var eppItems = retailEvent.Transaction?.Items?
-                .Where(i => IsEPPItem(i))
-                .ToList() ?? new List<TransactionItem>();
-
-            if (eppItems.Count == 0)
-                return "0"; // No EPP in transaction
-
-            // Check if any EPP covers this item's SKU
-            string? itemSku = item.Item?.Sku;
-            if (string.IsNullOrEmpty(itemSku))
-                return "0";
-
-            // Count how many merchandise items are covered by EPP(s) that match this item
-            foreach (var epp in eppItems)
-            {
-                string? coverageId = GetEPPCoverageIdentifier(epp);
-                if (string.IsNullOrEmpty(coverageId))
-                    continue;
-
-                // Count merchandise items (non-EPP) in the transaction that could be covered
-                int coveredItemCount = retailEvent.Transaction?.Items?
-                    .Count(i => !IsEPPItem(i)) ?? 0;
-
-                if (coveredItemCount == 1)
-                    return "1"; // Single item coverage
-                else if (coveredItemCount > 1)
-                    return "2"; // Multi-item coverage
-            }
-
-            return "0";
         }
 
         // Determine tax authority code based on tax rate and jurisdiction
