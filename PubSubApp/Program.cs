@@ -1474,8 +1474,9 @@ public partial class Program
                 var orderRecord = new OrderRecord
                 {
                     // Required Fields - per CSV specs
-                    TransType = mappedTransactionTypeSLFTTP,
-                    LineType = mappedTransactionTypeSLFLNT,
+                    // EPP items (x-epp-coverage-identifier = "9") get SLFTTP = "21" and SLFLNT = "21"
+                    TransType = GetEPPCoverageIdentifier(item) == "9" ? "21" : mappedTransactionTypeSLFTTP,
+                    LineType = GetEPPCoverageIdentifier(item) == "9" ? "21" : mappedTransactionTypeSLFLNT,
                     TransDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
                     TransTime = transactionDateTime.ToString("HHmmss"),
                     // Transaction Identification - with proper padding
