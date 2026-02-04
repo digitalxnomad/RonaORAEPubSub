@@ -2509,38 +2509,44 @@ public partial class Program
                     // Map tax type/category to ChargedTax1-4 flags
                     string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
 
-                    // Ontario-specific logic: SLFTX2=N, SLFTX3=Y for HST
+                    // Ontario-specific logic:
+                    // SLFTX3 = Y for HST (13%)
+                    // SLFTX4 = Y for Partial HST / GST (5%)
                     if (isOntario)
                     {
-                        switch (taxType)
+                        // Determine if this is full HST (13%) or Partial HST (5%) based on rate
+                        bool isFullHst = true; // Default to full HST
+
+                        // Check by ratePercent
+                        if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal ratePercent))
                         {
-                            case "HST":
-                            case "HARMONIZED":
-                                // Ontario HST goes to Tax3
-                                orderRecord.ChargedTax2 = "N"; // GST not separate
-                                orderRecord.ChargedTax3 = "Y"; // HST
-                                break;
-                            case "GST":
-                            case "FEDERAL":
-                                // GST only (rare in Ontario)
-                                orderRecord.ChargedTax2 = "N";
-                                orderRecord.ChargedTax3 = "Y";
-                                break;
-                            case "PST":
-                            case "PROVINCIAL":
-                                // PST (not used in Ontario, but if present)
-                                orderRecord.ChargedTax1 = "Y";
-                                break;
-                            case "MUNICIPAL":
-                            case "LOCAL":
-                            case "CITY":
-                                orderRecord.ChargedTax4 = "Y";
-                                break;
-                            default:
-                                // Default to HST for Ontario
-                                orderRecord.ChargedTax2 = "N";
-                                orderRecord.ChargedTax3 = "Y";
-                                break;
+                            isFullHst = ratePercent >= 10; // 13% is HST, 5% is Partial HST
+                        }
+                        // Check by taxRate (decimal form)
+                        else if (tax.TaxRate != null)
+                        {
+                            isFullHst = tax.TaxRate.Value >= 0.10m; // 0.13 is HST, 0.05 is Partial HST
+                        }
+                        // Check by jurisdiction region
+                        else if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                        {
+                            string region = tax.Jurisdiction.Region.ToUpper();
+                            isFullHst = region == "HON" || region.Contains("HST");
+                            // HON1 indicates Partial HST
+                            if (region == "HON1") isFullHst = false;
+                        }
+
+                        if (isFullHst)
+                        {
+                            // Full HST (13%) -> SLFTX3 = Y
+                            orderRecord.ChargedTax3 = "Y";
+                            orderRecord.ChargedTax4 = "N";
+                        }
+                        else
+                        {
+                            // Partial HST / GST (5%) -> SLFTX4 = Y
+                            orderRecord.ChargedTax3 = "N";
+                            orderRecord.ChargedTax4 = "Y";
                         }
                     }
                     else
