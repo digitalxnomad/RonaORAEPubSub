@@ -2,7 +2,7 @@
   "profiles": {
     "PubSubApp": {
       "commandName": "Project",
-      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\ORAE\\UnitTestTransactions\\7. Manual Discounts - Retest\\7. Manual Discounts - Retest\\input.json\""
+      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\ORAE\\UnitTestTransactions\\0144 - Partial HST and Full HST\\Input - 0144 - Partial HST and Full HST.json\""
     }
   }
 }
