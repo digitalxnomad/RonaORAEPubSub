@@ -1577,9 +1577,10 @@ public partial class Program
                 orderRecord.ExtendedValue = amountExt;
                 orderRecord.ExtendedValueNegativeSign = signExt;
 
-                // Override Price - default to zeros if not present
-               orderRecord.OverridePrice = overridePrice.ToString().PadLeft(9, '0'); 
-               orderRecord.OverridePriceNegativeSign = ""; // SLFOVN - Empty string
+                // Override Price - 9-digit format without decimal, default to zeros if not present
+                var (overrideAmt, overrideSign) = FormatCurrencyWithSign(overridePrice.ToString("F2"), 9);
+                orderRecord.OverridePrice = overrideAmt;
+                orderRecord.OverridePriceNegativeSign = overrideSign;
 
                 // SLFDSA - Discount Amount should always be 9 zeros for order records
                 // SLFDST - Discount Type should always be blank for order records
