@@ -498,7 +498,10 @@ public partial class Program
             for (int i = 0; i < recordSet.OrderRecords.Count; i++)
             {
                 var orderRecord = recordSet.OrderRecords[i];
-                Console.WriteLine($"\n  OrderRecord #{i + 1}:");
+                // Tax records have LineType starting with "X" (XH, XI, XR, etc.)
+                bool isTaxRecord = !string.IsNullOrEmpty(orderRecord.LineType) && orderRecord.LineType.StartsWith("X");
+                string recordLabel = isTaxRecord ? "TaxRecord" : "OrderRecord";
+                Console.WriteLine($"\n  {recordLabel} #{i + 1}:");
 
                 // Required fields
                 if (string.IsNullOrEmpty(orderRecord.TransType))
