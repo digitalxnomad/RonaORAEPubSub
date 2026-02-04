@@ -2,7 +2,7 @@
   "profiles": {
     "PubSubApp": {
       "commandName": "Project",
-      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\ORAE\\ORAE_Files_for_Testing\\Manual Override (1)\\PPR-Input-MOVD-0662.json\""
+      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\ORAE\\UnitTestTransactions\\0741-EPP\\Input - 0741 - EPP.json\""
     }
   }
 }

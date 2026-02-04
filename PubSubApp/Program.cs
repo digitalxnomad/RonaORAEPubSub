@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 02/02/26 v1.0.36";
+    static string Version = "PubSubApp 02/04/26 v1.0.41";
 
     public static async Task Main(string[] args)
     {
@@ -1699,7 +1699,7 @@ public partial class Program
                 // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
                 // 9 = This line item IS the EPP (has x-epp-coverage-identifier attribute)
                 // 0 = Not an EPP item
-                string eppDigit = GetEPPCoverageIdentifier(item) != null ? "9" : "0";
+                string eppDigit = GetEPPCoverageIdentifier(item);
                 orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
