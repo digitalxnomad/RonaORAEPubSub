@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 02/04/26 v1.0.41";
+    static string Version = "PubSubApp 02/04/26 v1.0.43";
 
     public static async Task Main(string[] args)
     {
@@ -1726,6 +1726,17 @@ public partial class Program
                 {
                     // Use reason from priceOverride if available
                     reasonCode = item.Pricing.PriceOverride.Reason;
+
+                    string transType = retailEvent.Transaction?.TransactionType ?? "";
+                    string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                    if (transType == "RETURN")
+                        reasonCode = "RRT0" + reasonCode;
+                    else if (transType == "VOID")
+                        reasonCode = "VOD0" + reasonCode;
+                    else if (hasOverride)
+                        reasonCode = "IDS0" + reasonCode;   //JCW for now this is always IDS0 + reasonCode;  was POV0
+                    else if (pvCodeForRsn == "MAN")
+                        reasonCode = "IDS0" + reasonCode;
                 }
                 else
                 {
