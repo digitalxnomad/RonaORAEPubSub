@@ -499,8 +499,10 @@ public partial class Program
             {
                 var orderRecord = recordSet.OrderRecords[i];
                 // Tax records have LineType starting with "X" (XH, XI, XR, etc.)
+                // EPP records have TransType = "21"
                 bool isTaxRecord = !string.IsNullOrEmpty(orderRecord.LineType) && orderRecord.LineType.StartsWith("X");
-                string recordLabel = isTaxRecord ? "TaxRecord" : "OrderRecord";
+                bool isEppRecord = orderRecord.TransType == "21";
+                string recordLabel = isTaxRecord ? "TaxRecord" : isEppRecord ? "EPP" : "OrderRecord";
                 Console.WriteLine($"\n  {recordLabel} #{i + 1}:");
 
                 // Required fields
