@@ -1781,6 +1781,87 @@ public partial class Program
 
                 // Add this OrderRecord to the item records list
                 itemRecords.Add(orderRecord);
+
+                // For items with EPP coverage (x-epp-coverage-identifier = "1" or "2"),
+                // create an additional duplicate order record with SLFTTP = "21" and SLFLNT = "21"
+                string? eppCovId = GetEPPCoverageIdentifier(item);
+                if (eppCovId == "1" || eppCovId == "2")
+                {
+                    var eppRecord = new OrderRecord
+                    {
+                        TransType = "21",
+                        LineType = "21",
+                        TransDate = orderRecord.TransDate,
+                        TransTime = orderRecord.TransTime,
+                        TransNumber = orderRecord.TransNumber,
+                        TransSeq = "00000", // Placeholder - will be updated after grouping
+                        RegisterID = orderRecord.RegisterID,
+                        PolledStore = orderRecord.PolledStore,
+                        PollCen = orderRecord.PollCen,
+                        PollDate = orderRecord.PollDate,
+                        CreateCen = orderRecord.CreateCen,
+                        CreateDate = orderRecord.CreateDate,
+                        CreateTime = orderRecord.CreateTime,
+                        Status = orderRecord.Status,
+                        SKUNumber = orderRecord.SKUNumber,
+                        Quantity = orderRecord.Quantity,
+                        QuantityNegativeSign = orderRecord.QuantityNegativeSign,
+                        OriginalPrice = orderRecord.OriginalPrice,
+                        OriginalPriceNegativeSign = orderRecord.OriginalPriceNegativeSign,
+                        OriginalRetail = orderRecord.OriginalRetail,
+                        OriginalRetailNegativeSign = orderRecord.OriginalRetailNegativeSign,
+                        ItemSellPrice = orderRecord.ItemSellPrice,
+                        SellPriceNegativeSign = orderRecord.SellPriceNegativeSign,
+                        ExtendedValue = orderRecord.ExtendedValue,
+                        ExtendedValueNegativeSign = orderRecord.ExtendedValueNegativeSign,
+                        OverridePrice = orderRecord.OverridePrice,
+                        OverridePriceNegativeSign = orderRecord.OverridePriceNegativeSign,
+                        ChargedTax1 = orderRecord.ChargedTax1,
+                        ChargedTax2 = orderRecord.ChargedTax2,
+                        ChargedTax3 = orderRecord.ChargedTax3,
+                        ChargedTax4 = orderRecord.ChargedTax4,
+                        TaxAuthCode = orderRecord.TaxAuthCode,
+                        TaxRateCode = orderRecord.TaxRateCode,
+                        ReferenceCode = orderRecord.ReferenceCode,
+                        ReferenceDesc = orderRecord.ReferenceDesc,
+                        OriginalTxStore = orderRecord.OriginalTxStore,
+                        OriginalTxDate = orderRecord.OriginalTxDate,
+                        OriginalTxRegister = orderRecord.OriginalTxRegister,
+                        OriginalTxNumber = orderRecord.OriginalTxNumber,
+                        CustomerName = orderRecord.CustomerName,
+                        CustomerNumber = orderRecord.CustomerNumber,
+                        ZipCode = orderRecord.ZipCode,
+                        Clerk = orderRecord.Clerk,
+                        EmployeeCardNumber = orderRecord.EmployeeCardNumber,
+                        UPCCode = orderRecord.UPCCode,
+                        EReceiptEmail = orderRecord.EReceiptEmail,
+                        ReasonCode = orderRecord.ReasonCode,
+                        TaxExemptId1 = orderRecord.TaxExemptId1,
+                        TaxExemptId2 = orderRecord.TaxExemptId2,
+                        TaxExemptionName = orderRecord.TaxExemptionName,
+                        AdCode = orderRecord.AdCode,
+                        AdPrice = orderRecord.AdPrice,
+                        AdPriceNegativeSign = orderRecord.AdPriceNegativeSign,
+                        PriceVehicleCode = orderRecord.PriceVehicleCode,
+                        PriceVehicleReference = orderRecord.PriceVehicleReference,
+                        OriginalSalesperson = orderRecord.OriginalSalesperson,
+                        OriginalStore = orderRecord.OriginalStore,
+                        GroupDiscAmount = orderRecord.GroupDiscAmount,
+                        GroupDiscSign = orderRecord.GroupDiscSign,
+                        SalesPerson = orderRecord.SalesPerson,
+                        DiscountAmount = orderRecord.DiscountAmount,
+                        DiscountType = orderRecord.DiscountType,
+                        DiscountAmountNegativeSign = orderRecord.DiscountAmountNegativeSign,
+                        GroupDiscReason = orderRecord.GroupDiscReason,
+                        RegDiscReason = orderRecord.RegDiscReason,
+                        OrderNumber = orderRecord.OrderNumber,
+                        ProjectNumber = orderRecord.ProjectNumber,
+                        SalesStore = orderRecord.SalesStore,
+                        InvStore = orderRecord.InvStore,
+                        ItemScanned = orderRecord.ItemScanned
+                    };
+                    itemRecords.Add(eppRecord);
+                }
             }
 
             // Determine if this is an Ontario transaction
