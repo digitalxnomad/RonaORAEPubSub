@@ -10,4 +10,5 @@ public class PubSubConfiguration
     public string LogPath { get; set; } = string.Empty;
     public bool DisableOraeValidation { get; set; } = false;
     public bool EnableDebugLogging { get; set; } = false;
+    public int IdleTimeoutMinutes { get; set; } = 30;
 }

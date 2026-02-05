@@ -131,18 +131,45 @@ public partial class Program
 
                 Console.WriteLine("✓ Subscriber started. Listening for messages...");
                 Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
-                Console.WriteLine($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1\n");
+                Console.WriteLine($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1");
+                Console.WriteLine($"  IdleWatchdog: {(pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30)} minutes (reconnects if no messages)\n");
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
                 SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
                 SimpleLogger.LogInfo("FlowControl config: MaxElements=100, MaxBytes=10MB, ClientCount=1");
+                SimpleLogger.LogInfo($"IdleWatchdog config: {(pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30)} minutes");
 
                 if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling subscriber.StartAsync - waiting for messages..."); SimpleLogger.LogInfo("DEBUG: Calling subscriber.StartAsync - waiting for messages..."); }
+
+                // Idle watchdog: if no messages received within this window, force reconnect
+                // This prevents silent gRPC stream death where StartAsync never completes
+                var idleTimeoutMinutes = pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30;
+                DateTime lastMessageTime = DateTime.UtcNow;
+                var idleWatchdogCts = new CancellationTokenSource();
+
+                // Background task that monitors for idle timeout
+                var watchdogTask = Task.Run(async () =>
+                {
+                    while (!idleWatchdogCts.Token.IsCancellationRequested)
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(1), idleWatchdogCts.Token).ConfigureAwait(false);
+                        var idleMinutes = (DateTime.UtcNow - lastMessageTime).TotalMinutes;
+                        if (idleMinutes >= idleTimeoutMinutes)
+                        {
+                            Console.WriteLine($"\n⚠ Idle watchdog: No messages for {idleMinutes:F0} minutes. Forcing reconnect...");
+                            SimpleLogger.LogWarning($"Idle watchdog triggered after {idleMinutes:F0} minutes of inactivity. Forcing subscriber reconnect.");
+                            try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                            break;
+                        }
+                    }
+                }, idleWatchdogCts.Token);
 
                 // Start subscribing - this Task completes when the subscriber stops
                 await subscriber.StartAsync(async (message, cancellationToken) =>
                 {
                     try
                     {
+                        lastMessageTime = DateTime.UtcNow; // Reset idle watchdog on each message
+
                         if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: >>> Message callback invoked for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: >>> Message callback invoked for MessageId={message.MessageId}"); }
 
                         // Process the message
@@ -291,11 +318,14 @@ public partial class Program
                     }
                 });
 
+                // Cancel the idle watchdog since subscriber has stopped
+                idleWatchdogCts.Cancel();
+
                 if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: subscriber.StartAsync has returned (subscriber stopped)"); SimpleLogger.LogInfo("DEBUG: subscriber.StartAsync has returned (subscriber stopped)"); }
 
-                // If StartAsync completes, the subscriber has stopped unexpectedly
-                Console.WriteLine("⚠ Subscriber stopped unexpectedly. Reconnecting...");
-                SimpleLogger.LogWarning("⚠ Subscriber stopped unexpectedly. Reconnecting...");
+                // If StartAsync completes, the subscriber has stopped (idle watchdog or unexpected)
+                Console.WriteLine("⚠ Subscriber stopped. Reconnecting...");
+                SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
             }
             catch (Exception ex)
             {
