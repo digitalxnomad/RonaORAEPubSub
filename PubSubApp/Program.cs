@@ -1227,6 +1227,9 @@ public partial class Program
         [JsonPropertyName("lineId")]
         public string? LineId { get; set; }
 
+        [JsonPropertyName("parentLineId")]
+        public string? ParentLineId { get; set; }
+
         [JsonPropertyName("pricing")]
         public Pricing? Pricing { get; set; }
 
@@ -1463,6 +1466,8 @@ public partial class Program
         // Temporary lists to group records by type
         List<OrderRecord> itemRecords = new List<OrderRecord>();
         List<OrderRecord> taxRecords = new List<OrderRecord>();
+        // Track lineId to index mapping for EPP parent lookup
+        Dictionary<string, int> lineIdToIndex = new Dictionary<string, int>();
         // Store computed TaxRateCode per item (for use by tax records)
         string lastComputedTaxRateCode = "";
 
@@ -1862,7 +1867,104 @@ public partial class Program
                     };
                     itemRecords.Add(eppRecord);
                 }
+
+                // Track lineId to record index for EPP parent lookup
+                if (!string.IsNullOrEmpty(item.LineId))
+                {
+                    lineIdToIndex[item.LineId] = itemRecords.Count - 1;
+                }
             }
+
+            // Reorder: EPP items (identifier="9") go right after their parent SKU using parentLineId
+            // Build ordered list: for each non-EPP-9 item, insert any EPP-9 items that reference it
+            List<OrderRecord> reorderedRecords = new List<OrderRecord>();
+            HashSet<int> placed = new HashSet<int>();
+
+            // Build a map of parentLineId -> list of EPP record indices
+            Dictionary<string, List<int>> eppChildMap = new Dictionary<string, List<int>>();
+            if (retailEvent.Transaction?.Items != null)
+            {
+                int recordIdx = 0;
+                foreach (var txItem in retailEvent.Transaction.Items)
+                {
+                    if (recordIdx < itemRecords.Count)
+                    {
+                        string? covId = GetEPPCoverageIdentifier(txItem);
+                        // EPP items (identifier="9") with a parentLineId should follow their parent
+                        if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                        {
+                            if (!eppChildMap.ContainsKey(txItem.ParentLineId))
+                                eppChildMap[txItem.ParentLineId] = new List<int>();
+                            eppChildMap[txItem.ParentLineId].Add(recordIdx);
+                        }
+                    }
+                    recordIdx++;
+                    // Account for EPP duplicate records (identifier="1"/"2" adds an extra record)
+                    string? covId2 = GetEPPCoverageIdentifier(txItem);
+                    if (covId2 == "1" || covId2 == "2")
+                        recordIdx++;
+                }
+            }
+
+            // Now build ordered list
+            if (retailEvent.Transaction?.Items != null)
+            {
+                int recordIdx = 0;
+                foreach (var txItem in retailEvent.Transaction.Items)
+                {
+                    if (recordIdx >= itemRecords.Count) break;
+
+                    string? covId = GetEPPCoverageIdentifier(txItem);
+
+                    // Skip EPP-9 items here - they'll be inserted after their parent
+                    if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                    {
+                        placed.Add(recordIdx);
+                        recordIdx++;
+                        continue;
+                    }
+
+                    // Add the item record
+                    if (!placed.Contains(recordIdx))
+                    {
+                        reorderedRecords.Add(itemRecords[recordIdx]);
+                        placed.Add(recordIdx);
+                    }
+                    recordIdx++;
+
+                    // If this item had EPP coverage (identifier="1"/"2"), the duplicate is next
+                    if (covId == "1" || covId == "2")
+                    {
+                        if (recordIdx < itemRecords.Count && !placed.Contains(recordIdx))
+                        {
+                            reorderedRecords.Add(itemRecords[recordIdx]);
+                            placed.Add(recordIdx);
+                        }
+                        recordIdx++;
+                    }
+
+                    // Insert any EPP-9 children that reference this item's lineId
+                    if (!string.IsNullOrEmpty(txItem.LineId) && eppChildMap.ContainsKey(txItem.LineId))
+                    {
+                        foreach (int eppIdx in eppChildMap[txItem.LineId])
+                        {
+                            if (!placed.Contains(eppIdx) && eppIdx < itemRecords.Count)
+                            {
+                                reorderedRecords.Add(itemRecords[eppIdx]);
+                                placed.Add(eppIdx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Add any remaining records that weren't placed
+            for (int i = 0; i < itemRecords.Count; i++)
+            {
+                if (!placed.Contains(i))
+                    reorderedRecords.Add(itemRecords[i]);
+            }
+            itemRecords = reorderedRecords;
 
             // Determine if this is an Ontario transaction
             string? province = GetProvince(retailEvent);
