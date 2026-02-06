@@ -405,6 +405,26 @@ public partial class Program
             Console.WriteLine($"✓ File read successfully ({jsonContent.Length} bytes)\n");
             SimpleLogger.LogInfo($"✓ File read successfully ({jsonContent.Length} bytes)");
 
+            // Save input file to InputSavePath
+            if (!string.IsNullOrEmpty(pubSubConfig.InputSavePath))
+            {
+                try
+                {
+                    Directory.CreateDirectory(pubSubConfig.InputSavePath);
+                    string inputSavePath = Path.Combine(pubSubConfig.InputSavePath,
+                        $"Input_{DateTime.Now:yyyyMMddHHmmss}_test.json");
+                    File.WriteAllText(inputSavePath, jsonContent);
+                    Console.WriteLine($"✓ Saved input to: {inputSavePath}");
+                    SimpleLogger.LogInfo($"✓ Saved input to: {inputSavePath} ({jsonContent.Length} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    string errorMsg = $"✗ Failed to save input file: {ex.Message}";
+                    Console.WriteLine(errorMsg);
+                    SimpleLogger.LogError(errorMsg, ex);
+                }
+            }
+
             Console.WriteLine("=== Input JSON ===");
             Console.WriteLine(jsonContent);
             Console.WriteLine();
