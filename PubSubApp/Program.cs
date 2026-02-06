@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 02/06/26 v1.0.49";
+    static string Version = "PubSubApp 02/02/26 v1.0.36";
 
     public static async Task Main(string[] args)
     {
@@ -178,6 +178,27 @@ public partial class Program
                         SimpleLogger.LogInfo($"✓ Received: {message.MessageId}");
                         Console.WriteLine($"Data: {data.Substring(0, Math.Min(50, data.Length))}...");
                         SimpleLogger.LogInfo($"Data: {data}");
+
+                        // Save incoming message to file
+                        if (!string.IsNullOrEmpty(pubSubConfig.InputSavePath))
+                        {
+                            try
+                            {
+                                Directory.CreateDirectory(pubSubConfig.InputSavePath);
+                                string inputFilePath = Path.Combine(pubSubConfig.InputSavePath,
+                                    $"Input_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
+                                File.WriteAllText(inputFilePath, data);
+                                Console.WriteLine($"✓ Saved input to: {inputFilePath}");
+                                SimpleLogger.LogInfo($"✓ Saved input to: {inputFilePath} ({data.Length} bytes)");
+                            }
+                            catch (Exception ex)
+                            {
+                                string errorMsg = $"✗ Failed to save input file: {ex.Message}";
+                                Console.WriteLine(errorMsg);
+                                SimpleLogger.LogError(errorMsg, ex);
+                                // Don't throw - continue with processing
+                            }
+                        }
 
                         if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Parsing JSON ({data.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Parsing JSON ({data.Length} bytes)..."); }
 
@@ -1753,7 +1774,7 @@ public partial class Program
                 // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
                 // 9 = This line item IS the EPP (has x-epp-coverage-identifier attribute)
                 // 0 = Not an EPP item
-                string eppDigit = GetEPPCoverageIdentifier(item);
+                string eppDigit = GetEPPCoverageIdentifier(item) != null ? "9" : "0";
                 orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
@@ -1773,39 +1794,21 @@ public partial class Program
                 orderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
 
                 // Reason codes - SLFRSN (16 chars, left justified)
-                // Use priceOverride.reason if available, otherwise fallback to transaction type logic
-                // RRT0 = Return, POV0 = Price Override, IDS0 = Manual Discount, VOD0 = Post Voided
+                // RRT0 = Return, POV0 = Price Override (OVD:OVR), IDS0 = Manual Discount, VOD0 = Post Voided
                 string reasonCode = "                "; // 16 blank spaces default
-                if (!string.IsNullOrEmpty(item.Pricing?.PriceOverride?.Reason))
-                {
-                    // Use reason from priceOverride if available
-                    reasonCode = item.Pricing.PriceOverride.Reason;
+                string transType = retailEvent.Transaction?.TransactionType ?? "";
+                string priceVehicle = item.Pricing?.PriceVehicle ?? "";
+                string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
+                string overrideReason = item.Pricing?.PriceOverride?.Reason ?? "";
 
-                    string transType = retailEvent.Transaction?.TransactionType ?? "";
-                    string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
-                    if (transType == "RETURN")
-                        reasonCode = "RRT0" + reasonCode;
-                    else if (transType == "VOID")
-                        reasonCode = "VOD0" + reasonCode;
-                    else if (hasOverride)
-                        reasonCode = "POV0" + reasonCode;   
-                    else if (pvCodeForRsn == "MAN")
-                        reasonCode = "IDS0" + reasonCode;
-                }
-                else
-                {
-                    // Fallback to transaction type logic
-                    string transType = retailEvent.Transaction?.TransactionType ?? "";
-                    string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
-                    if (transType == "RETURN")
-                        reasonCode = "RRT0";
-                    else if (transType == "VOID")
-                        reasonCode = "VOD0";
-                    else if (hasOverride)
-                        reasonCode = "POV0";
-                    else if (pvCodeForRsn == "MAN")
-                        reasonCode = "IDS0";
-                }
+                if (transType == "RETURN")
+                    reasonCode = "RRT0";
+                else if (transType == "VOID")
+                    reasonCode = "VOD0";
+                else if (priceVehicle == "OVD:OVR")
+                    reasonCode = "POV0" + overrideReason; // POV0 + priceOverride.reason (e.g. "POV01504")
+                else if (pvCodeForRsn == "MAN")
+                    reasonCode = "IDS0";
                 orderRecord.ReasonCode = reasonCode.PadRight(16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
