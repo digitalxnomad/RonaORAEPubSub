@@ -41,10 +41,10 @@ public class PubSubSubscriber : IPubSubSubscriber
                 string data = msg.Data.ToStringUtf8();
 
                 // Save to file using configured path with all message attributes
-                if (!string.IsNullOrEmpty(_config.MessageSavePath))
+                if (!string.IsNullOrEmpty(_config.InputSavePath))
                 {
                     // Ensure directory exists
-                    Directory.CreateDirectory(_config.MessageSavePath);
+                    Directory.CreateDirectory(_config.InputSavePath);
 
                     // Create a complete message envelope with all attributes
                     var messageEnvelope = new
@@ -56,7 +56,7 @@ public class PubSubSubscriber : IPubSubSubscriber
                         Data = JsonSerializer.Deserialize<object>(data) // Parse the JSON data
                     };
 
-                    string filePath = Path.Combine(_config.MessageSavePath, $"PubSubMessage_{DateTime.Now:yyyyMMddHHmmss}_{msg.MessageId}.json");
+                    string filePath = Path.Combine(_config.InputSavePath, $"PubSubMessage_{DateTime.Now:yyyyMMddHHmmss}_{msg.MessageId}.json");
                     string jsonOutput = JsonSerializer.Serialize(messageEnvelope, new JsonSerializerOptions
                     {
                         WriteIndented = true
