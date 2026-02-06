@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 public partial class Program
 {
-    static string Version = "PubSubApp 02/06/26 v1.0.48";
+    static string Version = "PubSubApp 02/06/26 v1.0.49";
 
     public static async Task Main(string[] args)
     {
@@ -1788,7 +1788,7 @@ public partial class Program
                     else if (transType == "VOID")
                         reasonCode = "VOD0" + reasonCode;
                     else if (hasOverride)
-                        reasonCode = "IDS0" + reasonCode;   //JCW for now this is always IDS0 + reasonCode;  was POV0
+                        reasonCode = "POV0" + reasonCode;   
                     else if (pvCodeForRsn == "MAN")
                         reasonCode = "IDS0" + reasonCode;
                 }
