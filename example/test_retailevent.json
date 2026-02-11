@@ -82,7 +82,11 @@
       },
       "changeDue": {
         "currency": "USD",
-        "value": "0.00"
+        "value": "0.82"
+      },
+      "cashRounding": {
+        "currency": "USD",
+        "value": "0.02"
       }
     }
   }

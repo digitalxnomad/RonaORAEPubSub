@@ -9,6 +9,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProcessFiles", "..\ProcessF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestPublisher", "..\TestPublisher\TestPublisher.csproj", "{7EEB5396-9019-9C9F-B367-EF4CEACD05F3}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "example", "example", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+	ProjectSection(SolutionItems) = preProject
+		..\example\README.md = ..\example\README.md
+		..\example\test_recordset.xml = ..\example\test_recordset.xml
+		..\example\test_retailevent.json = ..\example\test_retailevent.json
+		..\example\test_cash_tender.json = ..\example\test_cash_tender.json
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
