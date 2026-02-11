@@ -1172,6 +1172,9 @@ public partial class Program
         [JsonPropertyName("transaction")]
         public required Transaction Transaction { get; set; }
 
+        [JsonPropertyName("promotions")]
+        public List<JsonElement>? Promotions { get; set; }
+
         [JsonPropertyName("actor")]
         public Actor? Actor { get; set; }
     }
@@ -1274,6 +1277,9 @@ public partial class Program
         [JsonPropertyName("amount")]
         public CurrencyAmount? Amount { get; set; }
 
+        [JsonPropertyName("requestedAmount")]
+        public CurrencyAmount? RequestedAmount { get; set; }
+
         [JsonPropertyName("card")]
         public Card? Card { get; set; }
     }
@@ -1288,6 +1294,9 @@ public partial class Program
 
         [JsonPropertyName("authCode")]
         public string? AuthCode { get; set; }
+
+        [JsonPropertyName("responseCode")]
+        public string? ResponseCode { get; set; }
 
         [JsonPropertyName("emv")]
         public Emv? Emv { get; set; }
@@ -1465,6 +1474,9 @@ public partial class Program
 
         [JsonPropertyName("changeDue")]
         public CurrencyAmount? ChangeDue { get; set; }
+
+        [JsonPropertyName("cashRounding")]
+        public CurrencyAmount? CashRounding { get; set; }
     }
 
     public class CurrencyAmount
@@ -2327,35 +2339,19 @@ public partial class Program
                 sequence++;
             }
 
-            // Map ALL tenders (not just first one) - create one TenderRecord per tender
-            // Continue sequence from OrderRecords (will be updated after grouping)
+            // Map ALL tenders - create TenderRecord(s) per tender
+            // For CASH tenders: up to 3 records (CA amount, ZZ changeDue, PR cashRounding)
+            // For non-CASH tenders: 1 record per tender
             if (retailEvent.Transaction?.Tenders != null && retailEvent.Transaction.Tenders.Count > 0)
             {
+                bool cashChangeProcessed = false; // ZZ/PR records created only once per transaction
+
                 foreach (var tender in retailEvent.Transaction.Tenders)
                 {
-                    var tenderRecord = new TenderRecord
-                    {
-                        // Required Fields - per CSV specs
-                        TransactionDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
-                        TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time
-
-                        // Transaction Identification - with proper padding
-                        TransactionType = mappedTransactionTypeSLFTTP,
-                        TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransactionSeq = "00000", // Placeholder - will be updated after grouping
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-
-                        // Store Information
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-
-                        // Status - space for active
-                        Status = " "
-                    };
+                    // Line 1: Main tender record (all tender types)
+                    var tenderRecord = CreateBaseTenderRecord(
+                        transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                        polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
 
                     // TNFFCD - Fund code: Use TenderId directly from incoming ORAE data
                     tenderRecord.FundCode = tender.TenderId ?? "";
@@ -2368,89 +2364,63 @@ public partial class Program
                         tenderRecord.AmountNegativeSign = sign;
                     }
 
-                    // Tender reference - use tender ID
-                    // TNFRDC - Always blank
-                    tenderRecord.ReferenceCode = ""; // TNFRDC - Always blank
-
-                    // TNFRDS - Reference Desc - Always blank
-                    tenderRecord.ReferenceDesc = "";
-
-                    // === CSV-specified tender field mappings ===
-
                     // Card/Payment fields - populate from tender.card if available
                     if (tender.Card != null)
                     {
-                        // TNFCCD - Credit card number: last4 only, padded left with * to 19 chars
                         string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
-
-                        // TNFAUT - Authorization code, padded to 6 chars
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
-
-                        // TNFMSR - Mag stripe flag from card.emv.tags.magStrip, default to " " (1 space)
                         tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
                     }
-                    else
-                    {
-                        tenderRecord.CreditCardNumber = PadOrTruncate("", 19); // Empty when no card data
-                        tenderRecord.AuthNumber = PadOrTruncate("", 6); // Empty when no card data
-                        tenderRecord.MagStripeFlag = " "; // TNFMSR - Default to 1 space when no card data
-                    }
 
-                    tenderRecord.CardExpirationDate = "0000"; // TNFEXP - Must be "0000" per validation spec
-                    tenderRecord.PaymentHashValue = ""; // TNFHSH - TODO: populate from bank
-
-                    // Customer/Clerk fields - per CSV rules
-                    tenderRecord.CustomerMember = ""; // TNFMBR - Default blank
-                    tenderRecord.PostalCode = ""; // TNFZIP - Always blank
-                    tenderRecord.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5); // TNFCLK - Till number, right justified with zeros
-
-                    // Employee sale ID - TNFESI
-                    // Set to '#####' for employee sales where TNFTTP = '04', otherwise blank
-                    if (mappedTransactionTypeSLFTTP == "04")
-                    {
-                        tenderRecord.EmployeeSaleId = "#####";
-                    }
-                    else
-                    {
-                        tenderRecord.EmployeeSaleId = ""; // Blank
-                    }
-
-                    // Email - TNFEML (for ereceipt)
-                    tenderRecord.EReceiptEmail = ""; // Default blank, TODO: populate if ereceipt scenario
-
-                    // Blank fields - per CSV rules
-                    tenderRecord.SalesStore = 0; // ATFSST - Always blank
-                    tenderRecord.InvStore = 0; // ATFIST - Always blank
-                    tenderRecord.OriginalTransNumber = ""; // ATFOTX - Always blank
-                    tenderRecord.CustomerType = " "; // ATFMBT (1 space) - Always blank
-                    tenderRecord.OrderNumber = ""; // ATFORD - Always blank
-                    tenderRecord.ProjectNumber = ""; // ATFPRO - Always blank
-
-                    // Add this TenderRecord to the list (will update sequence after grouping)
                     recordSet.TenderRecords.Add(tenderRecord);
+
+                    // For CASH tenders: create additional CA (changeDue) and PR (cashRounding) records
+                    if (tender.Method?.ToUpper() == "CASH" && !cashChangeProcessed)
+                    {
+                        cashChangeProcessed = true;
+
+                        // Line 2: CA - Change returned (from transaction.totals.changeDue)
+                        var changeDue = retailEvent.Transaction?.Totals?.ChangeDue;
+                        if (changeDue?.Value != null && !IsZeroOrEmpty(changeDue.Value))
+                        {
+                            var changeRecord = CreateBaseTenderRecord(
+                                transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                                polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+                            changeRecord.FundCode = "CA";
+
+                            var (changeAmount, changeSign) = FormatCurrencyWithSign(changeDue.Value, 11);
+                            changeRecord.Amount = changeAmount;
+                            changeRecord.AmountNegativeSign = changeSign;
+
+                            recordSet.TenderRecords.Add(changeRecord);
+                        }
+
+                        // Line 3: PR - Penny rounding (from transaction.totals.cashRounding)
+                        var cashRounding = retailEvent.Transaction?.Totals?.CashRounding;
+                        if (cashRounding?.Value != null && !IsZeroOrEmpty(cashRounding.Value))
+                        {
+                            var prRecord = CreateBaseTenderRecord(
+                                transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                                polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+                            prRecord.FundCode = "PR";
+
+                            var (prAmount, prSign) = FormatCurrencyWithSign(cashRounding.Value, 11);
+                            prRecord.Amount = prAmount;
+                            prRecord.AmountNegativeSign = prSign;
+
+                            recordSet.TenderRecords.Add(prRecord);
+                        }
+                    }
                 }
             }
             else if (retailEvent.Transaction?.Totals?.Net?.Value != null)
             {
                 // Fallback: create one tender record with net total if no tenders array
-                var tenderRecord = new TenderRecord
-                {
-                    TransactionDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
-                    TransactionTime = transactionDateTime.ToString("HHmmss"), // TNFTTM - Use timezone-adjusted time
-                    TransactionType = mappedTransactionTypeSLFTTP,
-                    TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                    TransactionSeq = "00000", // Placeholder - will be updated after grouping
-                    RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                    PolledStore = polledStoreInt,
-                    PollCen = pollCen,
-                    PollDate = pollDate,
-                    CreateCen = createCen,
-                    CreateDate = createDate,
-                    CreateTime = createTime,
-                    FundCode = "CA", // Default cash (TNFFCD)
-                    Status = " " // Space for active
-                };
+                var tenderRecord = CreateBaseTenderRecord(
+                    transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                    polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+                tenderRecord.FundCode = "CA"; // Default cash
 
                 var (amount, sign) = FormatCurrencyWithSign(retailEvent.Transaction.Totals.Net.Value, 11);
                 tenderRecord.Amount = amount;
@@ -2590,6 +2560,65 @@ public partial class Program
         private int GetTimeAsInt(DateTime date)
         {
             return int.Parse(date.ToString("HHmmss"));
+        }
+
+        // Create a TenderRecord with all common fields populated.
+        // Caller sets FundCode, Amount, AmountNegativeSign, and card fields (if applicable).
+        private TenderRecord CreateBaseTenderRecord(
+            DateTime transactionDateTime,
+            string mappedTransactionTypeSLFTTP,
+            RetailEvent retailEvent,
+            int? polledStoreInt, int pollCen, int pollDate,
+            int createCen, int createDate, int createTime)
+        {
+            var rec = new TenderRecord
+            {
+                TransactionDate = transactionDateTime.ToString("yyMMdd"),
+                TransactionTime = transactionDateTime.ToString("HHmmss"),
+                TransactionType = mappedTransactionTypeSLFTTP,
+                TransactionNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                TransactionSeq = "00000", // Placeholder - updated after grouping
+                RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                PolledStore = polledStoreInt,
+                PollCen = pollCen,
+                PollDate = pollDate,
+                CreateCen = createCen,
+                CreateDate = createDate,
+                CreateTime = createTime,
+                Status = " "
+            };
+
+            // Reference fields - always blank
+            rec.ReferenceCode = "";
+            rec.ReferenceDesc = "";
+
+            // Card fields - default empty (overridden by caller for card tenders)
+            rec.CreditCardNumber = PadOrTruncate("", 19);
+            rec.AuthNumber = PadOrTruncate("", 6);
+            rec.MagStripeFlag = " ";
+            rec.CardExpirationDate = "0000";
+            rec.PaymentHashValue = "";
+
+            // Customer/Clerk fields
+            rec.CustomerMember = "";
+            rec.PostalCode = "";
+            rec.Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5);
+
+            // Employee sale ID
+            rec.EmployeeSaleId = (mappedTransactionTypeSLFTTP == "04") ? "#####" : "";
+
+            // Email
+            rec.EReceiptEmail = "";
+
+            // Blank fields
+            rec.SalesStore = 0;
+            rec.InvStore = 0;
+            rec.OriginalTransNumber = "";
+            rec.CustomerType = " ";
+            rec.OrderNumber = "";
+            rec.ProjectNumber = "";
+
+            return rec;
         }
 
         // Map tender method to fund code (TNFFCD) - 2-letter alpha codes
@@ -2855,6 +2884,18 @@ public partial class Program
             }
 
             return ("", ""); // Default to empty strings
+        }
+
+        // Check if a currency value string is zero, empty, or null
+        private bool IsZeroOrEmpty(string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return true;
+
+            if (decimal.TryParse(value, out decimal amount))
+                return amount == 0m;
+
+            return true;
         }
 
         // Helper method to pad or truncate string to exact required length
@@ -3302,6 +3343,14 @@ public partial class Program
                     errors.Add("Missing required field: transaction.totals.net");
                 else
                     ValidateMoney(retailEvent.Transaction.Totals.Net, "transaction.totals.net", errors);
+
+                // totals.changeDue (optional Money)
+                if (retailEvent.Transaction.Totals.ChangeDue != null)
+                    ValidateMoney(retailEvent.Transaction.Totals.ChangeDue, "transaction.totals.changeDue", errors);
+
+                // totals.cashRounding (optional Money)
+                if (retailEvent.Transaction.Totals.CashRounding != null)
+                    ValidateMoney(retailEvent.Transaction.Totals.CashRounding, "transaction.totals.cashRounding", errors);
             }
 
             // Items validation: must have at least 1 unless CANCEL/VOID (schema: allOf conditional)

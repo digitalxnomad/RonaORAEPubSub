@@ -143,7 +143,11 @@
       },
       "changeDue": {
         "currency": "CAD",
-        "value": "0.00"
+        "value": "3.55"
+      },
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.02"
       }
     }
   }

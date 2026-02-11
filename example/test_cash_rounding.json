@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7427425689125185112",
+  "occurredAt": "2026-02-11T18:58:08Z",
+  "ingestedAt": "2026-02-11T18:58:10Z",
+  "businessContext": {
+    "businessDay": "2026-02-11",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": { "currency": "CAD", "storeId": "55010", "taxArea": "ON" },
+    "workstation": { "registerId": "06", "sequenceNumber": 787, "type": "POS" }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "attributes": { "x-epp-coverage-identifier": "0" },
+        "item": {
+          "description": "SEED GRASS ALL PURPOSE 1KG",
+          "sku": "000395050"
+        },
+        "lineId": "1770836279286367685735",
+        "pricing": {
+          "extendedPrice": { "currency": "CAD", "value": "19.99" },
+          "originalUnitPrice": { "currency": "CAD", "value": "19.99" },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": { "currency": "CAD", "value": "19.99" }
+        },
+        "quantity": { "uom": "EA", "value": 1 },
+        "taxes": [
+          {
+            "amount": { "currency": "CAD", "value": "2.60" },
+            "jurisdiction": { "region": "HON" },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": { "currency": "CAD", "value": "22.60" },
+        "card": { "responseCode": "SETTLE" },
+        "method": "CASH",
+        "requestedAmount": { "currency": "CAD", "value": "22.60" },
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": { "currency": "CAD", "value": "0.01" },
+      "changeDue": { "currency": "CAD", "value": "0.00" },
+      "discounts": { "currency": "CAD", "value": "0.00" },
+      "gross": { "currency": "CAD", "value": "19.99" },
+      "net": { "currency": "CAD", "value": "22.60" },
+      "tax": { "currency": "CAD", "value": "2.60" }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": { "loginId": "6006523" },
+    "customer": { "customerIdToken": "" }
+  }
+}
