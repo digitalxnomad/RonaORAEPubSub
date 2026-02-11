@@ -2381,6 +2381,7 @@ public partial class Program
                         cashChangeProcessed = true;
 
                         // Line 2: CA - Change returned (from transaction.totals.changeDue)
+                        // Sign rule: If change is returned then always "-"
                         var changeDue = retailEvent.Transaction?.Totals?.ChangeDue;
                         if (changeDue?.Value != null && !IsZeroOrEmpty(changeDue.Value))
                         {
@@ -2389,14 +2390,15 @@ public partial class Program
                                 polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
                             changeRecord.FundCode = "CA";
 
-                            var (changeAmount, changeSign) = FormatCurrencyWithSign(changeDue.Value, 11);
+                            var (changeAmount, _) = FormatCurrencyWithSign(changeDue.Value, 11);
                             changeRecord.Amount = changeAmount;
-                            changeRecord.AmountNegativeSign = changeSign;
+                            changeRecord.AmountNegativeSign = "-"; // Always negative for change returned
 
                             recordSet.TenderRecords.Add(changeRecord);
                         }
 
                         // Line 3: PR - Penny rounding (from transaction.totals.cashRounding)
+                        // Sign rule: INVERTED - ORAE positive → "-", ORAE negative → blank
                         var cashRounding = retailEvent.Transaction?.Totals?.CashRounding;
                         if (cashRounding?.Value != null && !IsZeroOrEmpty(cashRounding.Value))
                         {
@@ -2407,7 +2409,8 @@ public partial class Program
 
                             var (prAmount, prSign) = FormatCurrencyWithSign(cashRounding.Value, 11);
                             prRecord.Amount = prAmount;
-                            prRecord.AmountNegativeSign = prSign;
+                            // Invert sign: ORAE positive → "-", ORAE negative → blank
+                            prRecord.AmountNegativeSign = (prSign == "-") ? "" : "-";
 
                             recordSet.TenderRecords.Add(prRecord);
                         }
