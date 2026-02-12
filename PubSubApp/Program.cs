@@ -2362,12 +2362,16 @@ public partial class Program
                     }
 
                     // Card/Payment fields - populate from tender.card if available
+                    // TNFMSR: Always blank for CA tenders (cash); only populate for card tenders
                     if (tender.Card != null)
                     {
                         string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
-                        tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
+                        if (tender.Method?.ToUpper() != "CASH")
+                        {
+                            tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
+                        }
                     }
 
                     recordSet.TenderRecords.Add(tenderRecord);
