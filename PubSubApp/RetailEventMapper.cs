@@ -966,11 +966,11 @@ class RetailEventMapper
                 }
                 catch (TimeZoneNotFoundException)
                 {
-                    // Unrecognised timezone string — fall through to legacy logic
+                    SimpleLogger.LogWarning($"⚠ ApplyTimezoneAdjustment: unrecognised timeZone '{timeZone}', falling back to store ID heuristic");
                 }
                 catch (InvalidTimeZoneException)
                 {
-                    // Corrupt timezone data — fall through to legacy logic
+                    SimpleLogger.LogWarning($"⚠ ApplyTimezoneAdjustment: invalid timeZone data '{timeZone}', falling back to store ID heuristic");
                 }
             }
 
@@ -1357,6 +1357,7 @@ class RetailEventMapper
                 return cents.ToString().PadLeft(length, '0');
             }
 
+            SimpleLogger.LogWarning($"⚠ FormatCurrency: unable to parse '{value}' as decimal, returning empty");
             return ""; // Default to empty string if parse fails
         }
 
@@ -1377,6 +1378,7 @@ class RetailEventMapper
                 return (formattedAmount, sign);
             }
 
+            SimpleLogger.LogWarning($"⚠ FormatCurrencyWithSign: unable to parse '{value}' as decimal, returning empty");
             return ("", ""); // Default to empty strings
         }
 
@@ -1389,6 +1391,7 @@ class RetailEventMapper
             if (decimal.TryParse(value, out decimal amount))
                 return amount == 0m;
 
+            SimpleLogger.LogWarning($"⚠ IsZeroOrEmpty: unable to parse '{value}' as decimal, treating as zero");
             return true;
         }
 
@@ -1432,6 +1435,13 @@ class RetailEventMapper
             }
 
             return value; // Exact length
+        }
+
+        // Log a warning and return a default value (used in switch expressions)
+        private static string LogAndDefault(string message, string defaultValue)
+        {
+            SimpleLogger.LogWarning(message);
+            return defaultValue;
         }
 
         // Get province/state from retail event (for tax logic)
@@ -1605,7 +1615,7 @@ class RetailEventMapper
                 "AR_PAYMENT" => "43",    // AR Payment
                 "VOID" => "87",          // Current transaction void
                 "POST_VOID" => "88",     // Post void transaction
-                _ => "01"                // Default to regular sale
+                _ => LogAndDefault($"⚠ MapTransTypeSLFTTP: unrecognised transactionType '{input}', defaulting to '01'", "01")
             };
         }
 
@@ -1654,6 +1664,7 @@ class RetailEventMapper
                 return "01";
 
             // Default to regular sale
+            SimpleLogger.LogWarning($"⚠ MapTransTypeSLFLNT: unrecognised transactionType '{input}', defaulting to '01'");
             return "01";
     }
 
