@@ -31,8 +31,11 @@ class RetailEventMapper
             polledStoreInt = storeId;
         }
 
-        // Apply timezone adjustment based on store region
-        DateTime transactionDateTime = ApplyTimezoneAdjustment(retailEvent.OccurredAt, retailEvent.BusinessContext?.Store?.StoreId);
+        // Apply timezone adjustment using ORAE timeZone (IANA), falling back to store region heuristic
+        DateTime transactionDateTime = ApplyTimezoneAdjustment(
+            retailEvent.OccurredAt,
+            retailEvent.BusinessContext?.Store?.TimeZone,
+            retailEvent.BusinessContext?.Store?.StoreId);
 
         // Get date/time values from adjusted transaction time
         int pollCen = 1;  // Always 1 per specification
@@ -947,11 +950,31 @@ class RetailEventMapper
             return recordSet;
         }
 
-        // Apply timezone adjustment based on store region
-        // Western region (BC, AB, SK, MB): subtract 8 hours
-        // Eastern region (ON, QC): subtract 5 hours
-        private DateTime ApplyTimezoneAdjustment(DateTime occurredAt, string? storeId)
+        // Apply timezone adjustment using IANA timeZone from ORAE store data.
+        // Falls back to legacy store-ID heuristic when timeZone is absent.
+        private DateTime ApplyTimezoneAdjustment(DateTime occurredAt, string? timeZone, string? storeId)
         {
+            // Prefer IANA timezone from ORAE payload (e.g. "America/Toronto")
+            if (!string.IsNullOrEmpty(timeZone))
+            {
+                try
+                {
+                    var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+                    // occurredAt is UTC — convert to the store's local time (handles DST automatically)
+                    return TimeZoneInfo.ConvertTimeFromUtc(
+                        DateTime.SpecifyKind(occurredAt, DateTimeKind.Utc), tz);
+                }
+                catch (TimeZoneNotFoundException)
+                {
+                    // Unrecognised timezone string — fall through to legacy logic
+                }
+                catch (InvalidTimeZoneException)
+                {
+                    // Corrupt timezone data — fall through to legacy logic
+                }
+            }
+
+            // Legacy fallback: fixed offset based on store ID ranges
             if (string.IsNullOrEmpty(storeId))
             {
                 return occurredAt.AddHours(-5); // Default to eastern
