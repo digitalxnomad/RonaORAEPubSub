@@ -12,7 +12,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http;
-using System.Xml.Linq;
 
 public partial class Program
 {
@@ -73,10 +72,6 @@ public partial class Program
 
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
-        Console.WriteLine(Version);
-        Console.WriteLine("✓ Publisher initialized\n");
-        Console.WriteLine("ProjectId: " + projectId);
-        Console.WriteLine("TopicId: " + topicId + "\n");
         SimpleLogger.LogInfo(Version);
         SimpleLogger.LogInfo("ProjectId: " + projectId);
         SimpleLogger.LogInfo("TopicId: " + topicId);
@@ -85,8 +80,7 @@ public partial class Program
         bool debugLog = pubSubConfig.EnableDebugLogging;
         if (debugLog)
         {
-            Console.WriteLine("DEBUG: Debug logging is ENABLED");
-            SimpleLogger.LogInfo("DEBUG: Debug logging is ENABLED");
+            SimpleLogger.LogDebug("Debug logging is ENABLED");
         }
 
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
@@ -100,7 +94,7 @@ public partial class Program
                 var keepAlivePingTimeout = TimeSpan.FromSeconds(30);
                 var ackExtensionWindow = TimeSpan.FromSeconds(30);
 
-                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Building SubscriberClient..."); SimpleLogger.LogInfo("DEBUG: Building SubscriberClient..."); }
+                if (debugLog) { SimpleLogger.LogDebug("Building SubscriberClient..."); }
 
                 var subscriberBuilder = new SubscriberClientBuilder
                 {
@@ -127,18 +121,14 @@ public partial class Program
                 };
                 subscriber = await subscriberBuilder.BuildAsync();
 
-                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: SubscriberClient built successfully"); SimpleLogger.LogInfo("DEBUG: SubscriberClient built successfully"); }
+                if (debugLog) { SimpleLogger.LogDebug("SubscriberClient built successfully"); }
 
-                Console.WriteLine("✓ Subscriber started. Listening for messages...");
-                Console.WriteLine($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
-                Console.WriteLine($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1");
-                Console.WriteLine($"  IdleWatchdog: {(pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30)} minutes (reconnects if no messages)\n");
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
-                SimpleLogger.LogInfo($"Heartbeat config: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
-                SimpleLogger.LogInfo("FlowControl config: MaxElements=100, MaxBytes=10MB, ClientCount=1");
-                SimpleLogger.LogInfo($"IdleWatchdog config: {(pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30)} minutes");
+                SimpleLogger.LogInfo($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
+                SimpleLogger.LogInfo($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1");
+                SimpleLogger.LogInfo($"  IdleWatchdog: {(pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30)} minutes (reconnects if no messages)");
 
-                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling subscriber.StartAsync - waiting for messages..."); SimpleLogger.LogInfo("DEBUG: Calling subscriber.StartAsync - waiting for messages..."); }
+                if (debugLog) { SimpleLogger.LogDebug("Calling subscriber.StartAsync - waiting for messages..."); }
 
                 // Idle watchdog: if no messages received within this window, force reconnect
                 // This prevents silent gRPC stream death where StartAsync never completes
@@ -155,8 +145,7 @@ public partial class Program
                         var idleMinutes = (DateTime.UtcNow - lastMessageTime).TotalMinutes;
                         if (idleMinutes >= idleTimeoutMinutes)
                         {
-                            Console.WriteLine($"\n⚠ Idle watchdog: No messages for {idleMinutes:F0} minutes. Forcing reconnect...");
-                            SimpleLogger.LogWarning($"Idle watchdog triggered after {idleMinutes:F0} minutes of inactivity. Forcing subscriber reconnect.");
+                            SimpleLogger.LogWarning($"⚠ Idle watchdog: No messages for {idleMinutes:F0} minutes. Forcing reconnect...");
                             try { await subscriber.StopAsync(CancellationToken.None); } catch { }
                             break;
                         }
@@ -170,14 +159,12 @@ public partial class Program
                     {
                         lastMessageTime = DateTime.UtcNow; // Reset idle watchdog on each message
 
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: >>> Message callback invoked for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: >>> Message callback invoked for MessageId={message.MessageId}"); }
+                        if (debugLog) { SimpleLogger.LogDebug($">>> Message callback invoked for MessageId={message.MessageId}"); }
 
                         // Process the message
                         string data = message.Data.ToStringUtf8();
-                        Console.WriteLine($"\n✓ Received: {message.MessageId}");
                         SimpleLogger.LogInfo($"✓ Received: {message.MessageId}");
-                        Console.WriteLine($"Data: {data.Substring(0, Math.Min(50, data.Length))}...");
-                        SimpleLogger.LogInfo($"Data: {data}");
+                        SimpleLogger.LogInfo($"Data: {data.Substring(0, Math.Min(200, data.Length))}...");
 
                         // Save incoming message to file
                         if (!string.IsNullOrEmpty(pubSubConfig.InputSavePath))
@@ -188,19 +175,16 @@ public partial class Program
                                 string inputFilePath = Path.Combine(pubSubConfig.InputSavePath,
                                     $"Input_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
                                 File.WriteAllText(inputFilePath, data);
-                                Console.WriteLine($"✓ Saved input to: {inputFilePath}");
                                 SimpleLogger.LogInfo($"✓ Saved input to: {inputFilePath} ({data.Length} bytes)");
                             }
                             catch (Exception ex)
                             {
-                                string errorMsg = $"✗ Failed to save input file: {ex.Message}";
-                                Console.WriteLine(errorMsg);
-                                SimpleLogger.LogError(errorMsg, ex);
+                                SimpleLogger.LogError($"✗ Failed to save input file: {ex.Message}", ex);
                                 // Don't throw - continue with processing
                             }
                         }
 
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Parsing JSON ({data.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Parsing JSON ({data.Length} bytes)..."); }
+                        if (debugLog) { SimpleLogger.LogDebug($"Parsing JSON ({data.Length} bytes)..."); }
 
                         MainClass mainClass = new MainClass();
 
@@ -212,15 +196,12 @@ public partial class Program
                         catch (JsonException jsonEx)
                         {
                             // Invalid JSON - log and ACK to prevent redelivery
-                            string errorMessage = $"JSON parsing error: {jsonEx.Message}";
-                            Console.WriteLine($"✗ {errorMessage}");
-                            SimpleLogger.LogError(errorMessage);
-                            Console.WriteLine($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
+                            SimpleLogger.LogError($"JSON parsing error: {jsonEx.Message}");
                             SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (invalid JSON, will not be redelivered)");
                             return SubscriberClient.Reply.Ack; // ACK invalid JSON to prevent redelivery
                         }
 
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: JSON parsed successfully"); SimpleLogger.LogInfo("DEBUG: JSON parsed successfully"); }
+                        if (debugLog) { SimpleLogger.LogDebug("JSON parsed successfully"); }
 
                         // Validate ORAE v2.0.0 compliance (if not disabled)
                         if (!pubSubConfig.DisableOraeValidation)
@@ -230,25 +211,21 @@ public partial class Program
                             {
                                 string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
                                                     string.Join("\n", validationErrors);
-                                Console.WriteLine($"✗ {errorMessage}");
                                 SimpleLogger.LogError(errorMessage);
-                                Console.WriteLine($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
                                 SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
                                 return SubscriberClient.Reply.Ack; // ACK to prevent redelivery of invalid ORAE data
                             }
-                            Console.WriteLine("✓ ORAE v2.0.0 validation passed");
                             SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
                         }
                         else
                         {
-                            Console.WriteLine("⚠ ORAE validation skipped (disabled in configuration)");
                             SimpleLogger.LogWarning("⚠ ORAE validation skipped (disabled in configuration)");
                         }
 
                         // Map to RecordSet
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Mapping RetailEvent to RecordSet..."); SimpleLogger.LogInfo("DEBUG: Mapping RetailEvent to RecordSet..."); }
+                        if (debugLog) { SimpleLogger.LogDebug("Mapping RetailEvent to RecordSet..."); }
                         RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: RecordSet mapping complete"); SimpleLogger.LogInfo("DEBUG: RecordSet mapping complete"); }
+                        if (debugLog) { SimpleLogger.LogDebug("RecordSet mapping complete"); }
 
                         // Validate output RecordSet
                         var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
@@ -256,14 +233,11 @@ public partial class Program
                         {
                             string errorMessage = $"RecordSet validation failed with {outputErrors.Count} error(s):\n" +
                                                 string.Join("\n", outputErrors);
-                            Console.WriteLine($"✗ {errorMessage}");
                             SimpleLogger.LogError(errorMessage);
                             // ACK the message to prevent infinite redelivery, but skip publishing
-                            Console.WriteLine($"⚠ ACK-ing invalid message {message.MessageId} to prevent redelivery");
                             SimpleLogger.LogWarning($"⚠ ACK-ing invalid message {message.MessageId} to prevent redelivery");
                             return SubscriberClient.Reply.Ack;
                         }
-                        Console.WriteLine("✓ RecordSet output validation passed");
                         SimpleLogger.LogInfo("✓ RecordSet output validation passed");
 
                         var options = new JsonSerializerOptions
@@ -288,14 +262,11 @@ public partial class Program
                                 string outputFilePath = Path.Combine(pubSubConfig.OutputSavePath,
                                     $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_{message.MessageId}.json");
                                 File.WriteAllText(outputFilePath, jsonString);
-                                Console.WriteLine($"✓ Saved output to: {outputFilePath}");
                                 SimpleLogger.LogInfo($"✓ Saved output to: {outputFilePath} ({jsonString.Length} bytes)");
                             }
                             catch (Exception ex)
                             {
-                                string errorMsg = $"✗ Failed to save output file: {ex.Message}";
-                                Console.WriteLine(errorMsg);
-                                SimpleLogger.LogError(errorMsg, ex);
+                                SimpleLogger.LogError($"✗ Failed to save output file: {ex.Message}", ex);
                                 // Don't throw - continue with publishing
                             }
                         }
@@ -305,7 +276,7 @@ public partial class Program
                         }
 
                         // Publish response with attributes
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Publishing response ({jsonString.Length} bytes)..."); SimpleLogger.LogInfo($"DEBUG: Publishing response ({jsonString.Length} bytes)..."); }
+                        if (debugLog) { SimpleLogger.LogDebug($"Publishing response ({jsonString.Length} bytes)..."); }
                         var responseMessage = new PubsubMessage
                         {
                             Data = ByteString.CopyFromUtf8(jsonString)
@@ -321,20 +292,18 @@ public partial class Program
                         responseMessage.Attributes["responseFor"] = message.MessageId;
                         responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
 
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Calling publisher.PublishAsync..."); SimpleLogger.LogInfo("DEBUG: Calling publisher.PublishAsync..."); }
+                        if (debugLog) { SimpleLogger.LogDebug("Calling publisher.PublishAsync..."); }
                         string publishedId = await publisher.PublishAsync(responseMessage);
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: PublishAsync returned, MessageId={publishedId}"); SimpleLogger.LogInfo($"DEBUG: PublishAsync returned, MessageId={publishedId}"); }
-                        Console.WriteLine($"✓ Published response: {publishedId}");
+                        if (debugLog) { SimpleLogger.LogDebug($"PublishAsync returned, MessageId={publishedId}"); }
                         SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
 
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Returning Ack for MessageId={message.MessageId}"); SimpleLogger.LogInfo($"DEBUG: Returning Ack for MessageId={message.MessageId}"); }
+                        if (debugLog) { SimpleLogger.LogDebug($"Returning Ack for MessageId={message.MessageId}"); }
                         return SubscriberClient.Reply.Ack;
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"✗ Error: {ex.Message}");
                         SimpleLogger.LogError($"✗ Error: {ex.Message}");
-                        if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); SimpleLogger.LogInfo($"DEBUG: Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); }
+                        if (debugLog) { SimpleLogger.LogDebug($"Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); }
                         return SubscriberClient.Reply.Nack;
                     }
                 });
@@ -342,16 +311,14 @@ public partial class Program
                 // Cancel the idle watchdog since subscriber has stopped
                 idleWatchdogCts.Cancel();
 
-                if (debugLog) { Console.WriteLine($"DEBUG [{DateTime.Now:HH:mm:ss.fff}]: subscriber.StartAsync has returned (subscriber stopped)"); SimpleLogger.LogInfo("DEBUG: subscriber.StartAsync has returned (subscriber stopped)"); }
+                if (debugLog) { SimpleLogger.LogDebug("subscriber.StartAsync has returned (subscriber stopped)"); }
 
                 // If StartAsync completes, the subscriber has stopped (idle watchdog or unexpected)
-                Console.WriteLine("⚠ Subscriber stopped. Reconnecting...");
                 SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...");
-                SimpleLogger.LogError($"Subscriber error: {ex.Message}", ex);
+                SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
                 await Task.Delay(TimeSpan.FromSeconds(5));
             }
             finally
@@ -389,20 +356,16 @@ public partial class Program
             // Initialize logger
             SimpleLogger.SetLogPath(pubSubConfig.LogPath, pubSubConfig.ProjectId);
 
-            Console.WriteLine($"\n=== Test Mode ===");
             SimpleLogger.LogInfo("=== Test Mode ===");
-            Console.WriteLine($"Reading: {jsonPath}\n");
             SimpleLogger.LogInfo($"Reading: {jsonPath}");
 
             if (!File.Exists(jsonPath))
             {
-                Console.WriteLine($"✗ Error: File not found: {jsonPath}");
-                SimpleLogger.LogError($"✗ Error: File not found: {jsonPath}");
+                SimpleLogger.LogError($"✗ File not found: {jsonPath}");
                 return Task.CompletedTask;
             }
 
             string jsonContent = File.ReadAllText(jsonPath);
-            Console.WriteLine($"✓ File read successfully ({jsonContent.Length} bytes)\n");
             SimpleLogger.LogInfo($"✓ File read successfully ({jsonContent.Length} bytes)");
 
             // Save input file to InputSavePath
@@ -414,74 +377,59 @@ public partial class Program
                     string inputSavePath = Path.Combine(pubSubConfig.InputSavePath,
                         $"Input_{DateTime.Now:yyyyMMddHHmmss}_test.json");
                     File.WriteAllText(inputSavePath, jsonContent);
-                    Console.WriteLine($"✓ Saved input to: {inputSavePath}");
                     SimpleLogger.LogInfo($"✓ Saved input to: {inputSavePath} ({jsonContent.Length} bytes)");
                 }
                 catch (Exception ex)
                 {
-                    string errorMsg = $"✗ Failed to save input file: {ex.Message}";
-                    Console.WriteLine(errorMsg);
-                    SimpleLogger.LogError(errorMsg, ex);
+                    SimpleLogger.LogError($"✗ Failed to save input file: {ex.Message}", ex);
                 }
             }
 
+            // Display input JSON to console only (too large for log file)
             Console.WriteLine("=== Input JSON ===");
             Console.WriteLine(jsonContent);
             Console.WriteLine();
-            SimpleLogger.LogInfo($"Input JSON: {jsonContent}");
 
             MainClass mainClass = new MainClass();
 
-            Console.WriteLine("Parsing RetailEvent...");
             SimpleLogger.LogInfo("Parsing RetailEvent...");
             RetailEvent retailEvent = mainClass.ReadRecordSetFromString(jsonContent);
-            Console.WriteLine($"✓ RetailEvent parsed successfully\n");
             SimpleLogger.LogInfo("✓ RetailEvent parsed successfully");
 
             // Validate ORAE v2.0.0 compliance (if not disabled)
             if (!pubSubConfig.DisableOraeValidation)
             {
-                Console.WriteLine("Validating ORAE v2.0.0 compliance...");
                 SimpleLogger.LogInfo("Validating ORAE v2.0.0 compliance...");
                 var validationErrors = MainClass.ValidateOraeCompliance(retailEvent);
                 if (validationErrors.Count > 0)
                 {
                     string errorMessage = $"✗ ORAE validation failed with {validationErrors.Count} error(s):\n" +
                                         string.Join("\n  - ", validationErrors.Prepend(""));
-                    Console.WriteLine(errorMessage);
                     SimpleLogger.LogError(errorMessage);
                     return Task.CompletedTask;
                 }
-                Console.WriteLine("✓ ORAE v2.0.0 validation passed\n");
                 SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
             }
             else
             {
-                Console.WriteLine("⚠ ORAE validation skipped (disabled in configuration)\n");
                 SimpleLogger.LogWarning("⚠ ORAE validation skipped (disabled in configuration)");
             }
 
-            Console.WriteLine("Mapping to RecordSet...");
             SimpleLogger.LogInfo("Mapping to RecordSet...");
             RecordSet recordSet = mainClass.MapRetailEventToRecordSet(retailEvent);
-            Console.WriteLine($"✓ RecordSet mapped successfully\n");
             SimpleLogger.LogInfo("✓ RecordSet mapped successfully");
 
             // Validate output RecordSet
-            Console.WriteLine("Validating RecordSet output...");
             SimpleLogger.LogInfo("Validating RecordSet output...");
             var outputErrors = MainClass.ValidateRecordSetOutput(recordSet);
-
 
             if (outputErrors.Count > 0)
             {
                 string errorMessage = $"✗ RecordSet validation failed with {outputErrors.Count} error(s):\n" +
                                     string.Join("\n  - ", outputErrors.Prepend(""));
-                Console.WriteLine(errorMessage);
                 SimpleLogger.LogError(errorMessage);
                 return Task.CompletedTask;
             }
-            Console.WriteLine("✓ RecordSet output validation passed\n");
             SimpleLogger.LogInfo("✓ RecordSet output validation passed");
 
             var options = new JsonSerializerOptions
@@ -497,11 +445,11 @@ public partial class Program
             int tenderCount = recordSet.TenderRecords?.Count ?? 0;
             SimpleLogger.LogInfo($"Output JSON generated: {orderCount} OrderRecords, {tenderCount} TenderRecords ({jsonOutput.Length} bytes)");
 
+            // Display output JSON to console only (too large for log file)
             Console.WriteLine("=== Output JSON ===");
             Console.WriteLine(jsonOutput);
             Console.WriteLine();
 
-            Console.WriteLine("=== Validation ===");
             SimpleLogger.LogInfo("=== Validation ===");
             ValidateRecordSet(recordSet);
 
@@ -514,14 +462,11 @@ public partial class Program
                     string outputPath = Path.Combine(pubSubConfig.OutputSavePath,
                         $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_test.json");
                     File.WriteAllText(outputPath, jsonOutput);
-                    Console.WriteLine($"\n✓ Output written to: {outputPath}");
                     SimpleLogger.LogInfo($"✓ Output written to: {outputPath} ({jsonOutput.Length} bytes)");
                 }
                 catch (Exception ex)
                 {
-                    string errorMsg = $"✗ Failed to save output file: {ex.Message}";
-                    Console.WriteLine(errorMsg);
-                    SimpleLogger.LogError(errorMsg, ex);
+                    SimpleLogger.LogError($"✗ Failed to save output file: {ex.Message}", ex);
                 }
             }
             else
@@ -531,21 +476,16 @@ public partial class Program
                     // Fallback to local directory if not configured
                     string outputPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? "", "output_" + Path.GetFileName(jsonPath));
                     File.WriteAllText(outputPath, jsonOutput);
-                    Console.WriteLine($"\n✓ Output written to: {outputPath}");
                     SimpleLogger.LogInfo($"✓ Output written to: {outputPath} ({jsonOutput.Length} bytes)");
                 }
                 catch (Exception ex)
                 {
-                    string errorMsg = $"✗ Failed to save output file: {ex.Message}";
-                    Console.WriteLine(errorMsg);
-                    SimpleLogger.LogError(errorMsg, ex);
+                    SimpleLogger.LogError($"✗ Failed to save output file: {ex.Message}", ex);
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"\n✗ Error: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
             SimpleLogger.LogError($"✗ Error: {ex.Message}");
             SimpleLogger.LogError($"Stack trace: {ex.StackTrace}");
         }
@@ -557,14 +497,14 @@ public partial class Program
     {
         if (recordSet == null)
         {
-            Console.WriteLine("✗ RecordSet is null");
+            SimpleLogger.LogError("✗ RecordSet is null");
             return;
         }
 
         // Validate OrderRecords
         if (recordSet.OrderRecords != null && recordSet.OrderRecords.Count > 0)
         {
-            Console.WriteLine($"✓ Found {recordSet.OrderRecords.Count} OrderRecord(s) in RIMSLF");
+            SimpleLogger.LogInfo($"✓ Found {recordSet.OrderRecords.Count} OrderRecord(s) in RIMSLF");
 
             for (int i = 0; i < recordSet.OrderRecords.Count; i++)
             {
@@ -574,87 +514,87 @@ public partial class Program
                 bool isTaxRecord = !string.IsNullOrEmpty(orderRecord.LineType) && orderRecord.LineType.StartsWith("X");
                 bool isEppRecord = orderRecord.TransType == "21";
                 string recordLabel = isTaxRecord ? "TaxRecord" : isEppRecord ? "EPP" : "OrderRecord";
-                Console.WriteLine($"\n  {recordLabel} #{i + 1}:");
+                SimpleLogger.LogInfo($"  {recordLabel} #{i + 1}:");
 
                 // Required fields
                 if (string.IsNullOrEmpty(orderRecord.TransType))
-                    Console.WriteLine($"    ✗ TransType (SLFTTP) is required");
+                    SimpleLogger.LogError($"    ✗ TransType (SLFTTP) is required");
                 else
-                    Console.WriteLine($"    ✓ TransType: {orderRecord.TransType}");
+                    SimpleLogger.LogInfo($"    ✓ TransType: {orderRecord.TransType}");
 
                 if (string.IsNullOrEmpty(orderRecord.LineType))
-                    Console.WriteLine($"    ✗ LineType (SLFLNT) is required");
+                    SimpleLogger.LogError($"    ✗ LineType (SLFLNT) is required");
                 else
-                    Console.WriteLine($"    ✓ LineType: {orderRecord.LineType}");
+                    SimpleLogger.LogInfo($"    ✓ LineType: {orderRecord.LineType}");
 
                 if (string.IsNullOrEmpty(orderRecord.TransDate))
-                    Console.WriteLine($"    ✗ TransDate (SLFTDT) is required");
+                    SimpleLogger.LogError($"    ✗ TransDate (SLFTDT) is required");
                 else
-                    Console.WriteLine($"    ✓ TransDate: {orderRecord.TransDate} (length: {orderRecord.TransDate.Length})");
+                    SimpleLogger.LogInfo($"    ✓ TransDate: {orderRecord.TransDate} (length: {orderRecord.TransDate.Length})");
 
                 if (string.IsNullOrEmpty(orderRecord.TransTime))
-                    Console.WriteLine($"    ✗ TransTime (SLFTTM) is required");
+                    SimpleLogger.LogError($"    ✗ TransTime (SLFTTM) is required");
                 else
-                    Console.WriteLine($"    ✓ TransTime: {orderRecord.TransTime} (length: {orderRecord.TransTime.Length})");
+                    SimpleLogger.LogInfo($"    ✓ TransTime: {orderRecord.TransTime} (length: {orderRecord.TransTime.Length})");
 
                 if (!string.IsNullOrEmpty(orderRecord.SKUNumber))
-                    Console.WriteLine($"    ✓ SKU: {orderRecord.SKUNumber}");
+                    SimpleLogger.LogInfo($"    ✓ SKU: {orderRecord.SKUNumber}");
 
                 if (!string.IsNullOrEmpty(orderRecord.Quantity))
-                    Console.WriteLine($"    ✓ Quantity: {orderRecord.Quantity} (sign: '{orderRecord.QuantityNegativeSign}')");
+                    SimpleLogger.LogInfo($"    ✓ Quantity: {orderRecord.Quantity} (sign: '{orderRecord.QuantityNegativeSign}')");
 
                 if (!string.IsNullOrEmpty(orderRecord.ExtendedValue))
-                    Console.WriteLine($"    ✓ ExtendedValue: {orderRecord.ExtendedValue} (sign: '{orderRecord.ExtendedValueNegativeSign}')");
+                    SimpleLogger.LogInfo($"    ✓ ExtendedValue: {orderRecord.ExtendedValue} (sign: '{orderRecord.ExtendedValueNegativeSign}')");
 
                 if (!string.IsNullOrEmpty(orderRecord.TransSeq))
-                    Console.WriteLine($"    ✓ TransSeq: {orderRecord.TransSeq}");
+                    SimpleLogger.LogInfo($"    ✓ TransSeq: {orderRecord.TransSeq}");
 
                 if (!string.IsNullOrEmpty(orderRecord.SourceLineId))
-                    Console.WriteLine($"    ✓ LineId: {orderRecord.SourceLineId}");
+                    SimpleLogger.LogInfo($"    ✓ LineId: {orderRecord.SourceLineId}");
 
                 if (!string.IsNullOrEmpty(orderRecord.SourceParentLineId))
-                    Console.WriteLine($"    ✓ ParentLineId: {orderRecord.SourceParentLineId}");
+                    SimpleLogger.LogInfo($"    ✓ ParentLineId: {orderRecord.SourceParentLineId}");
             }
         }
         else
         {
-            Console.WriteLine("⚠ No OrderRecords found in RIMSLF");
+            SimpleLogger.LogWarning("⚠ No OrderRecords found in RIMSLF");
         }
 
         // Validate TenderRecords
         if (recordSet.TenderRecords != null && recordSet.TenderRecords.Count > 0)
         {
-            Console.WriteLine($"\n✓ Found {recordSet.TenderRecords.Count} TenderRecord(s) in RIMTNF");
+            SimpleLogger.LogInfo($"✓ Found {recordSet.TenderRecords.Count} TenderRecord(s) in RIMTNF");
 
             for (int i = 0; i < recordSet.TenderRecords.Count; i++)
             {
                 var tenderRecord = recordSet.TenderRecords[i];
-                Console.WriteLine($"\n  TenderRecord #{i + 1}:");
+                SimpleLogger.LogInfo($"  TenderRecord #{i + 1}:");
 
                 // Required fields
                 if (string.IsNullOrEmpty(tenderRecord.TransactionDate))
-                    Console.WriteLine($"    ✗ TransactionDate (TNFTDT) is required");
+                    SimpleLogger.LogError($"    ✗ TransactionDate (TNFTDT) is required");
                 else
-                    Console.WriteLine($"    ✓ TransactionDate: {tenderRecord.TransactionDate} (length: {tenderRecord.TransactionDate.Length})");
+                    SimpleLogger.LogInfo($"    ✓ TransactionDate: {tenderRecord.TransactionDate} (length: {tenderRecord.TransactionDate.Length})");
 
                 if (string.IsNullOrEmpty(tenderRecord.TransactionTime))
-                    Console.WriteLine($"    ✗ TransactionTime (TNFTTM) is required");
+                    SimpleLogger.LogError($"    ✗ TransactionTime (TNFTTM) is required");
                 else
-                    Console.WriteLine($"    ✓ TransactionTime: {tenderRecord.TransactionTime} (length: {tenderRecord.TransactionTime.Length})");
+                    SimpleLogger.LogInfo($"    ✓ TransactionTime: {tenderRecord.TransactionTime} (length: {tenderRecord.TransactionTime.Length})");
 
                 if (!string.IsNullOrEmpty(tenderRecord.FundCode))
-                    Console.WriteLine($"    ✓ FundCode: {tenderRecord.FundCode}");
+                    SimpleLogger.LogInfo($"    ✓ FundCode: {tenderRecord.FundCode}");
 
                 if (!string.IsNullOrEmpty(tenderRecord.Amount))
-                    Console.WriteLine($"    ✓ Amount: {tenderRecord.Amount} (sign: '{tenderRecord.AmountNegativeSign}')");
+                    SimpleLogger.LogInfo($"    ✓ Amount: {tenderRecord.Amount} (sign: '{tenderRecord.AmountNegativeSign}')");
 
                 if (!string.IsNullOrEmpty(tenderRecord.TransactionSeq))
-                    Console.WriteLine($"    ✓ TransactionSeq: {tenderRecord.TransactionSeq}");
+                    SimpleLogger.LogInfo($"    ✓ TransactionSeq: {tenderRecord.TransactionSeq}");
             }
         }
         else
         {
-            Console.WriteLine("\n⚠ No TenderRecords found in RIMTNF");
+            SimpleLogger.LogWarning("⚠ No TenderRecords found in RIMTNF");
         }
     }
 }
@@ -1487,23 +1427,6 @@ public partial class Program
 
     class MainClass
     {
-        RecordSet recordSet = new RecordSet();
-        RetailEvent? retailEvent = null;
-
-        public void Main1(string?[] args)
-        {
-            // Read the retail event
-            retailEvent = ReadRecordSetFromFile(@"C:\TransactionTree\TTCustomers\Rona\PubSubProject\RonaPubSub\PubSubMessage_20251022154834.json");
-
-            // Map to RecordSet
-            recordSet = MapRetailEventToRecordSet(retailEvent);
-
-            // Write to output file
-            string outputPath = @"C:\TransactionTree\TTCustomers\Rona\PubSubProject\RonaPubSub\OutputRecordSet.json";
-            WriteRecordSetToFile(recordSet, outputPath);
-
-        }
-
     public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
     {
         // Check for employee discount (will set SLFPVC and affect SLFTTP/SLFLNT)
@@ -1515,10 +1438,10 @@ public partial class Program
         // Check for customer ID (currently always blank, but ready for future)
         bool hasCustomerId = !string.IsNullOrEmpty(GetCustomerId(retailEvent));
 
-        string? mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ?
-            MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType, hasEmployeeDiscount) : null;
-        string? mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ?
-            MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType, hasEmployeeDiscount, hasGiftCardTender, hasCustomerId) : null;
+        string mappedTransactionTypeSLFTTP = retailEvent.Transaction?.TransactionType != null ?
+            MapTransTypeSLFTTP(retailEvent.Transaction.TransactionType, hasEmployeeDiscount) : "01";
+        string mappedTransactionTypeSLFLNT = retailEvent.Transaction?.TransactionType != null ?
+            MapTransTypeSLFLNT(retailEvent.Transaction.TransactionType, hasEmployeeDiscount, hasGiftCardTender, hasCustomerId) : "01";
 
         // Parse storeId as integer for PolledStore fields
         int? polledStoreInt = null;
@@ -2625,43 +2548,6 @@ public partial class Program
             return rec;
         }
 
-        // Map tender method to fund code (TNFFCD) - 2-letter alpha codes
-        private string MapTenderMethodToFundCode(string? method)
-        {
-            return method?.ToUpper() switch
-            {
-                "CASH" => "CA",
-                "CHECK" or "CHEQUE" => "CH",
-                "DEBIT" or "DEBIT_CARD" or "DEBITATM" => "DC",
-                "CREDIT" or "CREDIT_CARD" => "VI", // Default to VISA if card scheme not available
-                "VISA" => "VI",
-                "MASTERCARD" or "MASTER_CARD" => "MA",
-                "AMEX" or "AMERICAN_EXPRESS" => "AX",
-                "GIFT_CARD" or "GIFTCARD" => "PG", // Gift card redeemed
-                "COUPON" => "CP",
-                "TRAVELLERS_CHEQUE" or "TRAVELERS_CHECK" => "TC",
-                "US_CASH" => "US",
-                "FLEXITI" => "FX",
-                "WEB_SALE" => "PL",
-                "PENNY_ROUNDING" => "PR",
-                "CHANGE" => "ZZ",
-                _ => "CA" // Default to cash
-            };
-        }
-
-        private string MapCardSchemeToFundCode(string? scheme)
-        {
-            return scheme?.ToUpper() switch
-            {
-                "VISA" => "VI",
-                "MASTERCARD" or "MASTER_CARD" or "MC" => "MA",
-                "AMEX" or "AMERICAN EXPRESS" or "AMERICANEXPRESS" => "AX",
-                "DEBIT" or "DEBITATM" => "DC",
-                "GIFTCARD" or "GIFT_CARD" => "PG",
-                _ => "VI" // Default to VISA for unknown card schemes
-            };
-        }
-
         // Parse item-level taxes and map to OrderRecord tax fields
         private string ParseItemTaxes(TransactionItem item, OrderRecord orderRecord, RetailEvent retailEvent)
         {
@@ -2944,13 +2830,6 @@ public partial class Program
             return value; // Exact length
         }
 
-        // Get century digit (0-9) from date
-        private int GetCentury(DateTime date)
-        {
-            int year = date.Year;
-            return (year / 100) % 10; // Returns last digit of century (20 -> 0, 21 -> 1)
-        }
-
         // Get province/state from retail event (for tax logic)
         private string? GetProvince(RetailEvent retailEvent)
         {
@@ -3184,36 +3063,9 @@ public partial class Program
             // Fix for CS9035: Always set required Transaction property
             return retailEvent ?? new RetailEvent { Transaction = new Transaction { Items = new List<TransactionItem>(), Totals = new Totals() } };
         }
-        catch (FileNotFoundException ex)
-        {
-            Console.WriteLine($"File not found: {ex.Message}");
-            throw;
-        }
         catch (JsonException ex)
         {
-            Console.WriteLine($"JSON parsing error: {ex.Message}");
-            throw;
-        }
-    }
-
-
-    public static RetailEvent ReadRecordSetFromFile(string filePath)
-    {
-        try
-        {
-            string jsonContent = File.ReadAllText(filePath);
-            var retailEvent = JsonSerializer.Deserialize<RetailEvent>(jsonContent);
-            // Fix for CS9035: Always set required Transaction property
-            return retailEvent ?? new RetailEvent { Transaction = new Transaction { Items = new List<TransactionItem>(), Totals = new Totals() } };
-        }
-        catch (FileNotFoundException ex)
-        {
-            Console.WriteLine($"File not found: {ex.Message}");
-            throw;
-        }
-        catch (JsonException ex)
-        {
-            Console.WriteLine($"JSON parsing error: {ex.Message}");
+            SimpleLogger.LogError($"JSON parsing error: {ex.Message}");
             throw;
         }
     }
@@ -3643,47 +3495,4 @@ public partial class Program
         }
     }
 
-        public static void WriteRecordSetToFile(RecordSet recordSet, string filePath)
-        {
-            try
-            {
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                };
-
-                string jsonString = JsonSerializer.Serialize(recordSet, options);
-                File.WriteAllText(filePath, jsonString);
-
-                Console.WriteLine($"RecordSet written to: {filePath}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error writing file: {ex.Message}");
-                throw;
-            }
-        }
-
-        public static async Task WriteRecordSetToFileAsync(RecordSet recordSet, string filePath)
-        {
-            try
-            {
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                };
-
-                using FileStream fileStream = File.Create(filePath);
-                await JsonSerializer.SerializeAsync(fileStream, recordSet, options);
-
-                Console.WriteLine($"RecordSet written to: {filePath}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error writing file: {ex.Message}");
-                throw;
-            }
-        }
     }

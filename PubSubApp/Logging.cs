@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PubSubApp
 {
@@ -11,9 +7,12 @@ namespace PubSubApp
         private static readonly object _lock = new object();
         private static string _logFilePath = "c:\\opt\\transactiontree\\pubsub\\log\\pubsub.log";
 
-        public static void SetLogPath(string path,string projectId)
+        public static void SetLogPath(string path, string projectId)
         {
-            _logFilePath = Path.GetDirectoryName(_logFilePath) + "\\" + Path.GetFileName(_logFilePath) + "_" + projectId + ".log";
+            string? directory = Path.GetDirectoryName(_logFilePath);
+            string fileNameWithoutExt = Path.GetFileNameWithoutExtension(_logFilePath);
+            string ext = Path.GetExtension(_logFilePath);
+            _logFilePath = Path.Combine(directory ?? ".", $"{fileNameWithoutExt}_{projectId}{ext}");
         }
 
         public static void Log(string message)
@@ -23,8 +22,9 @@ namespace PubSubApp
                 try
                 {
                     string logMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} | {message}";
+                    Directory.CreateDirectory(Path.GetDirectoryName(_logFilePath) ?? ".");
                     File.AppendAllText(_logFilePath, logMessage + Environment.NewLine);
-                    Console.WriteLine(logMessage);  // Also write to console
+                    Console.WriteLine(logMessage);
                 }
                 catch (Exception ex)
                 {
