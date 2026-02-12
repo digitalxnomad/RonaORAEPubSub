@@ -2802,7 +2802,7 @@ public partial class Program
             // Parse and convert to cents (remove decimal point)
             if (decimal.TryParse(value, out decimal amount))
             {
-                int cents = (int)(amount * 100);
+                long cents = (long)Math.Round(amount * 100, MidpointRounding.AwayFromZero);
                 return cents.ToString().PadLeft(length, '0');
             }
 
@@ -2820,7 +2820,7 @@ public partial class Program
             if (decimal.TryParse(value, out decimal amount))
             {
                 bool isNegative = amount < 0;
-                int cents = (int)(Math.Abs(amount) * 100);
+                long cents = (long)Math.Round(Math.Abs(amount) * 100, MidpointRounding.AwayFromZero);
                 string formattedAmount = cents.ToString().PadLeft(length, '0');
                 string sign = isNegative ? "-" : ""; // Use empty string for positive/no sign
                 return (formattedAmount, sign);
