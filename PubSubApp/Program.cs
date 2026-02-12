@@ -83,8 +83,28 @@ public partial class Program
             SimpleLogger.LogDebug("Debug logging is ENABLED");
         }
 
+        // Graceful shutdown: Ctrl+C, SIGTERM, or process exit will trigger clean shutdown
+        var shutdownCts = new CancellationTokenSource();
+        SubscriberClient? activeSubscriber = null;
+
+        Console.CancelKeyPress += (sender, e) =>
+        {
+            e.Cancel = true; // Prevent immediate process termination
+            SimpleLogger.LogInfo("⏹ Shutdown requested (Ctrl+C). Finishing current message...");
+            shutdownCts.Cancel();
+        };
+
+        AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+        {
+            if (!shutdownCts.IsCancellationRequested)
+            {
+                SimpleLogger.LogInfo("⏹ Shutdown requested (SIGTERM/process exit). Finishing current message...");
+                shutdownCts.Cancel();
+            }
+        };
+
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
-        while (true)
+        while (!shutdownCts.IsCancellationRequested)
         {
             SubscriberClient? subscriber = null;
             try
@@ -120,6 +140,7 @@ public partial class Program
                         })
                 };
                 subscriber = await subscriberBuilder.BuildAsync();
+                activeSubscriber = subscriber; // Track for graceful shutdown
 
                 if (debugLog) { SimpleLogger.LogDebug("SubscriberClient built successfully"); }
 
@@ -134,14 +155,27 @@ public partial class Program
                 // This prevents silent gRPC stream death where StartAsync never completes
                 var idleTimeoutMinutes = pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30;
                 DateTime lastMessageTime = DateTime.UtcNow;
-                var idleWatchdogCts = new CancellationTokenSource();
+                // Link idle watchdog to shutdown token so both can stop the subscriber
+                var idleWatchdogCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownCts.Token);
 
-                // Background task that monitors for idle timeout
+                // Background task that monitors for idle timeout or shutdown
                 var watchdogTask = Task.Run(async () =>
                 {
                     while (!idleWatchdogCts.Token.IsCancellationRequested)
                     {
-                        await Task.Delay(TimeSpan.FromMinutes(1), idleWatchdogCts.Token).ConfigureAwait(false);
+                        try
+                        {
+                            await Task.Delay(TimeSpan.FromMinutes(1), idleWatchdogCts.Token).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) { break; }
+
+                        if (shutdownCts.IsCancellationRequested)
+                        {
+                            // Graceful shutdown requested — stop the subscriber
+                            try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                            break;
+                        }
+
                         var idleMinutes = (DateTime.UtcNow - lastMessageTime).TotalMinutes;
                         if (idleMinutes >= idleTimeoutMinutes)
                         {
@@ -313,17 +347,26 @@ public partial class Program
 
                 if (debugLog) { SimpleLogger.LogDebug("subscriber.StartAsync has returned (subscriber stopped)"); }
 
-                // If StartAsync completes, the subscriber has stopped (idle watchdog or unexpected)
-                SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
+                // If StartAsync completes, the subscriber has stopped
+                if (shutdownCts.IsCancellationRequested)
+                {
+                    SimpleLogger.LogInfo("⏹ Subscriber stopped for shutdown.");
+                }
+                else
+                {
+                    SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
+                }
             }
             catch (Exception ex)
             {
                 SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
-                await Task.Delay(TimeSpan.FromSeconds(5));
+                try { await Task.Delay(TimeSpan.FromSeconds(5), shutdownCts.Token); }
+                catch (OperationCanceledException) { } // Shutdown requested during delay
             }
             finally
             {
-                // Clean up the old subscriber before creating a new one
+                // Clean up the subscriber before creating a new one or exiting
+                activeSubscriber = null;
                 if (subscriber != null)
                 {
                     try
@@ -335,9 +378,19 @@ public partial class Program
             }
         }
 
-        // Note: publisher.ShutdownAsync is no longer reachable in normal flow
-        // since the while(true) loop runs until the process is terminated.
-        // Graceful shutdown is handled by the OS/container runtime.
+        // Graceful shutdown: flush any pending publishes and release resources
+        SimpleLogger.LogInfo("⏹ Shutting down publisher...");
+        try
+        {
+            await publisher.ShutdownAsync(TimeSpan.FromSeconds(10));
+            SimpleLogger.LogInfo("✓ Publisher shut down cleanly.");
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogError("Publisher shutdown error", ex);
+        }
+
+        SimpleLogger.LogInfo($"⏹ {Version} stopped.");
     }
 
     static Task TestJsonFile(string jsonPath)
