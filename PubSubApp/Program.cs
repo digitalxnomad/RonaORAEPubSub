@@ -327,10 +327,26 @@ public partial class Program
                         responseMessage.Attributes["responseFor"] = message.MessageId;
                         responseMessage.Attributes["transformedAt"] = DateTime.UtcNow.ToString("O");
 
-                        if (debugLog) { SimpleLogger.LogDebug("Calling publisher.PublishAsync..."); }
-                        string publishedId = await publisher.PublishAsync(responseMessage);
-                        if (debugLog) { SimpleLogger.LogDebug($"PublishAsync returned, MessageId={publishedId}"); }
-                        SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
+                        // Publish with retry (exponential backoff) for transient failures
+                        const int maxRetries = 3;
+                        for (int attempt = 1; attempt <= maxRetries; attempt++)
+                        {
+                            try
+                            {
+                                if (debugLog) { SimpleLogger.LogDebug($"Calling publisher.PublishAsync (attempt {attempt}/{maxRetries})..."); }
+                                string publishedId = await publisher.PublishAsync(responseMessage);
+                                if (debugLog) { SimpleLogger.LogDebug($"PublishAsync returned, MessageId={publishedId}"); }
+                                SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
+                                break; // Success — exit retry loop
+                            }
+                            catch (Exception pubEx) when (attempt < maxRetries)
+                            {
+                                int delaySeconds = (int)Math.Pow(2, attempt); // 2s, 4s
+                                SimpleLogger.LogWarning($"⚠ Publish attempt {attempt}/{maxRetries} failed: {pubEx.Message}. Retrying in {delaySeconds}s...");
+                                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+                            }
+                            // Final attempt: exception propagates to outer catch → Nack
+                        }
 
                         if (debugLog) { SimpleLogger.LogDebug($"Returning Ack for MessageId={message.MessageId}"); }
                         return SubscriberClient.Reply.Ack;
