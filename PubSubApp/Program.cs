@@ -1277,9 +1277,6 @@ public partial class Program
         [JsonPropertyName("amount")]
         public CurrencyAmount? Amount { get; set; }
 
-        [JsonPropertyName("requestedAmount")]
-        public CurrencyAmount? RequestedAmount { get; set; }
-
         [JsonPropertyName("card")]
         public Card? Card { get; set; }
     }

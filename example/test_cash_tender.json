@@ -87,10 +87,6 @@
 					"responseCode": "SETTLE"
 				},
 				"method": "CASH",
-				"requestedAmount": {
-					"currency": "CAD",
-					"value": "22.50"
-				},
 				"tenderId": "CA"
 			}
 		],
