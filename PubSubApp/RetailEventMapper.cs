@@ -868,17 +868,14 @@ class RetailEventMapper
                         tenderRecord.AmountNegativeSign = sign;
                     }
 
-                    // Card/Payment fields - populate from tender.card if available
-                    // TNFMSR: Always blank for CA tenders (cash); only populate for card tenders
-                    if (tender.Card != null)
+                    // Card/Payment fields - only populate for non-cash tenders
+                    // Cash tenders may include a card object (e.g. responseCode) but should not populate card fields
+                    if (tender.Card != null && tender.Method?.ToUpper() != "CASH")
                     {
                         string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
                         tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
-                        if (tender.Method?.ToUpper() != "CASH")
-                        {
-                            tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
-                        }
+                        tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
                     }
 
                     recordSet.TenderRecords.Add(tenderRecord);
