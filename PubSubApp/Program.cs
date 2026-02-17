@@ -168,7 +168,15 @@ public partial class Program
                         {
                             await Task.Delay(TimeSpan.FromMinutes(1), idleWatchdogCts.Token).ConfigureAwait(false);
                         }
-                        catch (OperationCanceledException) { break; }
+                        catch (OperationCanceledException)
+                        {
+                            if (shutdownCts.IsCancellationRequested)
+                            {
+                                SimpleLogger.LogInfo("⏹ Watchdog: Shutdown detected. Stopping subscriber...");
+                                try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                            }
+                            break;
+                        }
 
                         if (shutdownCts.IsCancellationRequested)
                         {
