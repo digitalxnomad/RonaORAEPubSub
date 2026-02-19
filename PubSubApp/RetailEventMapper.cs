@@ -1428,6 +1428,23 @@ class RetailEventMapper
                     // Map tax type/category to ChargedTax1-4 flags
                     string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
 
+                    // Fallback: if taxType is not set, determine from rate
+                    if (string.IsNullOrEmpty(taxType))
+                    {
+                        if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal fallbackRate))
+                        {
+                            taxType = (fallbackRate >= 4 && fallbackRate <= 6) ? "GST" : "PST";
+                        }
+                        else if (tax.TaxRate != null)
+                        {
+                            taxType = (tax.TaxRate.Value >= 0.04m && tax.TaxRate.Value <= 0.06m) ? "GST" : "PST";
+                        }
+                        else
+                        {
+                            taxType = "GST"; // Default unknown to federal GST
+                        }
+                    }
+
                     // Ontario-specific logic:
                     // SLFTX3 = Y for HST (13%)
                     // SLFTX4 = Y for Partial HST / GST (5%)
