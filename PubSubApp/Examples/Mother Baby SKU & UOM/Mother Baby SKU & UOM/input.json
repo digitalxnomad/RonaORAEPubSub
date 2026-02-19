@@ -1,0 +1,180 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventId": "7422363678539293009",
+	"occurredAt": "2026-01-28T19:44:16Z",
+	"ingestedAt": "2026-01-28T19:44:19Z",
+	"businessContext": {
+		"businessDay": "2026-01-28",
+		"channel": "STORE",
+		"fulfillment": "CARRYOUT",
+		"store": {
+			"currency": "CAD",
+			"storeId": "55010",
+			"taxArea": "ON"
+		},
+		"workstation": {
+			"registerId": "85",
+			"sequenceNumber": 604,
+			"type": "POS"
+		}
+	},
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionSale",
+	"transaction": {
+		"transactionType": "SALE",
+		"items": [
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "WIRE SJTW 16/3 ORANGE LF",
+					"sku": "000272093"
+				},
+				"lineId": "1769629416782214612146",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "9.96"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "0.83"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "0.83"
+					}
+				},
+				"quantity": {
+					"uom": "FT",
+					"value": 12
+				},
+				"taxes": [
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "1.29"
+						},
+						"taxCode": "SALES"
+					},
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "0.00"
+						},
+						"jurisdiction": {
+							"region": "HON"
+						},
+						"taxCode": "HST"
+					}
+				]
+			},
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "WIRE SJTW 16/3 75M SPOOL ORANG",
+					"sku": "000125728"
+				},
+				"lineId": "176962940751769936457",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "139.00"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "139.00"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "139.00"
+					}
+				},
+				"quantity": {
+					"uom": "RL",
+					"value": 1
+				},
+				"taxes": [
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "18.07"
+						},
+						"taxCode": "SALES"
+					},
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "0.00"
+						},
+						"jurisdiction": {
+							"region": "HON"
+						},
+						"taxCode": "HST"
+					}
+				]
+			}
+		],
+		"tenders": [
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "168.32"
+				},
+				"card": {
+					"authCode": "0668512",
+					"emv": {
+						"tags": {
+							"magStrip": "S"
+						}
+					},
+					"entryMode": "SWIPED",
+					"last4": "4902",
+					"responseCode": "1[49]",
+					"scheme": "VISA"
+				},
+				"entryMethod": "SWIPED",
+				"method": "CREDIT",
+				"requestedAmount": {
+					"currency": "CAD",
+					"value": "168.32"
+				},
+				"tenderId": "VI"
+			}
+		],
+		"totals": {
+			"discounts": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"gross": {
+				"currency": "CAD",
+				"value": "148.96"
+			},
+			"net": {
+				"currency": "CAD",
+				"value": "168.32"
+			},
+			"tax": {
+				"currency": "CAD",
+				"value": "19.36"
+			}
+		}
+	},
+	"promotions": [],
+	"actor": {
+		"cashier": {
+			"loginId": "2"
+		},
+		"customer": {
+			"customerIdToken": ""
+		}
+	}
+}

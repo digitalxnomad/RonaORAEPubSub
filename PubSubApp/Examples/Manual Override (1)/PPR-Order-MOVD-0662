@@ -1,0 +1,280 @@
+PPR-Order-MOVD-0662
+{
+    "sourceId": "7424173435609729912",
+    "cartId": "7424173435609729912",
+    "cartType": "SHOPPING",
+    "testOrder": false,
+    "masterInvoiceNumber": "0662",
+    "identityType": "GUEST",
+    "customerSegments":
+    [
+        "REGULAR"
+    ],
+    "tenantType": "STORES",
+    "businessChannel": "CA_STORES_POS",
+    "banner": "RONA",
+    "channel": "Stores",
+    "users":
+    [
+        {
+            "userType": "SHOPPER",
+            "poRequired": false,
+            "userTaxExemptOptIn": true,
+            "taxExempt": false,
+            "bestPrice": false
+        }
+    ],
+    "cartItems":
+    [
+        {
+            "cartItemId": "17700608939635432100",
+            "omniItemId": "000481700",
+            "itemNumber": "000481700",
+            "model": "168256",
+            "vendor": "555557",
+            "itemDescription": "BROOM SUPER ANGLE PET PRO",
+            "itemType": "RGL",
+            "quantity": 1,
+            "itemWeight": 0.0,
+            "freeDetail": false,
+            "freeLead": false,
+            "freeMileage": false,
+            "priceInfo":
+            {
+                "priceType": 1,
+                "priceInfoUsageType": "SELLING",
+                "priceInfoDisplayType": "REGULAR",
+                "totalPercentage": 0.0,
+                "unitPrice": 9.8,
+                "unitCost": 0,
+                "prices":
+                [
+                    {
+                        "type": "BASE",
+                        "value": 19.99
+                    },
+                    {
+                        "type": "PRICE_UNLOCK",
+                        "value": 9.8
+                    },
+                    {
+                        "type": "RETAIL",
+                        "value": 19.99
+                    },
+                    {
+                        "type": "FINAL",
+                        "value": 19.99
+                    }
+                ],
+                "saveComponents":
+                []
+            },
+            "selectedFulfillment":
+            {
+                "availabilityTime": 1770060948.019000000,
+                "estimatedDeliveryDate": 1770060948.019000000,
+                "estimatedShipDate": 1770060948.019000000,
+                "fulfillmentId": "1",
+                "fulfillmentType": "CARRYWITH",
+                "fulfillmentNode":
+                {
+                    "storeId": "55010"
+                },
+                "ltlIdentifier": false,
+                "parcelDates":
+                []
+            },
+            "promotions":
+            [],
+            "oesSpecialPromotions":
+            [],
+            "imageUrl": "https://erona.rona.ca/images/medium/78/7856/78565132.jpg",
+            "cartItemSummary":
+            {
+                "subTotal": 9.8,
+                "totalPrice": 11.07,
+                "discount": 0,
+                "totalFees": 0,
+                "fees":
+                [],
+                "taxes":
+                [
+                    {
+                        "type": "SALES",
+                        "name": "LWS_SALES_TAX",
+                        "value": 1.27,
+                        "itemNbr": "000481700",
+                        "taxPercentage": 13.0,
+                        "fees":
+                        []
+                    },
+                    {
+                        "type": "TAXSPLIT",
+                        "value": 127,
+                        "denomination": "CENTS",
+                        "stateTax":
+                        {
+                            "description": "HST ONTARIO",
+                            "taxAmount": 127,
+                            "taxJurisdiction": "HON",
+                            "taxRate": 13,
+                            "taxType": "HST"
+                        },
+                        "unitQty": 1,
+                        "orderLineID": "17700608939635432100",
+                        "itemNbr": "000481700",
+                        "vbuNbr": "555557",
+                        "modelID": "168256",
+                        "unitPrice": 9.8,
+                        "purchaseDate": "2026-02-02",
+                        "extendedPrice": 1107.00,
+                        "taxAmount": 127,
+                        "taxPercentage": 13,
+                        "fees":
+                        []
+                    }
+                ],
+                "subTotalAfterDisc": 9.8,
+                "totalMarkDownSaving": 0.0,
+                "totalSavings": 0,
+                "totalSavingsByUnit": 0,
+                "unlockDiscount": 10.19
+            },
+            "installationPickUpType": "N",
+            "priceLockIndicator": false,
+            "barCode": "000000000000481700",
+            "terminalNumber": "85",
+            "associateId": "1",
+            "itemEntryMethod": "ENTERED_ITEM",
+            "priceUnlock":
+            {
+                "unlockPrice": 9.8,
+                "unlockType": "ITEM_DISCOUNT",
+                "reasonCode": "INCORRECT_PRICE",
+                "managerId": "2",
+                "managerApproved": true,
+                "transType": "1701",
+                "chargeName": "Incorrect Price",
+                "chargeCategory": "Discount",
+                "amountSavedPerUnit": 10.19
+            },
+            "createdTime": 1770060893.963000000,
+            "interPackCode": "EA",
+            "sosFlip": false,
+            "eppEligible": false,
+            "reservationDetails":
+            [],
+            "origOrderedQty": 0,
+            "primeLineNo": 1,
+            "taxExemptions":
+            [],
+            "pcrItemParent": false,
+            "pcrItemChild": false,
+            "multiPuis": false
+        }
+    ],
+    "zippedInStore":
+    {
+        "storeId": "55010",
+        "name": "55010 RONA Mississauga (Dundas)",
+        "address":
+        {
+            "addressGroupId": "177006088151066515819",
+            "addressType": "COMMERCIAL",
+            "addressTypeCode": "RA",
+            "addressLine1": "650 Dundas street East Mississauga, ON, L5A 3Y6",
+            "city": "Mississauga",
+            "state": "ON",
+            "zipCode": "L5A 3Y6",
+            "country": "CAN",
+            "phone": "9052766350",
+            "valid": true
+        },
+        "carbonStoreId": "55010"
+    },
+    "payments":
+    [
+        {
+            "paymentId": "17700609469260966823",
+            "amount": 11.07,
+            "cardType": "DEBITATM",
+            "transactionType": "REGULAR",
+            "gcBalance": 0,
+            "expirationMonth": "00",
+            "expirationYear": "0",
+            "accountType": "DEBIT",
+            "authStatus": "Approved",
+            "sequenceNumber": "119",
+            "transactionId": "0119",
+            "merchantId": "067992",
+            "savedCard": false,
+            "addingCard": false,
+            "cvvPresent": false,
+            "encryptedCardNumber": "6006497092249904781",
+            "attachedTime": 1770060946.931000000,
+            "mcmAuthData":
+            {
+                "cardTypeName": "DEBIT",
+                "cardTypeNum": "60",
+                "authCode": "0676432",
+                "processType": "SWIPED",
+                "language": "UNKNOWN",
+                "resultCode": "1[49]",
+                "accountType": "UNKNOWN",
+                "responseMessage": "APPROVED",
+                "giftCardBalance": 668.51
+            },
+            "settleIdc": "SETTLE"
+        }
+    ],
+    "appliedCoupons":
+    [],
+    "personnelNbr": "113173",
+    "currency": "CAD",
+    "cartSummary":
+    {
+        "grandTotal": 11.07,
+        "subTotal": 9.8,
+        "subTotalWithFees": 9.8,
+        "totalSavings": 0,
+        "totalSavingWithoutShippingPromotions": 0.0,
+        "totalfees": 0,
+        "fees":
+        [],
+        "totalSalesTax": 1.27,
+        "subTotalWithDiscount": 9.8,
+        "mileageFee": 0,
+        "totalTax": 1.27,
+        "remainingOrderBalance": 0.00,
+        "totalMarkDownSaving": 0.0,
+        "totalUnlockSaving": 10.19
+    },
+    "shipGroupCharges":
+    [],
+    "fraudStatus": "ACCEPT",
+    "itemCount": 1,
+    "detailFeeTnCAccepted": true,
+    "created": 1770060881.511000000,
+    "lastUpdated": 1770060956.460000000,
+    "orderSubmittedOn": 1770060956.916000000,
+    "oesSpecialCoupons":
+    [],
+    "scheduleDeliveryAppointments":
+    [],
+    "extnIsFullAuthOrder": true,
+    "aopEnabled": false,
+    "taxExempt": false,
+    "taxExemptOptIn": false,
+    "recurring": false,
+    "businessDate": 1770060947.000000000,
+    "associateId": "1",
+    "terminalNumber": "85",
+    "taxExemptions":
+    [],
+    "chargeFeeUnlock":
+    [],
+    "issueBopuisCoupon": false,
+    "failedDownstream":
+    [],
+    "upgradedUser": false
+}

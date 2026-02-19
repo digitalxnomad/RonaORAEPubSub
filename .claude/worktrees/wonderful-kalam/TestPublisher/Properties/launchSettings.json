@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TestPublisher": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\temp18\\test3.json"
+    }
+  }
+}
