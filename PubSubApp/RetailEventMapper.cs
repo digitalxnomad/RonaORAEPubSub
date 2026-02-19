@@ -1492,7 +1492,7 @@ class RetailEventMapper
                                 break;
                             case "QST":
                             case "QUEBEC":
-                                orderRecord.ChargedTax3 = "Y";
+                                orderRecord.ChargedTax1 = "Y";
                                 break;
                             case "MUNICIPAL":
                             case "LOCAL":
