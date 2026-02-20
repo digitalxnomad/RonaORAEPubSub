@@ -1,0 +1,308 @@
+{
+	"sourceId": "7422501634671419752",
+	"cartId": "7422501634671419752",
+	"cartType": "SHOPPING",
+	"testOrder": false,
+	"masterInvoiceNumber": "0616",
+	"identityType": "GUEST",
+	"customerSegments": [
+		"REGULAR"
+	],
+	"tenantType": "STORES",
+	"businessChannel": "CA_STORES_POS",
+	"banner": "RONA",
+	"channel": "Stores",
+	"users": [
+		{
+			"userType": "SHOPPER",
+			"poRequired": false,
+			"userTaxExemptOptIn": true,
+			"taxExempt": false,
+			"bestPrice": false
+		}
+	],
+	"cartItems": [
+		{
+			"cartItemId": "17696623045431301446",
+			"omniItemId": "000491013",
+			"itemNumber": "000491013",
+			"model": "897-630-3.78L",
+			"vendor": "5031",
+			"itemDescription": "PAINT INTERIOR WH.GLOSS 3.78L",
+			"itemType": "RGL",
+			"quantity": 1,
+			"itemWeight": 0.0,
+			"freeDetail": false,
+			"freeLead": false,
+			"freeMileage": false,
+			"priceInfo": {
+				"priceType": 1,
+				"priceInfoUsageType": "SELLING",
+				"priceInfoDisplayType": "REGULAR",
+				"totalPercentage": 0.0,
+				"unitPrice": 9.0,
+				"unitCost": 0,
+				"prices": [
+					{
+						"type": "BASE",
+						"value": 44.99
+					},
+					{
+						"type": "PRICE_UNLOCK",
+						"value": 9.0
+					},
+					{
+						"type": "FINAL",
+						"value": 44.99
+					},
+					{
+						"type": "RETAIL",
+						"value": 44.99
+					}
+				],
+				"saveComponents": []
+			},
+			"selectedFulfillment": {
+				"availabilityTime": 1769662492.721,
+				"estimatedDeliveryDate": 1769662492.721,
+				"estimatedShipDate": 1769662492.721,
+				"fulfillmentId": "1",
+				"fulfillmentType": "CARRYWITH",
+				"fulfillmentNode": {
+					"storeId": "55010"
+				},
+				"ltlIdentifier": false,
+				"parcelDates": []
+			},
+			"promotions": [],
+			"oesSpecialPromotions": [],
+			"imageUrl": "https://erona.rona.ca/images/medium/50/5031/50317224.jpg",
+			"cartItemSummary": {
+				"subTotal": 9.0,
+				"totalPrice": 10.17,
+				"discount": 0,
+				"totalFees": 0,
+				"fees": [],
+				"taxes": [
+					{
+						"type": "SALES",
+						"name": "LWS_SALES_TAX",
+						"value": 1.17,
+						"itemNbr": "000491013",
+						"taxPercentage": 13.0,
+						"fees": []
+					},
+					{
+						"type": "TAXSPLIT",
+						"value": 117,
+						"denomination": "CENTS",
+						"stateTax": {
+							"description": "HST ONTARIO",
+							"taxAmount": 117,
+							"taxJurisdiction": "HON",
+							"taxRate": 13,
+							"taxType": "HST"
+						},
+						"unitQty": 1,
+						"orderLineID": "17696623045431301446",
+						"itemNbr": "000491013",
+						"vbuNbr": "5031",
+						"modelID": "897-630-3.78L",
+						"unitPrice": 9,
+						"purchaseDate": "2026-01-29",
+						"extendedPrice": 1017.0,
+						"taxAmount": 117,
+						"taxPercentage": 13,
+						"fees": []
+					}
+				],
+				"subTotalAfterDisc": 9.0,
+				"totalMarkDownSaving": 0.0,
+				"totalSavings": 0,
+				"totalSavingsByUnit": 0,
+				"unlockDiscount": 35.99
+			},
+			"installationPickUpType": "N",
+			"priceLockIndicator": false,
+			"barCode": "000000000000491013",
+			"terminalNumber": "85",
+			"associateId": "1",
+			"itemEntryMethod": "ENTERED_ITEM",
+			"priceUnlock": {
+				"unlockPrice": 9.0,
+				"unlockType": "ITEM_DISCOUNT",
+				"reasonCode": "INCORRECT_PRICE",
+				"managerId": "2",
+				"managerApproved": true,
+				"transType": "1704",
+				"chargeName": "Incorrect Price",
+				"chargeCategory": "Discount",
+				"amountSavedPerUnit": 35.99
+			},
+			"createdTime": 1769662304.544,
+			"interPackCode": "EA",
+			"sosFlip": false,
+			"eppEligible": false,
+			"reservationDetails": [],
+			"origOrderedQty": 0,
+			"primeLineNo": 1,
+			"taxExemptions": [],
+			"pcrItemParent": false,
+			"pcrItemChild": false,
+			"multiPuis": false
+		}
+	],
+	"zippedInStore": {
+		"storeId": "55010",
+		"name": "55010 RONA Mississauga (Dundas)",
+		"address": {
+			"addressGroupId": "17696622931124547859",
+			"addressType": "COMMERCIAL",
+			"addressTypeCode": "RA",
+			"addressLine1": "650 Dundas street East Mississauga, ON, L5A 3Y6",
+			"city": "Mississauga",
+			"state": "ON",
+			"zipCode": "L5A 3Y6",
+			"country": "CAN",
+			"phone": "9052766350",
+			"valid": true
+		},
+		"carbonStoreId": "55010"
+	},
+	"payments": [
+		{
+			"paymentId": "17696624228107946370",
+			"amount": 1.1,
+			"cardType": "VISA",
+			"transactionType": "REGULAR",
+			"gcBalance": 0,
+			"expirationMonth": "00",
+			"expirationYear": "0",
+			"accountType": "CREDIT",
+			"authStatus": "Approved",
+			"sequenceNumber": "119",
+			"transactionId": "0119",
+			"merchantId": "067992",
+			"savedCard": false,
+			"addingCard": false,
+			"cvvPresent": false,
+			"encryptedCardNumber": "6006497092249902346",
+			"attachedTime": 1769662422.81,
+			"mcmAuthData": {
+				"cardTypeName": "VISA",
+				"cardTypeNum": "50",
+				"authCode": "0987654",
+				"processType": "SWIPED",
+				"language": "UNKNOWN",
+				"resultCode": "1[49]",
+				"accountType": "UNKNOWN",
+				"responseMessage": "APPROVED",
+				"giftCardBalance": 668.51
+			},
+			"settleIdc": "SETTLE"
+		},
+		{
+			"paymentId": "176966249247441565656",
+			"amount": 8.49,
+			"cardType": "GC",
+			"transactionType": "REGULAR",
+			"gcBalance": 0,
+			"expirationMonth": "00",
+			"expirationYear": "0",
+			"accountType": "GIFTCARD",
+			"authStatus": "Approved",
+			"sequenceNumber": "119",
+			"transactionId": "0119",
+			"merchantId": "067992",
+			"savedCard": false,
+			"addingCard": false,
+			"cvvPresent": false,
+			"encryptedCardNumber": "6006497092249904902",
+			"attachedTime": 1769662492.474,
+			"mcmAuthData": {
+				"cardTypeName": "GIFT CARD",
+				"cardTypeNum": "80",
+				"authCode": "0668512",
+				"processType": "SWIPED",
+				"language": "UNKNOWN",
+				"resultCode": "1[49]",
+				"accountType": "UNKNOWN",
+				"responseMessage": "APPROVED",
+				"giftCardBalance": 668.51
+			},
+			"settleIdc": "SETTLE"
+		},
+		{
+			"paymentId": "1769662370026529055154",
+			"amount": 0.58,
+			"cardType": "DEBITATM",
+			"transactionType": "REGULAR",
+			"gcBalance": 0,
+			"expirationMonth": "00",
+			"expirationYear": "0",
+			"accountType": "DEBIT",
+			"authStatus": "Approved",
+			"sequenceNumber": "119",
+			"transactionId": "0119",
+			"merchantId": "067992",
+			"savedCard": false,
+			"addingCard": false,
+			"cvvPresent": false,
+			"encryptedCardNumber": "6006497092249909871",
+			"attachedTime": 1769662370.027,
+			"mcmAuthData": {
+				"cardTypeName": "DEBIT",
+				"cardTypeNum": "60",
+				"authCode": "0752846",
+				"processType": "SWIPED",
+				"language": "UNKNOWN",
+				"resultCode": "1[49]",
+				"accountType": "UNKNOWN",
+				"responseMessage": "APPROVED",
+				"giftCardBalance": 668.51
+			},
+			"settleIdc": "SETTLE"
+		}
+	],
+	"appliedCoupons": [],
+	"personnelNbr": "113173",
+	"currency": "CAD",
+	"cartSummary": {
+		"grandTotal": 10.17,
+		"subTotal": 9.0,
+		"subTotalWithFees": 9.0,
+		"totalSavings": 0,
+		"totalSavingWithoutShippingPromotions": 0.0,
+		"totalfees": 0,
+		"fees": [],
+		"totalSalesTax": 1.17,
+		"subTotalWithDiscount": 9.0,
+		"mileageFee": 0,
+		"totalTax": 1.17,
+		"remainingOrderBalance": 0.0,
+		"totalMarkDownSaving": 0.0,
+		"totalUnlockSaving": 35.99
+	},
+	"shipGroupCharges": [],
+	"fraudStatus": "ACCEPT",
+	"itemCount": 1,
+	"detailFeeTnCAccepted": true,
+	"created": 1769662293.112,
+	"lastUpdated": 1769662500.023,
+	"orderSubmittedOn": 1769662500.151,
+	"oesSpecialCoupons": [],
+	"scheduleDeliveryAppointments": [],
+	"extnIsFullAuthOrder": true,
+	"aopEnabled": false,
+	"taxExempt": false,
+	"taxExemptOptIn": false,
+	"recurring": false,
+	"businessDate": 1769662492.0,
+	"associateId": "1",
+	"terminalNumber": "85",
+	"taxExemptions": [],
+	"chargeFeeUnlock": [],
+	"issueBopuisCoupon": false,
+	"failedDownstream": [],
+	"upgradedUser": false
+}

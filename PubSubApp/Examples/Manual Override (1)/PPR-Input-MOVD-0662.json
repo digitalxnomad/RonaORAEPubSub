@@ -1,0 +1,167 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7424173435609729912",
+    "occurredAt": "2026-02-02T19:35:56Z",
+    "ingestedAt": "2026-02-02T19:36:01Z",
+    "businessContext":
+    {
+        "businessDay": "2026-02-02",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store":
+        {
+            "currency": "CAD",
+            "storeId": "55010",
+            "taxArea": "ON"
+        },
+        "workstation":
+        {
+            "registerId": "85",
+            "sequenceNumber": 662,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction":
+    {
+        "transactionType": "SALE",
+        "items":
+        [
+            {
+                "attributes":
+                {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item":
+                {
+                    "description": "BROOM SUPER ANGLE PET PRO",
+                    "sku": "000481700"
+                },
+                "lineId": "17700608939635432100",
+                "pricing":
+                {
+                    "extendedPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "9.80"
+                    },
+                    "originalUnitPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "19.99"
+                    },
+                    "priceOverride":
+                    {
+                        "approvedBy": "2",
+                        "overridden": true,
+                        "overrideUnitPrice":
+                        {
+                            "currency": "CAD",
+                            "value": "9.80"
+                        },
+                        "reason": "1701"
+                    },
+                    "priceVehicle": "MAN:D51",
+                    "unitPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "9.80"
+                    }
+                },
+                "quantity":
+                {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes":
+                [
+                    {
+                        "amount":
+                        {
+                            "currency": "CAD",
+                            "value": "1.27"
+                        },
+                        "jurisdiction":
+                        {
+                            "region": "HON"
+                        },
+                        "ratePercent": "13",
+                        "taxCode": "HST"
+                    }
+                ]
+            }
+        ],
+        "tenders":
+        [
+            {
+                "amount":
+                {
+                    "currency": "CAD",
+                    "value": "11.07"
+                },
+                "card":
+                {
+                    "authCode": "0676432",
+                    "emv":
+                    {
+                        "tags":
+                        {
+                            "magStrip": "S"
+                        }
+                    },
+                    "entryMode": "SWIPED",
+                    "last4": "4781",
+                    "responseCode": "1[49]",
+                    "scheme": "DEBITATM"
+                },
+                "entryMethod": "SWIPED",
+                "method": "DEBIT",
+                "requestedAmount":
+                {
+                    "currency": "CAD",
+                    "value": "11.07"
+                },
+                "tenderId": "DC"
+            }
+        ],
+        "totals":
+        {
+            "discounts":
+            {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross":
+            {
+                "currency": "CAD",
+                "value": "9.80"
+            },
+            "net":
+            {
+                "currency": "CAD",
+                "value": "11.07"
+            },
+            "tax":
+            {
+                "currency": "CAD",
+                "value": "1.27"
+            }
+        }
+    },
+    "promotions":
+    [],
+    "actor":
+    {
+        "cashier":
+        {
+            "loginId": "1"
+        },
+        "customer":
+        {
+            "customerIdToken": ""
+        }
+    }
+}

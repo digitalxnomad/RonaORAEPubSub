@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7427412289959683667",
+  "occurredAt": "2026-02-11T18:07:22Z",
+  "ingestedAt": "2026-02-11T18:07:24Z",
+  "businessContext": {
+    "businessDay": "2026-02-11",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "06",
+      "sequenceNumber": 783,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "GRASS SEED QUICK/THICK 1.2KG",
+          "sku": "000502124"
+        },
+        "lineId": "1770833084805335346975",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "23.89"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "23.99"
+          },
+          "priceOverride": {
+            "approvedBy": "6006523",
+            "overridden": true,
+            "overrideUnitPrice": {
+              "currency": "CAD",
+              "value": "23.89"
+            },
+            "reason": "1705"
+          },
+          "priceVehicle": "MAN:D0",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "23.89"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "3.11"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "27.00"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "requestedAmount": {
+          "currency": "CAD",
+          "value": "27.00"
+        },
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "23.89"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "27.00"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "3.11"
+      }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": {
+      "loginId": "6006523"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}

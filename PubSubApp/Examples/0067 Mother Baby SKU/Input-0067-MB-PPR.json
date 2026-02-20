@@ -1,0 +1,208 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7424209377796082562",
+    "occurredAt": "2026-02-02T21:58:29Z",
+    "ingestedAt": "2026-02-02T21:58:33Z",
+    "businessContext":
+    {
+        "businessDay": "2026-02-02",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store":
+        {
+            "currency": "CAD",
+            "storeId": "55010",
+            "taxArea": "ON"
+        },
+        "workstation":
+        {
+            "registerId": "85",
+            "sequenceNumber": 667,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction":
+    {
+        "transactionType": "SALE",
+        "items":
+        [
+            {
+                "attributes":
+                {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item":
+                {
+                    "description": "WIRE SJTW 16/3 75M SPOOL ORANG",
+                    "sku": "000125728"
+                },
+                "lineId": "177006945604654896344",
+                "pricing":
+                {
+                    "extendedPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "139.00"
+                    },
+                    "originalUnitPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "139.00"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "139.00"
+                    }
+                },
+                "quantity":
+                {
+                    "uom": "RL",
+                    "value": 1
+                },
+                "taxes":
+                [
+                    {
+                        "amount":
+                        {
+                            "currency": "CAD",
+                            "value": "18.07"
+                        },
+                        "jurisdiction":
+                        {
+                            "region": "HON"
+                        },
+                        "ratePercent": "13",
+                        "taxCode": "HST"
+                    }
+                ]
+            },
+            {
+                "attributes":
+                {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item":
+                {
+                    "description": "WIRE SJTW 16/3 ORANGE LF",
+                    "sku": "000272093"
+                },
+                "lineId": "177006946778774880357",
+                "pricing":
+                {
+                    "extendedPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "8.30"
+                    },
+                    "originalUnitPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "0.83"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice":
+                    {
+                        "currency": "CAD",
+                        "value": "0.83"
+                    }
+                },
+                "quantity":
+                {
+                    "uom": "FT",
+                    "value": 10
+                },
+                "taxes":
+                [
+                    {
+                        "amount":
+                        {
+                            "currency": "CAD",
+                            "value": "1.08"
+                        },
+                        "jurisdiction":
+                        {
+                            "region": "HON"
+                        },
+                        "ratePercent": "13",
+                        "taxCode": "HST"
+                    }
+                ]
+            }
+        ],
+        "tenders":
+        [
+            {
+                "amount":
+                {
+                    "currency": "CAD",
+                    "value": "166.45"
+                },
+                "card":
+                {
+                    "authCode": "0676432",
+                    "emv":
+                    {
+                        "tags":
+                        {
+                            "magStrip": "S"
+                        }
+                    },
+                    "entryMode": "SWIPED",
+                    "last4": "4781",
+                    "responseCode": "1[49]",
+                    "scheme": "DEBITATM"
+                },
+                "entryMethod": "SWIPED",
+                "method": "DEBIT",
+                "requestedAmount":
+                {
+                    "currency": "CAD",
+                    "value": "166.45"
+                },
+                "tenderId": "DC"
+            }
+        ],
+        "totals":
+        {
+            "discounts":
+            {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross":
+            {
+                "currency": "CAD",
+                "value": "147.30"
+            },
+            "net":
+            {
+                "currency": "CAD",
+                "value": "166.45"
+            },
+            "tax":
+            {
+                "currency": "CAD",
+                "value": "19.15"
+            }
+        }
+    },
+    "promotions":
+    [],
+    "actor":
+    {
+        "cashier":
+        {
+            "loginId": "1"
+        },
+        "customer":
+        {
+            "customerIdToken": ""
+        }
+    }
+}
