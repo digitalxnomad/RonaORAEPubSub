@@ -344,7 +344,7 @@ class RetailEventMapper
                 else if (priceVehicle == "OVD:OVR")
                     reasonCode = "POV0" + overrideReason; // POV0 + priceOverride.reason (e.g. "POV01504")
                 else if (pvCodeForRsn == "MAN")
-                    reasonCode = "IDS0";
+                    reasonCode = "IDS0" + overrideReason;
                 orderRecord.ReasonCode = reasonCode.PadRight(16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
