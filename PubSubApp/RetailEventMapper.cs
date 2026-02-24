@@ -307,10 +307,10 @@ class RetailEventMapper
                     ? customerId.PadLeft(10, '0')
                     : "";
 
-                // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
-                // 9 = This line item IS the EPP (has x-epp-coverage-identifier attribute)
-                // 0 = Not an EPP item
-                string eppDigit = GetEPPCoverageIdentifier(item) != null ? "9" : "0";
+                // SLFZIP - 9 spaces + EPP coverage identifier digit (10 chars total)
+                // Value comes directly from x-epp-coverage-identifier attribute
+                // Defaults to "0" when attribute is not present
+                string eppDigit = GetEPPCoverageIdentifier(item) ?? "0";
                 orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
@@ -1492,6 +1492,7 @@ class RetailEventMapper
                                 break;
                             case "QST":
                             case "QUEBEC":
+                                orderRecord.ChargedTax1 = "Y";
                                 orderRecord.ChargedTax3 = "Y";
                                 break;
                             case "MUNICIPAL":
