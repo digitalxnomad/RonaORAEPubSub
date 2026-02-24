@@ -173,7 +173,7 @@ The application now supports comprehensive item-level tax parsing from ORAE v2.0
 - **PST**: `SLFTX1=Y`
 - **GST**: `SLFTX2=Y`
 - **HST**: `SLFTX1=Y`, `SLFTX2=Y` (combined)
-- **QST**: `SLFTX3=Y` (Quebec)
+- **QST**: `SLFTX1=Y`, `SLFTX3=Y` (Quebec)
 - **Municipal**: `SLFTX4=Y`
 - **Tax Records**: Per-item tax records (one tax line per item)
 
