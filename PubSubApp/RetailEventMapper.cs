@@ -1518,8 +1518,7 @@ class RetailEventMapper
                                 orderRecord.ChargedTax4 = "Y";
                                 break;
                             default:
-                                // Default unrecognized tax types to GST (Tax2)
-                                orderRecord.ChargedTax2 = "Y";
+                                // Unrecognized tax types - do not set any flag
                                 break;
                         }
                     }
