@@ -414,12 +414,14 @@ public partial class Program
 
                         // Check if publish failure is auth-related
                         bool isPublishAuth = ex is Grpc.Core.RpcException rpc
-                            && (rpc.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpc.StatusCode == Grpc.Core.StatusCode.PermissionDenied);
+                            && (rpc.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpc.StatusCode == Grpc.Core.StatusCode.PermissionDenied || rpc.StatusCode == Grpc.Core.StatusCode.NotFound);
                         if (!isPublishAuth)
                             isPublishAuth = ex.Message.Contains("credential", StringComparison.OrdinalIgnoreCase)
                                 || ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
                                 || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
-                                || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase);
+                                || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("does not have access", StringComparison.OrdinalIgnoreCase);
                         if (isPublishAuth)
                             await SendSlackAlert(pubSubConfig.SlackWebhookUrl, $"✗ AUTHENTICATION FAILED: Publish to PubSub failed. Check credentials. {ex.Message}");
 
@@ -462,7 +464,7 @@ public partial class Program
                     }
                 }
             }
-            catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied)
+            catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied || rpcEx.StatusCode == Grpc.Core.StatusCode.NotFound)
             {
                 authFailureCount++;
                 SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {rpcEx.Message}", rpcEx);
@@ -481,7 +483,9 @@ public partial class Program
                 bool isAuthError = ex.Message.Contains("credential", StringComparison.OrdinalIgnoreCase)
                     || ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
                     || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
-                    || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase);
+                    || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("does not have access", StringComparison.OrdinalIgnoreCase);
                 if (isAuthError)
                 {
                     authFailureCount++;
