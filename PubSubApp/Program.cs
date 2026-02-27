@@ -17,6 +17,22 @@ using System.Net.Http;
 public partial class Program
 {
     static string Version = $"PubSubApp v{typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
+    static readonly HttpClient _slackHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+
+    static async Task SendSlackAlert(string webhookUrl, string message)
+    {
+        if (string.IsNullOrEmpty(webhookUrl)) return;
+        try
+        {
+            string hostname = Environment.MachineName;
+            string payload = JsonSerializer.Serialize(new { text = $"[{hostname}] {message}" });
+            await _slackHttpClient.PostAsync(webhookUrl, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"));
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogWarning($"Slack alert failed: {ex.Message}");
+        }
+    }
 
     public static async Task Main(string[] args)
     {
@@ -82,7 +98,9 @@ public partial class Program
         }
         catch (Exception ex)
         {
-            SimpleLogger.LogError($"✗ AUTHENTICATION FAILED: Unable to connect to PubSub. Check credentials and project configuration. {ex.Message}", ex);
+            string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub. Check credentials and project configuration. {ex.Message}";
+            SimpleLogger.LogError(alertMsg, ex);
+            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
             return;
         }
 
@@ -394,7 +412,9 @@ public partial class Program
             }
             catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied)
             {
-                SimpleLogger.LogError($"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {rpcEx.Message}", rpcEx);
+                string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {rpcEx.Message}";
+                SimpleLogger.LogError(alertMsg, rpcEx);
+                await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
                 try { await Task.Delay(TimeSpan.FromSeconds(30), shutdownCts.Token); }
                 catch (OperationCanceledException) { }
             }
@@ -405,7 +425,11 @@ public partial class Program
                     || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
                     || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase);
                 if (isAuthError)
-                    SimpleLogger.LogError($"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {ex.Message}", ex);
+                {
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {ex.Message}";
+                    SimpleLogger.LogError(alertMsg, ex);
+                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                }
                 else
                     SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
 
