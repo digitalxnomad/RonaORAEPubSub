@@ -18,15 +18,19 @@ public partial class Program
 {
     static string Version = $"PubSubApp v{typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
     static readonly HttpClient _slackHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+    static DateTime _lastSlackAlertTime = DateTime.MinValue;
+    static readonly TimeSpan _slackAlertCooldown = TimeSpan.FromMinutes(20);
 
     static async Task SendSlackAlert(string webhookUrl, string message)
     {
         if (string.IsNullOrEmpty(webhookUrl)) return;
+        if (DateTime.UtcNow - _lastSlackAlertTime < _slackAlertCooldown) return;
         try
         {
             string hostname = Environment.MachineName;
             string payload = JsonSerializer.Serialize(new { text = $"[{hostname}] {message}" });
             await _slackHttpClient.PostAsync(webhookUrl, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"));
+            _lastSlackAlertTime = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
@@ -391,6 +395,18 @@ public partial class Program
                     {
                         SimpleLogger.LogError($"✗ Error: {ex.Message}");
                         if (debugLog) { SimpleLogger.LogDebug($"Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); }
+
+                        // Check if publish failure is auth-related
+                        bool isPublishAuth = ex is Grpc.Core.RpcException rpc
+                            && (rpc.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpc.StatusCode == Grpc.Core.StatusCode.PermissionDenied);
+                        if (!isPublishAuth)
+                            isPublishAuth = ex.Message.Contains("credential", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase);
+                        if (isPublishAuth)
+                            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, $"✗ AUTHENTICATION FAILED: Publish to PubSub failed. Check credentials. {ex.Message}");
+
                         return SubscriberClient.Reply.Nack;
                     }
                 });
