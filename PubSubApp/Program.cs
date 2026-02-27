@@ -243,6 +243,7 @@ public partial class Program
                 }, idleWatchdogCts.Token);
 
                 // Start subscribing - this Task completes when the subscriber stops
+                var subscriberStartTime = DateTime.UtcNow;
                 await subscriber.StartAsync(async (message, cancellationToken) =>
                 {
                     try
@@ -438,7 +439,27 @@ public partial class Program
                 }
                 else
                 {
-                    SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
+                    var subscriberUptime = DateTime.UtcNow - subscriberStartTime;
+                    if (subscriberUptime.TotalSeconds < 30)
+                    {
+                        // Subscriber stopped almost immediately — likely an auth/connection failure
+                        authFailureCount++;
+                        SimpleLogger.LogWarning($"⚠ Subscriber stopped after {subscriberUptime.TotalSeconds:F0}s (possible auth failure {authFailureCount}/{maxAuthRetries}). Reconnecting...");
+                        if (authFailureCount >= maxAuthRetries)
+                        {
+                            string alertMsg = $"✗ AUTHENTICATION FAILED: PubSub subscriber failed to stay connected after {maxAuthRetries} attempts (last uptime: {subscriberUptime.TotalSeconds:F0}s). Check credentials and project configuration.";
+                            SimpleLogger.LogError(alertMsg);
+                            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                            authFailureCount = 0;
+                        }
+                        try { await Task.Delay(TimeSpan.FromSeconds(30), shutdownCts.Token); }
+                        catch (OperationCanceledException) { }
+                    }
+                    else
+                    {
+                        authFailureCount = 0; // Was connected long enough — not an auth issue
+                        SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
+                    }
                 }
             }
             catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied)
