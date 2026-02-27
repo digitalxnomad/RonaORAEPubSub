@@ -191,7 +191,6 @@ public partial class Program
 
                 if (debugLog) { SimpleLogger.LogDebug("SubscriberClient built successfully"); }
 
-                authFailureCount = 0; // Reset on successful connection
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
                 SimpleLogger.LogInfo($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
                 SimpleLogger.LogInfo($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1");
