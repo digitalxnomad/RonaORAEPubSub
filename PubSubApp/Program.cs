@@ -56,26 +56,36 @@ public partial class Program
         var topicName = TopicName.FromProjectTopic(projectId, topicId);
         var subscriptionName = SubscriptionName.FromProjectSubscription(projectId, subscriptionId);
 
-        // Create publisher with immediate publish (no batching delay)
-        var publisherBuilder = new PublisherClientBuilder
-        {
-            TopicName = topicName,
-            Settings = new PublisherClient.Settings
-            {
-                BatchingSettings = new Google.Api.Gax.BatchingSettings(
-                    elementCountThreshold: 1,
-                    byteCountThreshold: null,
-                    delayThreshold: TimeSpan.FromMilliseconds(10)
-                )
-            }
-        };
-        var publisher = await publisherBuilder.BuildAsync();
-
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
         SimpleLogger.LogInfo(Version);
         SimpleLogger.LogInfo("ProjectId: " + projectId);
         SimpleLogger.LogInfo("TopicId: " + topicId);
+
+        // Create publisher with immediate publish (no batching delay)
+        PublisherClient publisher;
+        try
+        {
+            var publisherBuilder = new PublisherClientBuilder
+            {
+                TopicName = topicName,
+                Settings = new PublisherClient.Settings
+                {
+                    BatchingSettings = new Google.Api.Gax.BatchingSettings(
+                        elementCountThreshold: 1,
+                        byteCountThreshold: null,
+                        delayThreshold: TimeSpan.FromMilliseconds(10)
+                    )
+                }
+            };
+            publisher = await publisherBuilder.BuildAsync();
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogError($"✗ AUTHENTICATION FAILED: Unable to connect to PubSub. Check credentials and project configuration. {ex.Message}", ex);
+            return;
+        }
+
         SimpleLogger.LogInfo("✓ Publisher initialized");
 
         bool debugLog = pubSubConfig.EnableDebugLogging;
@@ -382,10 +392,24 @@ public partial class Program
                     SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
                 }
             }
+            catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied)
+            {
+                SimpleLogger.LogError($"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {rpcEx.Message}", rpcEx);
+                try { await Task.Delay(TimeSpan.FromSeconds(30), shutdownCts.Token); }
+                catch (OperationCanceledException) { }
+            }
             catch (Exception ex)
             {
-                SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
-                try { await Task.Delay(TimeSpan.FromSeconds(5), shutdownCts.Token); }
+                bool isAuthError = ex.Message.Contains("credential", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase);
+                if (isAuthError)
+                    SimpleLogger.LogError($"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {ex.Message}", ex);
+                else
+                    SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
+
+                try { await Task.Delay(TimeSpan.FromSeconds(isAuthError ? 30 : 5), shutdownCts.Token); }
                 catch (OperationCanceledException) { } // Shutdown requested during delay
             }
             finally
