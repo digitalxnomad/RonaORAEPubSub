@@ -83,29 +83,42 @@ public partial class Program
         SimpleLogger.LogInfo("TopicId: " + topicId);
 
         // Create publisher with immediate publish (no batching delay)
-        PublisherClient publisher;
-        try
+        // Retry up to MaxAuthRetries times before sending Slack alert and exiting
+        int maxAuthRetries = pubSubConfig.MaxAuthRetries > 0 ? pubSubConfig.MaxAuthRetries : 5;
+        PublisherClient? publisher = null;
+        for (int pubAttempt = 1; pubAttempt <= maxAuthRetries; pubAttempt++)
         {
-            var publisherBuilder = new PublisherClientBuilder
+            try
             {
-                TopicName = topicName,
-                Settings = new PublisherClient.Settings
+                var publisherBuilder = new PublisherClientBuilder
                 {
-                    BatchingSettings = new Google.Api.Gax.BatchingSettings(
-                        elementCountThreshold: 1,
-                        byteCountThreshold: null,
-                        delayThreshold: TimeSpan.FromMilliseconds(10)
-                    )
+                    TopicName = topicName,
+                    Settings = new PublisherClient.Settings
+                    {
+                        BatchingSettings = new Google.Api.Gax.BatchingSettings(
+                            elementCountThreshold: 1,
+                            byteCountThreshold: null,
+                            delayThreshold: TimeSpan.FromMilliseconds(10)
+                        )
+                    }
+                };
+                publisher = await publisherBuilder.BuildAsync();
+                break; // Success
+            }
+            catch (Exception ex)
+            {
+                SimpleLogger.LogError($"✗ Publisher connection attempt {pubAttempt}/{maxAuthRetries} failed: {ex.Message}", ex);
+                if (pubAttempt >= maxAuthRetries)
+                {
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub publisher after {maxAuthRetries} attempts. Check credentials and project configuration. {ex.Message}";
+                    SimpleLogger.LogError(alertMsg, ex);
+                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                    return;
                 }
-            };
-            publisher = await publisherBuilder.BuildAsync();
-        }
-        catch (Exception ex)
-        {
-            string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub. Check credentials and project configuration. {ex.Message}";
-            SimpleLogger.LogError(alertMsg, ex);
-            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
-            return;
+                int delaySeconds = (int)Math.Pow(2, pubAttempt); // 2s, 4s, 8s, 16s, 32s
+                SimpleLogger.LogInfo($"  Retrying in {delaySeconds}s...");
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+            }
         }
 
         SimpleLogger.LogInfo("✓ Publisher initialized");
@@ -137,6 +150,7 @@ public partial class Program
         };
 
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
+        int authFailureCount = 0;
         while (!shutdownCts.IsCancellationRequested)
         {
             SubscriberClient? subscriber = null;
@@ -177,6 +191,7 @@ public partial class Program
 
                 if (debugLog) { SimpleLogger.LogDebug("SubscriberClient built successfully"); }
 
+                authFailureCount = 0; // Reset on successful connection
                 SimpleLogger.LogInfo("✓ Subscriber started. Listening for messages...");
                 SimpleLogger.LogInfo($"  Heartbeat: PingDelay={keepAlivePingDelay.TotalSeconds}s, PingTimeout={keepAlivePingTimeout.TotalSeconds}s, AckExtension={ackExtensionWindow.TotalSeconds}s");
                 SimpleLogger.LogInfo($"  FlowControl: MaxElements=100, MaxBytes=10MB, ClientCount=1");
@@ -374,7 +389,7 @@ public partial class Program
                             try
                             {
                                 if (debugLog) { SimpleLogger.LogDebug($"Calling publisher.PublishAsync (attempt {attempt}/{maxRetries})..."); }
-                                string publishedId = await publisher.PublishAsync(responseMessage);
+                                string publishedId = await publisher!.PublishAsync(responseMessage);
                                 if (debugLog) { SimpleLogger.LogDebug($"PublishAsync returned, MessageId={publishedId}"); }
                                 SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
                                 break; // Success — exit retry loop
@@ -428,9 +443,15 @@ public partial class Program
             }
             catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied)
             {
-                string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {rpcEx.Message}";
-                SimpleLogger.LogError(alertMsg, rpcEx);
-                await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                authFailureCount++;
+                SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {rpcEx.Message}", rpcEx);
+                if (authFailureCount >= maxAuthRetries)
+                {
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {rpcEx.Message}";
+                    SimpleLogger.LogError(alertMsg, rpcEx);
+                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                    authFailureCount = 0; // Reset so next cycle can retry
+                }
                 try { await Task.Delay(TimeSpan.FromSeconds(30), shutdownCts.Token); }
                 catch (OperationCanceledException) { }
             }
@@ -442,9 +463,15 @@ public partial class Program
                     || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase);
                 if (isAuthError)
                 {
-                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber. Check credentials and project configuration. {ex.Message}";
-                    SimpleLogger.LogError(alertMsg, ex);
-                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                    authFailureCount++;
+                    SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {ex.Message}", ex);
+                    if (authFailureCount >= maxAuthRetries)
+                    {
+                        string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {ex.Message}";
+                        SimpleLogger.LogError(alertMsg, ex);
+                        await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                        authFailureCount = 0; // Reset so next cycle can retry
+                    }
                 }
                 else
                     SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
@@ -471,7 +498,7 @@ public partial class Program
         SimpleLogger.LogInfo("⏹ Shutting down publisher...");
         try
         {
-            await publisher.ShutdownAsync(TimeSpan.FromSeconds(10));
+            await publisher!.ShutdownAsync(TimeSpan.FromSeconds(10));
             SimpleLogger.LogInfo("✓ Publisher shut down cleanly.");
         }
         catch (Exception ex)
