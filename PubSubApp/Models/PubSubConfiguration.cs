@@ -12,4 +12,5 @@ public class PubSubConfiguration
     public bool EnableDebugLogging { get; set; } = false;
     public int IdleTimeoutMinutes { get; set; } = 30;
     public string SlackWebhookUrl { get; set; } = string.Empty;
+    public int MaxAuthRetries { get; set; } = 5;
 }
