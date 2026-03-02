@@ -380,6 +380,94 @@ class RetailEventMapper
                 {
                     lineIdToIndex[item.LineId] = itemRecords.Count - 1;
                 }
+
+                // Generate eco fee records for this item
+                if (item.Fees != null)
+                {
+                    foreach (var fee in item.Fees)
+                    {
+                        if (fee.FeeAmt <= 0) continue;
+
+                        // Convert cents to dollars
+                        decimal feeAmountDollars = fee.FeeAmt / 100m;
+                        string feeAmountFormatted = feeAmountDollars.ToString("F2");
+
+                        var feeRecord = new OrderRecord
+                        {
+                            TransType = mappedTransactionTypeSLFTTP,
+                            LineType = "83",
+                            TransDate = transactionDateTime.ToString("yyMMdd"),
+                            TransTime = transactionDateTime.ToString("HHmmss"),
+                            TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                            TransSeq = "00000", // Placeholder - updated after grouping
+                            RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                            PolledStore = polledStoreInt,
+                            PollCen = pollCen,
+                            PollDate = pollDate,
+                            CreateCen = createCen,
+                            CreateDate = createDate,
+                            CreateTime = createTime,
+                            Status = " ",
+                            SKUNumber = PadNumeric(item.Item?.Sku, 9),
+                            Quantity = orderRecord.Quantity,
+                            QuantityNegativeSign = orderRecord.QuantityNegativeSign,
+                            OriginalPrice = "000000000",
+                            OriginalPriceNegativeSign = "",
+                            OverridePrice = "000000000",
+                            OverridePriceNegativeSign = "",
+                            OriginalRetail = "000000000",
+                            OriginalRetailNegativeSign = "",
+                            ItemSellPrice = FormatCurrency(feeAmountFormatted, 9),
+                            SellPriceNegativeSign = "",
+                            ExtendedValue = FormatCurrency(feeAmountFormatted, 11),
+                            ExtendedValueNegativeSign = "",
+                            ChargedTax1 = "N",
+                            ChargedTax2 = "N",
+                            ChargedTax3 = "N",
+                            ChargedTax4 = "N",
+                            TaxAuthCode = "",
+                            TaxRateCode = "",
+                            CustomerName = "",
+                            CustomerNumber = "",
+                            ZipCode = "         0",
+                            Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                            EmployeeCardNumber = 0,
+                            UPCCode = "0000000000000",
+                            EReceiptEmail = "",
+                            ReasonCode = "",
+                            TaxExemptId1 = "",
+                            TaxExemptId2 = "",
+                            TaxExemptionName = "",
+                            AdCode = "0000",
+                            AdPrice = "000000000",
+                            AdPriceNegativeSign = "",
+                            PriceVehicleCode = "",
+                            PriceVehicleReference = "",
+                            ReferenceCode = "",
+                            ReferenceDesc = "",
+                            OriginalSalesperson = "00000",
+                            OriginalStore = "00000",
+                            OriginalTxStore = "00000",
+                            OriginalTxDate = "000000",
+                            OriginalTxRegister = "000",
+                            OriginalTxNumber = "00000",
+                            GroupDiscAmount = "000000000",
+                            GroupDiscSign = "",
+                            SalesPerson = salesPersonId,
+                            DiscountAmount = "000000000",
+                            DiscountType = "",
+                            DiscountAmountNegativeSign = "",
+                            GroupDiscReason = "00",
+                            RegDiscReason = "00",
+                            OrderNumber = "",
+                            ProjectNumber = "",
+                            SalesStore = 0,
+                            InvStore = 0,
+                            ItemScanned = "N"
+                        };
+                        itemRecords.Add(feeRecord);
+                    }
+                }
             }
 
             // Reorder: EPP items (identifier="9") go right after their parent SKU using parentLineId
