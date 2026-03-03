@@ -386,10 +386,8 @@ class RetailEventMapper
                 {
                     foreach (var fee in item.Fees)
                     {
-                        if (fee.FeeAmt <= 0) continue;
+                        if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars <= 0) continue;
 
-                        // Convert cents to dollars
-                        decimal feeAmountDollars = fee.FeeAmt / 100m;
                         string feeAmountFormatted = feeAmountDollars.ToString("F2");
 
                         var feeRecord = new OrderRecord
@@ -425,8 +423,8 @@ class RetailEventMapper
                             ChargedTax2 = "N",
                             ChargedTax3 = "N",
                             ChargedTax4 = "N",
-                            TaxAuthCode = PadOrTruncate(fee.FeeAuthority ?? "", 6),
-                            TaxRateCode = PadOrTruncate(fee.FeeCode ?? "", 6),
+                            TaxAuthCode = "      ",
+                            TaxRateCode = "      ",
                             CustomerName = "",
                             CustomerNumber = "",
                             ZipCode = "         0",
