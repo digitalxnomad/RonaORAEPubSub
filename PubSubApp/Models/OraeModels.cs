@@ -163,17 +163,11 @@ public class TransactionItem
 
 public class Fee
 {
-    [JsonPropertyName("feeName")]
-    public string? FeeName { get; set; }
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
 
-    [JsonPropertyName("feeAmt")]
-    public int FeeAmt { get; set; }
-
-    [JsonPropertyName("feeCode")]
-    public string? FeeCode { get; set; }
-
-    [JsonPropertyName("feeAuthority")]
-    public string? FeeAuthority { get; set; }
+    [JsonPropertyName("amount")]
+    public CurrencyAmount? Amount { get; set; }
 }
 
 public class Item
