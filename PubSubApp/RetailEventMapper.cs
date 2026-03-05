@@ -424,7 +424,7 @@ class RetailEventMapper
                             ChargedTax3 = "N",
                             ChargedTax4 = "N",
                             TaxAuthCode = "      ",
-                            TaxRateCode = "      ",
+                            TaxRateCode = PadOrTruncate(fee.Code ?? "", 6),
                             CustomerName = "",
                             CustomerNumber = "",
                             ZipCode = "         0",
