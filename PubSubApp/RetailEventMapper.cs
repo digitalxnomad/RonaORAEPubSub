@@ -406,7 +406,7 @@ class RetailEventMapper
                             CreateDate = createDate,
                             CreateTime = createTime,
                             Status = " ",
-                            SKUNumber = "000000000",
+                            SKUNumber = PadNumeric(item.Item?.Sku, 9),
                             Quantity = orderRecord.Quantity,
                             QuantityNegativeSign = orderRecord.QuantityNegativeSign,
                             OriginalPrice = "000000000",
