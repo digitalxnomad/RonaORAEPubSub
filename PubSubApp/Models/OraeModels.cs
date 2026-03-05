@@ -168,6 +168,9 @@ public class Fee
 
     [JsonPropertyName("amount")]
     public CurrencyAmount? Amount { get; set; }
+
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
 }
 
 public class Item
