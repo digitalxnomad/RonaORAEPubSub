@@ -469,78 +469,92 @@ class RetailEventMapper
             }
 
             // Reorder: EPP items (identifier="9") go right after their parent SKU using parentLineId
-            // Build ordered list: for each non-EPP-9 item, insert any EPP-9 items that reference it
+            // Each transaction item may have multiple records (item + eco fees), tracked as ranges
             List<OrderRecord> reorderedRecords = new List<OrderRecord>();
-            HashSet<int> placed = new HashSet<int>();
+            HashSet<int> placedRanges = new HashSet<int>(); // tracks placed transaction item indices
 
-            // Build a map of parentLineId -> list of EPP record indices
-            Dictionary<string, List<int>> eppChildMap = new Dictionary<string, List<int>>();
+            // Build record ranges per transaction item: itemRangeStart[txIdx] and itemRangeCount[txIdx]
+            // Each range includes the item record plus any eco fee records that follow it
+            List<int> itemRangeStart = new List<int>();
+            List<int> itemRangeCount = new List<int>();
             if (retailEvent.Transaction?.Items != null)
             {
-                int recordIdx = 0;
-                foreach (var txItem in retailEvent.Transaction.Items)
+                int recIdx = 0;
+                for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
                 {
-                    if (recordIdx < itemRecords.Count)
+                    itemRangeStart.Add(recIdx);
+                    var txItem = retailEvent.Transaction.Items[txIdx];
+                    int count = 1; // the item record itself
+                    // Count eco fee records for this item
+                    if (txItem.Fees != null)
                     {
-                        string? covId = GetEPPCoverageIdentifier(txItem);
-                        // EPP items (identifier="9") with a parentLineId should follow their parent
-                        if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                        foreach (var fee in txItem.Fees)
                         {
-                            if (!eppChildMap.ContainsKey(txItem.ParentLineId))
-                                eppChildMap[txItem.ParentLineId] = new List<int>();
-                            eppChildMap[txItem.ParentLineId].Add(recordIdx);
+                            if (fee.Amount != null && decimal.TryParse(fee.Amount.Value, out decimal amt) && amt > 0)
+                                count++;
                         }
                     }
-                    recordIdx++;
+                    itemRangeCount.Add(count);
+                    recIdx += count;
                 }
             }
 
-            // Now build ordered list
+            // Build a map of parentLineId -> list of transaction item indices for EPP items
+            Dictionary<string, List<int>> eppChildMap = new Dictionary<string, List<int>>();
             if (retailEvent.Transaction?.Items != null)
             {
-                int recordIdx = 0;
-                foreach (var txItem in retailEvent.Transaction.Items)
+                for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
                 {
-                    if (recordIdx >= itemRecords.Count) break;
+                    var txItem = retailEvent.Transaction.Items[txIdx];
+                    string? covId = GetEPPCoverageIdentifier(txItem);
+                    if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                    {
+                        if (!eppChildMap.ContainsKey(txItem.ParentLineId))
+                            eppChildMap[txItem.ParentLineId] = new List<int>();
+                        eppChildMap[txItem.ParentLineId].Add(txIdx);
+                    }
+                }
+            }
 
+            // Helper to place all records in a transaction item's range
+            void PlaceRange(int txIdx)
+            {
+                if (placedRanges.Contains(txIdx)) return;
+                placedRanges.Add(txIdx);
+                int start = itemRangeStart[txIdx];
+                int count = itemRangeCount[txIdx];
+                for (int i = start; i < start + count && i < itemRecords.Count; i++)
+                    reorderedRecords.Add(itemRecords[i]);
+            }
+
+            // Build ordered list
+            if (retailEvent.Transaction?.Items != null)
+            {
+                for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
+                {
+                    var txItem = retailEvent.Transaction.Items[txIdx];
                     string? covId = GetEPPCoverageIdentifier(txItem);
 
                     // Skip EPP-9 items here - they'll be inserted after their parent via eppChildMap
                     if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
-                    {
-                        recordIdx++;
                         continue;
-                    }
 
-                    // Add the item record
-                    if (!placed.Contains(recordIdx))
-                    {
-                        reorderedRecords.Add(itemRecords[recordIdx]);
-                        placed.Add(recordIdx);
-                    }
-                    recordIdx++;
+                    // Place this item and its eco fee records
+                    PlaceRange(txIdx);
 
-                    // Insert any EPP-9 children that reference this item's lineId
+                    // Insert any EPP-9 children that reference this item's lineId (with their eco fees)
                     if (!string.IsNullOrEmpty(txItem.LineId) && eppChildMap.ContainsKey(txItem.LineId))
                     {
-                        foreach (int eppIdx in eppChildMap[txItem.LineId])
-                        {
-                            if (!placed.Contains(eppIdx) && eppIdx < itemRecords.Count)
-                            {
-                                reorderedRecords.Add(itemRecords[eppIdx]);
-                                placed.Add(eppIdx);
-                            }
-                        }
+                        foreach (int eppTxIdx in eppChildMap[txItem.LineId])
+                            PlaceRange(eppTxIdx);
                     }
                 }
             }
 
             // Add any remaining records that weren't placed
-            for (int i = 0; i < itemRecords.Count; i++)
-            {
-                if (!placed.Contains(i))
-                    reorderedRecords.Add(itemRecords[i]);
-            }
+            for (int txIdx = 0; txIdx < itemRangeStart.Count; txIdx++)
+                PlaceRange(txIdx);
+
             itemRecords = reorderedRecords;
 
             // Determine if this is an Ontario transaction
