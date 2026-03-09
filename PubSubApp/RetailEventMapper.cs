@@ -384,6 +384,20 @@ class RetailEventMapper
                 // Generate eco fee records for this item
                 if (item.Fees != null)
                 {
+                    // Get province code from item taxes jurisdiction for SLFACD
+                    string feeProvince = "";
+                    if (item.Taxes != null)
+                    {
+                        foreach (var tax in item.Taxes)
+                        {
+                            if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                            {
+                                feeProvince = tax.Jurisdiction.Region;
+                                break;
+                            }
+                        }
+                    }
+
                     foreach (var fee in item.Fees)
                     {
                         if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars <= 0) continue;
@@ -423,7 +437,7 @@ class RetailEventMapper
                             ChargedTax2 = "N",
                             ChargedTax3 = "N",
                             ChargedTax4 = "N",
-                            TaxAuthCode = "      ",
+                            TaxAuthCode = PadOrTruncate(feeProvince, 6),
                             TaxRateCode = PadOrTruncate(fee.Code ?? "", 6),
                             CustomerName = "",
                             CustomerNumber = "",
