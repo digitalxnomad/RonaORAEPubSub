@@ -1229,7 +1229,13 @@ class RetailEventMapper
                     {
                         string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
-                        tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
+
+                        // Flexiti (FX): use last 6 digits of auth code; others: use first 6
+                        string authCode = tender.Card.AuthCode ?? "";
+                        if (tender.TenderId?.ToUpper() == "FX" && authCode.Length > 6)
+                            authCode = authCode.Substring(authCode.Length - 6);
+                        tenderRecord.AuthNumber = PadOrTruncate(authCode, 6);
+
                         tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
                     }
 
