@@ -38,6 +38,21 @@ public partial class Program
         }
     }
 
+    static async Task SendSlackAlertImmediate(string webhookUrl, string message)
+    {
+        if (string.IsNullOrEmpty(webhookUrl)) return;
+        try
+        {
+            string hostname = Environment.MachineName;
+            string payload = JsonSerializer.Serialize(new { text = $"[{hostname}] {message}" });
+            await _slackHttpClient.PostAsync(webhookUrl, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"));
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogWarning($"Slack alert failed: {ex.Message}");
+        }
+    }
+
     public static async Task Main(string[] args)
     {
         // Load configuration from appsettings.json
@@ -302,6 +317,10 @@ public partial class Program
                                 string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
                                                     string.Join("\n", validationErrors);
                                 SimpleLogger.LogError(errorMessage);
+                                string alertMsg = $"✗ ORAE VALIDATION FAILED: {validationErrors.Count} error(s) on message {message.MessageId}:\n" +
+                                    string.Join("\n", validationErrors.Take(5));
+                                if (alertMsg.Length > 500) alertMsg = alertMsg[..500] + "...";
+                                await SendSlackAlertImmediate(pubSubConfig.SlackWebhookUrl, alertMsg);
                                 SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
                                 return SubscriberClient.Reply.Ack; // ACK to prevent redelivery of invalid ORAE data
                             }
