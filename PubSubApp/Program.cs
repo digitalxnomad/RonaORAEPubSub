@@ -24,6 +24,31 @@ public partial class Program
     static DateTime _lastSlackAlertTime = DateTime.MinValue;
     static readonly TimeSpan _slackAlertCooldown = TimeSpan.FromMinutes(20);
 
+    /// <summary>
+    /// Scrubs potentially sensitive data from exception messages before sending to external systems.
+    /// Removes connection strings, credentials, file paths, and other sensitive patterns.
+    /// </summary>
+    static string ScrubExceptionMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return "Unknown error";
+        // Remove connection strings (Server=...; or Host=...; patterns)
+        message = System.Text.RegularExpressions.Regex.Replace(message,
+            @"(Server|Host|Data Source|Initial Catalog|User Id|Password|Pwd|Connection String)\s*=\s*[^;""]+",
+            "$1=***", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Remove file paths (C:\..., /home/..., etc.)
+        message = System.Text.RegularExpressions.Regex.Replace(message,
+            @"[A-Za-z]:\\[^\s""']+|/(?:home|opt|var|etc|tmp|usr)/[^\s""']+",
+            "[path-redacted]");
+        // Remove API keys / tokens (long alphanumeric strings that look like secrets)
+        message = System.Text.RegularExpressions.Regex.Replace(message,
+            @"(key|token|secret|api[_-]?key|bearer)\s*[:=]\s*[A-Za-z0-9\-_.]{20,}",
+            "$1=***", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Truncate to prevent overly long messages in Slack
+        if (message.Length > 300)
+            message = message[..300] + "...";
+        return message;
+    }
+
     static async Task SendSlackAlert(string webhookUrl, string message)
     {
         if (string.IsNullOrEmpty(webhookUrl)) return;
@@ -107,6 +132,19 @@ public partial class Program
         var pubSubConfig = new PubSubConfiguration();
         configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
 
+        // Validate required configuration before proceeding
+        var configErrors = new List<string>();
+        if (string.IsNullOrWhiteSpace(pubSubConfig.ProjectId)) configErrors.Add("ProjectId is required");
+        if (string.IsNullOrWhiteSpace(pubSubConfig.TopicId)) configErrors.Add("TopicId is required");
+        if (string.IsNullOrWhiteSpace(pubSubConfig.SubscriptionId)) configErrors.Add("SubscriptionId is required");
+        if (configErrors.Count > 0)
+        {
+            Console.Error.WriteLine($"✗ Configuration error(s) in appsettings.json:");
+            foreach (var error in configErrors)
+                Console.Error.WriteLine($"  - {error}");
+            return;
+        }
+
         // Set console window title with project ID and version
         Console.Title = $"{pubSubConfig.ProjectId} - {Version}";
 
@@ -168,7 +206,7 @@ public partial class Program
                 SimpleLogger.LogError($"✗ Publisher connection attempt {pubAttempt}/{maxAuthRetries} failed: {ex.Message}", ex);
                 if (pubAttempt >= maxAuthRetries)
                 {
-                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub publisher after {maxAuthRetries} attempts. Check credentials and project configuration. {ex.Message}";
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub publisher after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(ex.Message)}";
                     SimpleLogger.LogError(alertMsg, ex);
                     await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
                     return;
@@ -530,7 +568,7 @@ public partial class Program
                                 || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase)
                                 || ex.Message.Contains("does not have access", StringComparison.OrdinalIgnoreCase);
                         if (isPublishAuth)
-                            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, $"✗ AUTHENTICATION FAILED: Publish to PubSub failed. Check credentials. {ex.Message}");
+                            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, $"✗ AUTHENTICATION FAILED: Publish to PubSub failed. Check credentials. {ScrubExceptionMessage(ex.Message)}");
 
                         return SubscriberClient.Reply.Nack;
                     }
@@ -589,7 +627,7 @@ public partial class Program
                 SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {rpcEx.Message}", rpcEx);
                 if (authFailureCount >= maxAuthRetries)
                 {
-                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {rpcEx.Message}";
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(rpcEx.Message)}";
                     SimpleLogger.LogError(alertMsg, rpcEx);
                     await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
                     authFailureCount = 0; // Reset so next cycle can retry
@@ -611,7 +649,7 @@ public partial class Program
                     SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {ex.Message}", ex);
                     if (authFailureCount >= maxAuthRetries)
                     {
-                        string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {ex.Message}";
+                        string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(ex.Message)}";
                         SimpleLogger.LogError(alertMsg, ex);
                         await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
                         authFailureCount = 0; // Reset so next cycle can retry
