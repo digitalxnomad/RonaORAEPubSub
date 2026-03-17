@@ -347,7 +347,9 @@ public partial class Program
                 }, idleWatchdogCts.Token);
 
                 // Background task: periodically check subscription backlog for waiting messages
-                var backlogMonitorTask = Task.Run(async () =>
+                if (!pubSubConfig.EnableBacklogMonitor)
+                    SimpleLogger.LogInfo("ℹ Backlog monitor disabled via config (EnableBacklogMonitor=false)");
+                var backlogMonitorTask = pubSubConfig.EnableBacklogMonitor ? Task.Run(async () =>
                 {
                     // Initial delay to let the subscriber establish its stream
                     try { await Task.Delay(TimeSpan.FromMinutes(2), idleWatchdogCts.Token); }
@@ -381,7 +383,7 @@ public partial class Program
                         try { await Task.Delay(TimeSpan.FromMinutes(5), idleWatchdogCts.Token); }
                         catch (OperationCanceledException) { break; }
                     }
-                }, idleWatchdogCts.Token);
+                }, idleWatchdogCts.Token) : Task.CompletedTask;
 
                 // Start subscribing - this Task completes when the subscriber stops
                 var subscriberStartTime = DateTime.UtcNow;
@@ -590,11 +592,14 @@ public partial class Program
                     var disconnectTime = DateTime.UtcNow;
 
                     // Check backlog during reconnect gap so we know if transactions are waiting
-                    long backlog = await GetUndeliveredMessageCountAsync(projectId, subscriptionId);
-                    if (backlog > 0)
-                        SimpleLogger.LogWarning($"⚠ RECONNECT GAP: {backlog} message(s) waiting in subscription while disconnected");
-                    else if (backlog == 0)
-                        SimpleLogger.LogInfo("  Backlog check: 0 messages waiting during reconnect");
+                    if (pubSubConfig.EnableBacklogMonitor)
+                    {
+                        long backlog = await GetUndeliveredMessageCountAsync(projectId, subscriptionId);
+                        if (backlog > 0)
+                            SimpleLogger.LogWarning($"⚠ RECONNECT GAP: {backlog} message(s) waiting in subscription while disconnected");
+                        else if (backlog == 0)
+                            SimpleLogger.LogInfo("  Backlog check: 0 messages waiting during reconnect");
+                    }
 
                     if (subscriberUptime.TotalSeconds < 30)
                     {
