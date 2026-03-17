@@ -1674,29 +1674,10 @@ class RetailEventMapper
             }
             else
             {
-                // Fallback: Use transaction-level tax if no item-level taxes
-                if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
-                    decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
-                    taxAmount > 0)
-                {
-                    // Ontario: SLFTX2=N, SLFTX3=Y
-                    if (isOntario)
-                    {
-                        orderRecord.ChargedTax2 = "N";
-                        orderRecord.ChargedTax3 = "Y";
-                    }
-                    else
-                    {
-                        orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
-                    }
-
-                    // Tax authority and rate code from store's tax area
-                    if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
-                    {
-                        orderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                        orderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                    }
-                }
+                // No item-level taxes: item is tax-exempt, all SLFTX flags stay "N"
+                // Do NOT fall back to transaction-level tax totals, as that would
+                // incorrectly mark tax-exempt items (donations, deposits, water bottles, etc.)
+                // as taxed.
             }
 
             // SLFTCD on tax records: use taxCode from the first tax that has a jurisdiction
