@@ -384,15 +384,15 @@ class RetailEventMapper
                 // Generate eco fee records for this item
                 if (item.Fees != null)
                 {
-                    // Get province code from item taxes jurisdiction for SLFACD
-                    string feeProvince = "";
+                    // Fallback province code from item taxes jurisdiction for SLFACD
+                    string fallbackFeeProvince = "";
                     if (item.Taxes != null)
                     {
                         foreach (var tax in item.Taxes)
                         {
                             if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
                             {
-                                feeProvince = tax.Jurisdiction.Region;
+                                fallbackFeeProvince = tax.Jurisdiction.Region;
                                 break;
                             }
                         }
@@ -403,6 +403,9 @@ class RetailEventMapper
                         if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars <= 0) continue;
 
                         string feeAmountFormatted = feeAmountDollars.ToString("F2");
+
+                        // SLFACD: use fee's own authority if available, otherwise fall back to item tax jurisdiction
+                        string feeAuthority = !string.IsNullOrEmpty(fee.Authority) ? fee.Authority : fallbackFeeProvince;
 
                         var feeRecord = new OrderRecord
                         {
@@ -437,7 +440,7 @@ class RetailEventMapper
                             ChargedTax2 = "N",
                             ChargedTax3 = "N",
                             ChargedTax4 = "N",
-                            TaxAuthCode = PadOrTruncate(feeProvince, 6),
+                            TaxAuthCode = PadOrTruncate(feeAuthority, 6),
                             TaxRateCode = PadOrTruncate(fee.Code ?? "", 6),
                             CustomerName = "",
                             CustomerNumber = "",

@@ -171,6 +171,9 @@ public class Fee
 
     [JsonPropertyName("code")]
     public string? Code { get; set; }
+
+    [JsonPropertyName("authority")]
+    public string? Authority { get; set; }
 }
 
 public class Item
