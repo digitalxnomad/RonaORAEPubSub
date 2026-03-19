@@ -461,6 +461,7 @@ class RetailEventMapper
             string? province = GetProvince(retailEvent);
             bool isOntario = province?.ToUpper() == "ON" || province?.ToUpper() == "ONTARIO";
             bool isGstPstProvince = province?.ToUpper() is "BC" or "MB" or "SK" or "QC";
+            bool isGstOnlyProvince = province?.ToUpper() is "AB";
 
             // For Ontario: Create up to TWO tax records:
             //   - HON (13% HST) - accumulated sum of all HST taxes
@@ -468,6 +469,9 @@ class RetailEventMapper
             // For GST+PST/QST provinces (BC, MB, SK, QC): Create up to TWO consolidated tax records:
             //   - Federal GST (FED -> XG) - accumulated sum of all federal taxes across all items
             //   - Provincial PST/QST (BC/MB/SK/PQ -> XR/XM/XS/XQ) - accumulated sum of all provincial taxes
+            // For GST-only provinces (AB): Create ONE consolidated tax record:
+            //   - Federal GST (FED -> XG) - accumulated sum of all taxes across all items
+            //   - No tax line if tax total is zero
             // For other provinces: Create per-item tax records
             if (isOntario)
             {
@@ -927,6 +931,113 @@ class RetailEventMapper
                         ItemScanned = ""
                     };
                     taxRecords.Add(provincialTaxRecord);
+                }
+            }
+            else if (isGstOnlyProvince)
+            {
+                // GST-only province (AB): Create ONE consolidated tax record (FED -> XG)
+                decimal gstTaxTotal = 0;
+                string gstTaxRateCode = "";
+
+                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
+                {
+                    if (item.Taxes != null)
+                    {
+                        foreach (var tax in item.Taxes)
+                        {
+                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
+                            {
+                                gstTaxTotal += taxAmount;
+                                if (string.IsNullOrEmpty(gstTaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
+                                    gstTaxRateCode = tax.TaxCode;
+                            }
+                        }
+                    }
+                }
+
+                // Only create tax line if there's a non-zero tax amount
+                if (gstTaxTotal != 0)
+                {
+                    var gstTaxRecord = new OrderRecord
+                    {
+                        TransType = mappedTransactionTypeSLFTTP,
+                        LineType = MapTaxAuthToLineType("FED"), // XG
+                        TransDate = transactionDateTime.ToString("yyMMdd"),
+                        TransTime = transactionDateTime.ToString("HHmmss"),
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransSeq = "00000",
+                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+                        Status = " ",
+                        ChargedTax1 = "N",
+                        ChargedTax2 = "N",
+                        ChargedTax3 = "N",
+                        ChargedTax4 = "N",
+                        TaxAuthCode = PadOrTruncate("FED", 6),
+                        TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(gstTaxRateCode) ? gstTaxRateCode : lastComputedTaxRateCode, 6),
+                        ExtendedValue = FormatCurrency(gstTaxTotal.ToString("F2"), 11),
+                        ExtendedValueNegativeSign = gstTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(gstTaxTotal.ToString("F2"), 9),
+                        SellPriceNegativeSign = gstTaxTotal < 0 ? "-" : "",
+                        SKUNumber = "000000000",
+                        Quantity = "000000100",
+                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
+                        OriginalPrice = "000000000",
+                        OriginalPriceNegativeSign = "",
+                        OverridePrice = "000000000",
+                        OverridePriceNegativeSign = "",
+                        OriginalRetail = "000000000",
+                        OriginalRetailNegativeSign = "",
+                        ReferenceCode = "",
+                        ReferenceDesc = "",
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
+                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
+                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
+                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
+                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
+                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
+                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                        CustomerName = "",
+                        CustomerNumber = "",
+                        ZipCode = "         0",
+                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                        EmployeeCardNumber = 0,
+                        UPCCode = "0000000000000",
+                        EReceiptEmail = "",
+                        ReasonCode = "",
+                        TaxExemptId1 = "",
+                        TaxExemptId2 = "",
+                        TaxExemptionName = "",
+                        AdCode = "0000",
+                        AdPrice = "000000000",
+                        AdPriceNegativeSign = "",
+                        PriceVehicleCode = "",
+                        PriceVehicleReference = "",
+                        OriginalSalesperson = "00000",
+                        OriginalStore = "00000",
+                        GroupDiscAmount = "000000000",
+                        GroupDiscSign = "",
+                        SalesPerson = salesPersonId,
+                        DiscountAmount = "000000000",
+                        DiscountType = "",
+                        DiscountAmountNegativeSign = "",
+                        GroupDiscReason = "00",
+                        RegDiscReason = "00",
+                        OrderNumber = "",
+                        ProjectNumber = "",
+                        SalesStore = 0,
+                        InvStore = 0,
+                        ItemScanned = ""
+                    };
+                    taxRecords.Add(gstTaxRecord);
                 }
             }
             else
@@ -1396,6 +1507,7 @@ class RetailEventMapper
             // Detect province/state for tax logic
             string? province = GetProvince(retailEvent);
             bool isOntario = province?.ToUpper() == "ON" || province?.ToUpper() == "ONTARIO";
+            bool isGstOnlyProvince = province?.ToUpper() is "AB";
 
             // Tax flags - default to N
             orderRecord.ChargedTax1 = "N";
@@ -1428,10 +1540,15 @@ class RetailEventMapper
                     // Map tax type/category to ChargedTax1-4 flags
                     string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
 
+                    // Alberta: GST-only province, all taxes are federal GST -> SLFTX2 = Y
+                    if (isGstOnlyProvince)
+                    {
+                        orderRecord.ChargedTax2 = "Y";
+                    }
                     // Ontario-specific logic:
                     // SLFTX3 = Y for HST (13%)
                     // SLFTX4 = Y for Partial HST / GST (5%)
-                    if (isOntario)
+                    else if (isOntario)
                     {
                         // Determine if this is full HST (13%) or Partial HST (5%) based on rate
                         bool isFullHst = true; // Default to full HST
