@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7427425843282634329",
+  "occurredAt": "2026-02-11T19:00:05Z",
+  "ingestedAt": "2026-02-11T19:00:06Z",
+  "businessContext": {
+    "businessDay": "2026-02-11",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": { "currency": "CAD", "storeId": "55010", "taxArea": "ON" },
+    "workstation": { "registerId": "06", "sequenceNumber": 788, "type": "POS" }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "attributes": { "x-epp-coverage-identifier": "0" },
+        "discounts": [
+          {
+            "appliedAmount": { "currency": "CAD", "value": "2.00" },
+            "code": "247162",
+            "discountId": "BESTPRICE",
+            "method": "AMOUNT",
+            "reason": "ProductLevelBestPriceValueD",
+            "type": "BNuy in bulk",
+            "value": "2.00"
+          }
+        ],
+        "item": {
+          "description": "COAT.CONCR.EPOXYSHIE.BL-GY454G",
+          "sku": "000294367"
+        },
+        "lineId": "17708363159884365973",
+        "pricing": {
+          "extendedPrice": { "currency": "CAD", "value": "35.99" },
+          "originalUnitPrice": { "currency": "CAD", "value": "35.99" },
+          "priceVehicle": "CLR:CLR247162",
+          "unitPrice": { "currency": "CAD", "value": "33.99" }
+        },
+        "quantity": { "uom": "EA", "value": 1 },
+        "taxes": [
+          {
+            "amount": { "currency": "CAD", "value": "4.42" },
+            "jurisdiction": { "region": "HON" },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": { "currency": "CAD", "value": "18.40" },
+        "card": { "responseCode": "SETTLE" },
+        "method": "CASH",
+        "requestedAmount": { "currency": "CAD", "value": "18.40" },
+        "tenderId": "CA"
+      },
+      {
+        "amount": { "currency": "CAD", "value": "20.01" },
+        "card": {
+          "authCode": "907574",
+          "emv": { "tags": { "magStrip": "t" } },
+          "entryMode": "TAP_ICC",
+          "last4": "8644",
+          "responseCode": "1[49]",
+          "scheme": "DEBITATM"
+        },
+        "entryMethod": "TAP_ICC",
+        "method": "DEBIT",
+        "requestedAmount": { "currency": "CAD", "value": "20.01" },
+        "tenderId": "DC"
+      }
+    ],
+    "totals": {
+      "cashRounding": { "currency": "CAD", "value": "0.00" },
+      "changeDue": { "currency": "CAD", "value": "0.00" },
+      "discounts": { "currency": "CAD", "value": "-2.00" },
+      "gross": { "currency": "CAD", "value": "35.99" },
+      "net": { "currency": "CAD", "value": "38.41" },
+      "tax": { "currency": "CAD", "value": "4.42" }
+    }
+  },
+  "promotions": [
+    {
+      "code": "247162",
+      "description": "",
+      "amount": { "currency": "CAD", "value": "2.00" }
+    }
+  ],
+  "actor": {
+    "cashier": { "loginId": "6006523" },
+    "customer": { "customerIdToken": "" }
+  }
+}

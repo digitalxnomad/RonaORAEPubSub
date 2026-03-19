@@ -1,0 +1,345 @@
+{
+	"sourceId": "7422363678539293009",
+	"cartId": "7422363678539293009",
+	"cartType": "SHOPPING",
+	"testOrder": false,
+	"masterInvoiceNumber": "0604",
+	"identityType": "GUEST",
+	"customerSegments": [
+		"REGULAR"
+	],
+	"tenantType": "STORES",
+	"businessChannel": "CA_STORES_POS",
+	"banner": "RONA",
+	"channel": "Stores",
+	"users": [
+		{
+			"userType": "SHOPPER",
+			"poRequired": false,
+			"userTaxExemptOptIn": true,
+			"taxExempt": false,
+			"bestPrice": false
+		}
+	],
+	"cartItems": [
+		{
+			"cartItemId": "1769629416782214612146",
+			"omniItemId": "000272093",
+			"itemNumber": "000272093",
+			"model": "55730175-B",
+			"vendor": "777777",
+			"itemDescription": "WIRE SJTW 16/3 ORANGE LF",
+			"itemType": "RGL",
+			"quantity": 12,
+			"itemWeight": 0.0,
+			"freeDetail": false,
+			"freeLead": false,
+			"freeMileage": false,
+			"priceInfo": {
+				"priceType": 1,
+				"priceInfoUsageType": "SELLING",
+				"priceInfoDisplayType": "REGULAR",
+				"totalPercentage": 0.0,
+				"unitPrice": 0.83,
+				"unitCost": 0,
+				"prices": [
+					{
+						"type": "BASE",
+						"value": 0.83
+					},
+					{
+						"type": "FINAL",
+						"value": 0.83
+					},
+					{
+						"type": "RETAIL",
+						"value": 0.83
+					}
+				],
+				"saveComponents": []
+			},
+			"selectedFulfillment": {
+				"availabilityTime": 1769629451.487,
+				"estimatedDeliveryDate": 1769629451.487,
+				"estimatedShipDate": 1769629451.487,
+				"fulfillmentId": "1",
+				"fulfillmentType": "CARRYWITH",
+				"fulfillmentNode": {
+					"storeId": "55010"
+				},
+				"ltlIdentifier": false,
+				"parcelDates": []
+			},
+			"promotions": [],
+			"oesSpecialPromotions": [],
+			"imageUrl": "https://erona.rona.ca/images/medium/81/8179/8179002.jpg",
+			"cartItemSummary": {
+				"subTotal": 9.96,
+				"totalPrice": 11.25,
+				"discount": 0,
+				"totalFees": 0,
+				"fees": [],
+				"taxes": [
+					{
+						"type": "SALES",
+						"name": "LWS_SALES_TAX",
+						"value": 1.29,
+						"itemNbr": "000272093",
+						"taxPercentage": 13.0,
+						"fees": []
+					},
+					{
+						"type": "TAXSPLIT",
+						"value": 129,
+						"denomination": "CENTS",
+						"stateTax": {
+							"description": "HST ONTARIO",
+							"taxAmount": 129,
+							"taxJurisdiction": "HON",
+							"taxRate": 13,
+							"taxType": "HST"
+						},
+						"unitQty": 12,
+						"orderLineID": "1769629416782214612146",
+						"itemNbr": "000272093",
+						"vbuNbr": "777777",
+						"modelID": "55730175-B",
+						"unitPrice": 0.83,
+						"purchaseDate": "2026-01-28",
+						"extendedPrice": 1125.0,
+						"taxAmount": 129,
+						"taxPercentage": 13,
+						"fees": []
+					}
+				],
+				"subTotalAfterDisc": 9.96,
+				"totalMarkDownSaving": 0.0,
+				"totalSavings": 0,
+				"totalSavingsByUnit": 0,
+				"unlockDiscount": 0.0
+			},
+			"installationPickUpType": "N",
+			"priceLockIndicator": false,
+			"barCode": "000000000000272093",
+			"terminalNumber": "85",
+			"associateId": "2",
+			"itemEntryMethod": "ENTERED_ITEM",
+			"createdTime": 1769629416.782,
+			"interPackCode": "FT",
+			"sosFlip": false,
+			"eppEligible": false,
+			"reservationDetails": [],
+			"origOrderedQty": 0,
+			"primeLineNo": 2,
+			"taxExemptions": [],
+			"pcrItemParent": false,
+			"pcrItemChild": false,
+			"multiPuis": false
+		},
+		{
+			"cartItemId": "176962940751769936457",
+			"omniItemId": "000125728",
+			"itemNumber": "000125728",
+			"model": "10733",
+			"vendor": "777777",
+			"itemDescription": "WIRE SJTW 16/3 75M SPOOL ORANG",
+			"itemType": "RGL",
+			"quantity": 1,
+			"itemWeight": 0.0,
+			"freeDetail": false,
+			"freeLead": false,
+			"freeMileage": false,
+			"priceInfo": {
+				"priceType": 1,
+				"priceInfoUsageType": "SELLING",
+				"priceInfoDisplayType": "REGULAR",
+				"totalPercentage": 0.0,
+				"unitPrice": 139.0,
+				"unitCost": 0,
+				"prices": [
+					{
+						"type": "BASE",
+						"value": 139.0
+					},
+					{
+						"type": "RETAIL",
+						"value": 139.0
+					},
+					{
+						"type": "FINAL",
+						"value": 139.0
+					}
+				],
+				"saveComponents": []
+			},
+			"selectedFulfillment": {
+				"availabilityTime": 1769629451.487,
+				"estimatedDeliveryDate": 1769629451.487,
+				"estimatedShipDate": 1769629451.487,
+				"fulfillmentId": "1",
+				"fulfillmentType": "CARRYWITH",
+				"fulfillmentNode": {
+					"storeId": "55010"
+				},
+				"ltlIdentifier": false,
+				"parcelDates": []
+			},
+			"promotions": [],
+			"oesSpecialPromotions": [],
+			"imageUrl": "https://erona.rona.ca/images/medium/81/8179/8179002.jpg",
+			"cartItemSummary": {
+				"subTotal": 139.0,
+				"totalPrice": 157.07,
+				"discount": 0,
+				"totalFees": 0,
+				"fees": [],
+				"taxes": [
+					{
+						"type": "SALES",
+						"name": "LWS_SALES_TAX",
+						"value": 18.07,
+						"itemNbr": "000125728",
+						"taxPercentage": 13.0,
+						"fees": []
+					},
+					{
+						"type": "TAXSPLIT",
+						"value": 1807,
+						"denomination": "CENTS",
+						"stateTax": {
+							"description": "HST ONTARIO",
+							"taxAmount": 1807,
+							"taxJurisdiction": "HON",
+							"taxRate": 13,
+							"taxType": "HST"
+						},
+						"unitQty": 1,
+						"orderLineID": "176962940751769936457",
+						"itemNbr": "000125728",
+						"vbuNbr": "777777",
+						"modelID": "10733",
+						"unitPrice": 139,
+						"purchaseDate": "2026-01-28",
+						"extendedPrice": 15707.0,
+						"taxAmount": 1807,
+						"taxPercentage": 13,
+						"fees": []
+					}
+				],
+				"subTotalAfterDisc": 139.0,
+				"totalMarkDownSaving": 0.0,
+				"totalSavings": 0,
+				"totalSavingsByUnit": 0,
+				"unlockDiscount": 0.0
+			},
+			"installationPickUpType": "N",
+			"priceLockIndicator": false,
+			"barCode": "000000000000125728",
+			"terminalNumber": "85",
+			"associateId": "2",
+			"itemEntryMethod": "ENTERED_ITEM",
+			"createdTime": 1769629407.518,
+			"interPackCode": "RL",
+			"sosFlip": false,
+			"eppEligible": false,
+			"reservationDetails": [],
+			"origOrderedQty": 0,
+			"primeLineNo": 1,
+			"taxExemptions": [],
+			"pcrItemParent": false,
+			"pcrItemChild": false,
+			"multiPuis": false
+		}
+	],
+	"zippedInStore": {
+		"storeId": "55010",
+		"name": "55010 RONA Mississauga (Dundas)",
+		"address": {
+			"addressGroupId": "1769629401807202574207",
+			"addressType": "COMMERCIAL",
+			"addressTypeCode": "RA",
+			"addressLine1": "650 Dundas street East Mississauga, ON, L5A 3Y6",
+			"city": "Mississauga",
+			"state": "ON",
+			"zipCode": "L5A 3Y6",
+			"country": "CAN",
+			"phone": "9052766350",
+			"valid": true
+		},
+		"carbonStoreId": "55010"
+	},
+	"payments": [
+		{
+			"paymentId": "1769629451203256277457",
+			"amount": 168.32,
+			"cardType": "VISA",
+			"transactionType": "REGULAR",
+			"gcBalance": 0,
+			"expirationMonth": "00",
+			"expirationYear": "0",
+			"accountType": "CREDIT",
+			"authStatus": "Approved",
+			"sequenceNumber": "119",
+			"transactionId": "0119",
+			"merchantId": "067992",
+			"savedCard": false,
+			"addingCard": false,
+			"cvvPresent": false,
+			"encryptedCardNumber": "6006497092249904902",
+			"attachedTime": 1769629451.204,
+			"mcmAuthData": {
+				"cardTypeName": "VISA",
+				"cardTypeNum": "50",
+				"authCode": "0668512",
+				"processType": "SWIPED",
+				"language": "UNKNOWN",
+				"resultCode": "1[49]",
+				"accountType": "UNKNOWN",
+				"responseMessage": "APPROVED",
+				"giftCardBalance": 668.51
+			},
+			"settleIdc": "SETTLE"
+		}
+	],
+	"appliedCoupons": [],
+	"personnelNbr": "113173",
+	"currency": "CAD",
+	"cartSummary": {
+		"grandTotal": 168.32,
+		"subTotal": 148.96,
+		"subTotalWithFees": 148.96,
+		"totalSavings": 0,
+		"totalSavingWithoutShippingPromotions": 0.0,
+		"totalfees": 0,
+		"fees": [],
+		"totalSalesTax": 19.36,
+		"subTotalWithDiscount": 148.96,
+		"mileageFee": 0,
+		"totalTax": 19.36,
+		"remainingOrderBalance": 0.0,
+		"totalMarkDownSaving": 0.0,
+		"totalUnlockSaving": 0.0
+	},
+	"shipGroupCharges": [],
+	"fraudStatus": "ACCEPT",
+	"itemCount": 13,
+	"detailFeeTnCAccepted": true,
+	"created": 1769629401.807,
+	"lastUpdated": 1769629456.634,
+	"orderSubmittedOn": 1769629456.768,
+	"oesSpecialCoupons": [],
+	"scheduleDeliveryAppointments": [],
+	"extnIsFullAuthOrder": true,
+	"aopEnabled": false,
+	"taxExempt": false,
+	"taxExemptOptIn": false,
+	"recurring": false,
+	"businessDate": 1769629451.0,
+	"associateId": "2",
+	"terminalNumber": "85",
+	"taxExemptions": [],
+	"chargeFeeUnlock": [],
+	"issueBopuisCoupon": false,
+	"failedDownstream": [],
+	"upgradedUser": false
+}

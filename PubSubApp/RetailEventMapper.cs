@@ -307,10 +307,10 @@ class RetailEventMapper
                     ? customerId.PadLeft(10, '0')
                     : "";
 
-                // SLFZIP - 9 spaces + EPP eligibility digit (10 chars total)
-                // 9 = This line item IS the EPP (has x-epp-coverage-identifier attribute)
-                // 0 = Not an EPP item
-                string eppDigit = GetEPPCoverageIdentifier(item) != null ? "9" : "0";
+                // SLFZIP - 9 spaces + EPP coverage identifier digit (10 chars total)
+                // Value comes directly from x-epp-coverage-identifier attribute
+                // Defaults to "0" when attribute is not present
+                string eppDigit = GetEPPCoverageIdentifier(item) ?? "0";
                 orderRecord.ZipCode = "         " + eppDigit; // 9 spaces + digit
 
                 // Till/Clerk - SLFCLK (from till number) - right justified with zeros
@@ -344,7 +344,7 @@ class RetailEventMapper
                 else if (priceVehicle == "OVD:OVR")
                     reasonCode = "POV0" + overrideReason; // POV0 + priceOverride.reason (e.g. "POV01504")
                 else if (pvCodeForRsn == "MAN")
-                    reasonCode = "IDS0";
+                    reasonCode = "IDS0" + overrideReason;
                 orderRecord.ReasonCode = reasonCode.PadRight(16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
@@ -380,81 +380,198 @@ class RetailEventMapper
                 {
                     lineIdToIndex[item.LineId] = itemRecords.Count - 1;
                 }
-            }
 
-            // Reorder: EPP items (identifier="9") go right after their parent SKU using parentLineId
-            // Build ordered list: for each non-EPP-9 item, insert any EPP-9 items that reference it
-            List<OrderRecord> reorderedRecords = new List<OrderRecord>();
-            HashSet<int> placed = new HashSet<int>();
-
-            // Build a map of parentLineId -> list of EPP record indices
-            Dictionary<string, List<int>> eppChildMap = new Dictionary<string, List<int>>();
-            if (retailEvent.Transaction?.Items != null)
-            {
-                int recordIdx = 0;
-                foreach (var txItem in retailEvent.Transaction.Items)
+                // Generate eco fee records for this item
+                if (item.Fees != null)
                 {
-                    if (recordIdx < itemRecords.Count)
+                    // Fallback province code from item taxes jurisdiction for SLFACD
+                    string fallbackFeeProvince = "";
+                    if (item.Taxes != null)
                     {
-                        string? covId = GetEPPCoverageIdentifier(txItem);
-                        // EPP items (identifier="9") with a parentLineId should follow their parent
-                        if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                        foreach (var tax in item.Taxes)
                         {
-                            if (!eppChildMap.ContainsKey(txItem.ParentLineId))
-                                eppChildMap[txItem.ParentLineId] = new List<int>();
-                            eppChildMap[txItem.ParentLineId].Add(recordIdx);
+                            if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                            {
+                                fallbackFeeProvince = tax.Jurisdiction.Region;
+                                break;
+                            }
                         }
                     }
-                    recordIdx++;
+
+                    foreach (var fee in item.Fees)
+                    {
+                        if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars <= 0) continue;
+
+                        string feeAmountFormatted = feeAmountDollars.ToString("F2");
+
+                        // SLFACD: use fee's own authority if available, otherwise fall back to item tax jurisdiction
+                        string feeAuthority = !string.IsNullOrEmpty(fee.Authority) ? fee.Authority : fallbackFeeProvince;
+
+                        var feeRecord = new OrderRecord
+                        {
+                            TransType = mappedTransactionTypeSLFTTP,
+                            LineType = "83",
+                            TransDate = transactionDateTime.ToString("yyMMdd"),
+                            TransTime = transactionDateTime.ToString("HHmmss"),
+                            TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                            TransSeq = "00000", // Placeholder - updated after grouping
+                            RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                            PolledStore = polledStoreInt,
+                            PollCen = pollCen,
+                            PollDate = pollDate,
+                            CreateCen = createCen,
+                            CreateDate = createDate,
+                            CreateTime = createTime,
+                            Status = " ",
+                            SKUNumber = PadNumeric(item.Item?.Sku, 9),
+                            Quantity = orderRecord.Quantity,
+                            QuantityNegativeSign = orderRecord.QuantityNegativeSign,
+                            OriginalPrice = "000000000",
+                            OriginalPriceNegativeSign = "",
+                            OverridePrice = "000000000",
+                            OverridePriceNegativeSign = "",
+                            OriginalRetail = "000000000",
+                            OriginalRetailNegativeSign = "",
+                            ItemSellPrice = FormatCurrency(feeAmountFormatted, 9),
+                            SellPriceNegativeSign = "",
+                            ExtendedValue = FormatCurrency(feeAmountFormatted, 11),
+                            ExtendedValueNegativeSign = "",
+                            ChargedTax1 = "N",
+                            ChargedTax2 = "N",
+                            ChargedTax3 = "N",
+                            ChargedTax4 = "N",
+                            TaxAuthCode = PadOrTruncate(feeAuthority, 6),
+                            TaxRateCode = PadOrTruncate(fee.Code ?? "", 6),
+                            CustomerName = "",
+                            CustomerNumber = "",
+                            ZipCode = "         0",
+                            Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                            EmployeeCardNumber = 0,
+                            UPCCode = "0000000000000",
+                            EReceiptEmail = "",
+                            ReasonCode = "",
+                            TaxExemptId1 = "",
+                            TaxExemptId2 = "",
+                            TaxExemptionName = "",
+                            AdCode = "0000",
+                            AdPrice = "000000000",
+                            AdPriceNegativeSign = "",
+                            PriceVehicleCode = "",
+                            PriceVehicleReference = "",
+                            ReferenceCode = "",
+                            ReferenceDesc = "",
+                            OriginalSalesperson = "00000",
+                            OriginalStore = "00000",
+                            OriginalTxStore = "00000",
+                            OriginalTxDate = "000000",
+                            OriginalTxRegister = "000",
+                            OriginalTxNumber = "00000",
+                            GroupDiscAmount = "000000000",
+                            GroupDiscSign = "",
+                            SalesPerson = salesPersonId,
+                            DiscountAmount = "000000000",
+                            DiscountType = "",
+                            DiscountAmountNegativeSign = "",
+                            GroupDiscReason = "00",
+                            RegDiscReason = "00",
+                            OrderNumber = "",
+                            ProjectNumber = "",
+                            SalesStore = 0,
+                            InvStore = 0,
+                            ItemScanned = "N"
+                        };
+                        itemRecords.Add(feeRecord);
+                    }
                 }
             }
 
-            // Now build ordered list
+            // Reorder: EPP items (identifier="9") go right after their parent SKU using parentLineId
+            // Each transaction item may have multiple records (item + eco fees), tracked as ranges
+            List<OrderRecord> reorderedRecords = new List<OrderRecord>();
+            HashSet<int> placedRanges = new HashSet<int>(); // tracks placed transaction item indices
+
+            // Build record ranges per transaction item: itemRangeStart[txIdx] and itemRangeCount[txIdx]
+            // Each range includes the item record plus any eco fee records that follow it
+            List<int> itemRangeStart = new List<int>();
+            List<int> itemRangeCount = new List<int>();
             if (retailEvent.Transaction?.Items != null)
             {
-                int recordIdx = 0;
-                foreach (var txItem in retailEvent.Transaction.Items)
+                int recIdx = 0;
+                for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
                 {
-                    if (recordIdx >= itemRecords.Count) break;
+                    itemRangeStart.Add(recIdx);
+                    var txItem = retailEvent.Transaction.Items[txIdx];
+                    int count = 1; // the item record itself
+                    // Count eco fee records for this item
+                    if (txItem.Fees != null)
+                    {
+                        foreach (var fee in txItem.Fees)
+                        {
+                            if (fee.Amount != null && decimal.TryParse(fee.Amount.Value, out decimal amt) && amt > 0)
+                                count++;
+                        }
+                    }
+                    itemRangeCount.Add(count);
+                    recIdx += count;
+                }
+            }
 
+            // Build a map of parentLineId -> list of transaction item indices for EPP items
+            Dictionary<string, List<int>> eppChildMap = new Dictionary<string, List<int>>();
+            if (retailEvent.Transaction?.Items != null)
+            {
+                for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
+                {
+                    var txItem = retailEvent.Transaction.Items[txIdx];
+                    string? covId = GetEPPCoverageIdentifier(txItem);
+                    if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                    {
+                        if (!eppChildMap.ContainsKey(txItem.ParentLineId))
+                            eppChildMap[txItem.ParentLineId] = new List<int>();
+                        eppChildMap[txItem.ParentLineId].Add(txIdx);
+                    }
+                }
+            }
+
+            // Helper to place all records in a transaction item's range
+            void PlaceRange(int txIdx)
+            {
+                if (placedRanges.Contains(txIdx)) return;
+                placedRanges.Add(txIdx);
+                int start = itemRangeStart[txIdx];
+                int count = itemRangeCount[txIdx];
+                for (int i = start; i < start + count && i < itemRecords.Count; i++)
+                    reorderedRecords.Add(itemRecords[i]);
+            }
+
+            // Build ordered list
+            if (retailEvent.Transaction?.Items != null)
+            {
+                for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
+                {
+                    var txItem = retailEvent.Transaction.Items[txIdx];
                     string? covId = GetEPPCoverageIdentifier(txItem);
 
                     // Skip EPP-9 items here - they'll be inserted after their parent via eppChildMap
                     if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
-                    {
-                        recordIdx++;
                         continue;
-                    }
 
-                    // Add the item record
-                    if (!placed.Contains(recordIdx))
-                    {
-                        reorderedRecords.Add(itemRecords[recordIdx]);
-                        placed.Add(recordIdx);
-                    }
-                    recordIdx++;
+                    // Place this item and its eco fee records
+                    PlaceRange(txIdx);
 
-                    // Insert any EPP-9 children that reference this item's lineId
+                    // Insert any EPP-9 children that reference this item's lineId (with their eco fees)
                     if (!string.IsNullOrEmpty(txItem.LineId) && eppChildMap.ContainsKey(txItem.LineId))
                     {
-                        foreach (int eppIdx in eppChildMap[txItem.LineId])
-                        {
-                            if (!placed.Contains(eppIdx) && eppIdx < itemRecords.Count)
-                            {
-                                reorderedRecords.Add(itemRecords[eppIdx]);
-                                placed.Add(eppIdx);
-                            }
-                        }
+                        foreach (int eppTxIdx in eppChildMap[txItem.LineId])
+                            PlaceRange(eppTxIdx);
                     }
                 }
             }
 
             // Add any remaining records that weren't placed
-            for (int i = 0; i < itemRecords.Count; i++)
-            {
-                if (!placed.Contains(i))
-                    reorderedRecords.Add(itemRecords[i]);
-            }
+            for (int txIdx = 0; txIdx < itemRangeStart.Count; txIdx++)
+                PlaceRange(txIdx);
+
             itemRecords = reorderedRecords;
 
             // Determine if this is an Ontario transaction
@@ -1226,7 +1343,13 @@ class RetailEventMapper
                     {
                         string cardNumber = tender.Card.Last4 ?? "";
                         tenderRecord.CreditCardNumber = cardNumber.PadLeft(19, '*');
-                        tenderRecord.AuthNumber = PadOrTruncate(tender.Card.AuthCode ?? "", 6);
+
+                        // Flexiti (FX): use last 6 digits of auth code; others: use first 6
+                        string authCode = tender.Card.AuthCode ?? "";
+                        if (tender.TenderId?.ToUpper() == "FX" && authCode.Length > 6)
+                            authCode = authCode.Substring(authCode.Length - 6);
+                        tenderRecord.AuthNumber = PadOrTruncate(authCode, 6);
+
                         tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
                     }
 
@@ -1545,6 +1668,23 @@ class RetailEventMapper
                     {
                         orderRecord.ChargedTax2 = "Y";
                     }
+                    // Fallback: if taxType is not set, determine from rate
+                    if (string.IsNullOrEmpty(taxType))
+                    {
+                        if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal fallbackRate))
+                        {
+                            taxType = (fallbackRate >= 4 && fallbackRate <= 6) ? "GST" : "PST";
+                        }
+                        else if (tax.TaxRate != null)
+                        {
+                            taxType = (tax.TaxRate.Value >= 0.04m && tax.TaxRate.Value <= 0.06m) ? "GST" : "PST";
+                        }
+                        else
+                        {
+                            taxType = "GST"; // Default unknown to federal GST
+                        }
+                    }
+
                     // Ontario-specific logic:
                     // SLFTX3 = Y for HST (13%)
                     // SLFTX4 = Y for Partial HST / GST (5%)
@@ -1609,6 +1749,7 @@ class RetailEventMapper
                                 break;
                             case "QST":
                             case "QUEBEC":
+                                orderRecord.ChargedTax1 = "Y";
                                 orderRecord.ChargedTax3 = "Y";
                                 break;
                             case "MUNICIPAL":
@@ -1617,8 +1758,7 @@ class RetailEventMapper
                                 orderRecord.ChargedTax4 = "Y";
                                 break;
                             default:
-                                // Default unrecognized tax types to GST (Tax2)
-                                orderRecord.ChargedTax2 = "Y";
+                                // Unrecognized tax types - do not set any flag
                                 break;
                         }
                     }
@@ -1651,29 +1791,10 @@ class RetailEventMapper
             }
             else
             {
-                // Fallback: Use transaction-level tax if no item-level taxes
-                if (retailEvent.Transaction?.Totals?.Tax?.Value != null &&
-                    decimal.TryParse(retailEvent.Transaction.Totals.Tax.Value, out decimal taxAmount) &&
-                    taxAmount > 0)
-                {
-                    // Ontario: SLFTX2=N, SLFTX3=Y
-                    if (isOntario)
-                    {
-                        orderRecord.ChargedTax2 = "N";
-                        orderRecord.ChargedTax3 = "Y";
-                    }
-                    else
-                    {
-                        orderRecord.ChargedTax2 = "Y"; // Default to GST (Tax2)
-                    }
-
-                    // Tax authority and rate code from store's tax area
-                    if (!string.IsNullOrEmpty(retailEvent.BusinessContext?.Store?.TaxArea))
-                    {
-                        orderRecord.TaxAuthCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                        orderRecord.TaxRateCode = PadOrTruncate(retailEvent.BusinessContext.Store.TaxArea, 6);
-                    }
-                }
+                // No item-level taxes: item is tax-exempt, all SLFTX flags stay "N"
+                // Do NOT fall back to transaction-level tax totals, as that would
+                // incorrectly mark tax-exempt items (donations, deposits, water bottles, etc.)
+                // as taxed.
             }
 
             // SLFTCD on tax records: use taxCode from the first tax that has a jurisdiction

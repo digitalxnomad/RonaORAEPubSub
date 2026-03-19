@@ -1,5 +1,8 @@
 ﻿ using Google.Cloud.PubSub.V1;
+using Google.Cloud.Monitoring.V3;
+using Google.Api.Gax.ResourceNames;
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 using PubSubApp;
 using PubSubApp.Models;
 using PubSubApp.Validation;
@@ -17,6 +20,106 @@ using System.Net.Http;
 public partial class Program
 {
     static string Version = $"PubSubApp v{typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
+    static readonly HttpClient _slackHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+    static DateTime _lastSlackAlertTime = DateTime.MinValue;
+    static readonly TimeSpan _slackAlertCooldown = TimeSpan.FromMinutes(20);
+
+    /// <summary>
+    /// Scrubs potentially sensitive data from exception messages before sending to external systems.
+    /// Removes connection strings, credentials, file paths, and other sensitive patterns.
+    /// </summary>
+    static string ScrubExceptionMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return "Unknown error";
+        // Remove connection strings (Server=...; or Host=...; patterns)
+        message = System.Text.RegularExpressions.Regex.Replace(message,
+            @"(Server|Host|Data Source|Initial Catalog|User Id|Password|Pwd|Connection String)\s*=\s*[^;""]+",
+            "$1=***", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Remove file paths (C:\..., /home/..., etc.)
+        message = System.Text.RegularExpressions.Regex.Replace(message,
+            @"[A-Za-z]:\\[^\s""']+|/(?:home|opt|var|etc|tmp|usr)/[^\s""']+",
+            "[path-redacted]");
+        // Remove API keys / tokens (long alphanumeric strings that look like secrets)
+        message = System.Text.RegularExpressions.Regex.Replace(message,
+            @"(key|token|secret|api[_-]?key|bearer)\s*[:=]\s*[A-Za-z0-9\-_.]{20,}",
+            "$1=***", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Truncate to prevent overly long messages in Slack
+        if (message.Length > 300)
+            message = message[..300] + "...";
+        return message;
+    }
+
+    static async Task SendSlackAlert(string webhookUrl, string message)
+    {
+        if (string.IsNullOrEmpty(webhookUrl)) return;
+        if (DateTime.UtcNow - _lastSlackAlertTime < _slackAlertCooldown) return;
+        try
+        {
+            string hostname = Environment.MachineName;
+            string payload = JsonSerializer.Serialize(new { text = $"[{hostname}] {message}" });
+            await _slackHttpClient.PostAsync(webhookUrl, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"));
+            _lastSlackAlertTime = DateTime.UtcNow;
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogWarning($"Slack alert failed: {ex.Message}");
+        }
+    }
+
+    static async Task SendSlackAlertImmediate(string webhookUrl, string message)
+    {
+        if (string.IsNullOrEmpty(webhookUrl)) return;
+        try
+        {
+            string hostname = Environment.MachineName;
+            string payload = JsonSerializer.Serialize(new { text = $"[{hostname}] {message}" });
+            await _slackHttpClient.PostAsync(webhookUrl, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"));
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogWarning($"Slack alert failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Queries Google Cloud Monitoring for the number of undelivered messages in a PubSub subscription.
+    /// Returns -1 if the metric is unavailable (e.g., permissions, API not enabled).
+    /// </summary>
+    static async Task<long> GetUndeliveredMessageCountAsync(string projectId, string subscriptionId)
+    {
+        try
+        {
+            var client = await MetricServiceClient.CreateAsync();
+            var now = DateTime.UtcNow;
+            var request = new ListTimeSeriesRequest
+            {
+                Name = $"projects/{projectId}",
+                Filter = $"metric.type=\"pubsub.googleapis.com/subscription/num_undelivered_messages\" AND resource.label.subscription_id=\"{subscriptionId}\"",
+                Interval = new TimeInterval
+                {
+                    StartTime = Timestamp.FromDateTime(now.AddMinutes(-5)),
+                    EndTime = Timestamp.FromDateTime(now)
+                },
+                View = ListTimeSeriesRequest.Types.TimeSeriesView.Full
+            };
+
+            var response = client.ListTimeSeries(request);
+            foreach (var timeSeries in response)
+            {
+                if (timeSeries.Points.Count > 0)
+                {
+                    // Return the most recent data point
+                    return timeSeries.Points[0].Value.Int64Value;
+                }
+            }
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            SimpleLogger.LogWarning($"⚠ Backlog check failed: {ex.Message}");
+            return -1;
+        }
+    }
 
     public static async Task Main(string[] args)
     {
@@ -28,6 +131,19 @@ public partial class Program
 
         var pubSubConfig = new PubSubConfiguration();
         configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
+
+        // Validate required configuration before proceeding
+        var configErrors = new List<string>();
+        if (string.IsNullOrWhiteSpace(pubSubConfig.ProjectId)) configErrors.Add("ProjectId is required");
+        if (string.IsNullOrWhiteSpace(pubSubConfig.TopicId)) configErrors.Add("TopicId is required");
+        if (string.IsNullOrWhiteSpace(pubSubConfig.SubscriptionId)) configErrors.Add("SubscriptionId is required");
+        if (configErrors.Count > 0)
+        {
+            Console.Error.WriteLine($"✗ Configuration error(s) in appsettings.json:");
+            foreach (var error in configErrors)
+                Console.Error.WriteLine($"  - {error}");
+            return;
+        }
 
         // Set console window title with project ID and version
         Console.Title = $"{pubSubConfig.ProjectId} - {Version}";
@@ -56,26 +172,51 @@ public partial class Program
         var topicName = TopicName.FromProjectTopic(projectId, topicId);
         var subscriptionName = SubscriptionName.FromProjectSubscription(projectId, subscriptionId);
 
-        // Create publisher with immediate publish (no batching delay)
-        var publisherBuilder = new PublisherClientBuilder
-        {
-            TopicName = topicName,
-            Settings = new PublisherClient.Settings
-            {
-                BatchingSettings = new Google.Api.Gax.BatchingSettings(
-                    elementCountThreshold: 1,
-                    byteCountThreshold: null,
-                    delayThreshold: TimeSpan.FromMilliseconds(10)
-                )
-            }
-        };
-        var publisher = await publisherBuilder.BuildAsync();
-
         SimpleLogger.SetLogPath(pubSubConfig.LogPath, projectId);
 
         SimpleLogger.LogInfo(Version);
         SimpleLogger.LogInfo("ProjectId: " + projectId);
         SimpleLogger.LogInfo("TopicId: " + topicId);
+
+        // Create publisher with immediate publish (no batching delay)
+        // Retry up to MaxAuthRetries times before sending Slack alert and exiting
+        int maxAuthRetries = pubSubConfig.MaxAuthRetries > 0 ? pubSubConfig.MaxAuthRetries : 5;
+        PublisherClient? publisher = null;
+        for (int pubAttempt = 1; pubAttempt <= maxAuthRetries; pubAttempt++)
+        {
+            try
+            {
+                var publisherBuilder = new PublisherClientBuilder
+                {
+                    TopicName = topicName,
+                    Settings = new PublisherClient.Settings
+                    {
+                        BatchingSettings = new Google.Api.Gax.BatchingSettings(
+                            elementCountThreshold: 1,
+                            byteCountThreshold: null,
+                            delayThreshold: TimeSpan.FromMilliseconds(10)
+                        )
+                    }
+                };
+                publisher = await publisherBuilder.BuildAsync();
+                break; // Success
+            }
+            catch (Exception ex)
+            {
+                SimpleLogger.LogError($"✗ Publisher connection attempt {pubAttempt}/{maxAuthRetries} failed: {ex.Message}", ex);
+                if (pubAttempt >= maxAuthRetries)
+                {
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub publisher after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(ex.Message)}";
+                    SimpleLogger.LogError(alertMsg, ex);
+                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                    return;
+                }
+                int delaySeconds = (int)Math.Pow(2, pubAttempt); // 2s, 4s, 8s, 16s, 32s
+                SimpleLogger.LogInfo($"  Retrying in {delaySeconds}s...");
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+            }
+        }
+
         SimpleLogger.LogInfo("✓ Publisher initialized");
 
         bool debugLog = pubSubConfig.EnableDebugLogging;
@@ -105,14 +246,16 @@ public partial class Program
         };
 
         // Resilient subscriber loop - recreates the subscriber if it stops after idle/disconnect
+        int authFailureCount = 0;
         while (!shutdownCts.IsCancellationRequested)
         {
             SubscriberClient? subscriber = null;
+            int subscriberStopping = 0; // Atomic flag to prevent concurrent StopAsync calls
             try
             {
                 // Create a fresh subscriber with gRPC keepalive to prevent idle disconnects
-                var keepAlivePingDelay = TimeSpan.FromSeconds(60);
-                var keepAlivePingTimeout = TimeSpan.FromSeconds(30);
+                var keepAlivePingDelay = TimeSpan.FromSeconds(20);
+                var keepAlivePingTimeout = TimeSpan.FromSeconds(10);
                 var ackExtensionWindow = TimeSpan.FromSeconds(30);
 
                 if (debugLog) { SimpleLogger.LogDebug("Building SubscriberClient..."); }
@@ -155,9 +298,19 @@ public partial class Program
                 // Idle watchdog: if no messages received within this window, force reconnect
                 // This prevents silent gRPC stream death where StartAsync never completes
                 var idleTimeoutMinutes = pubSubConfig.IdleTimeoutMinutes > 0 ? pubSubConfig.IdleTimeoutMinutes : 30;
-                DateTime lastMessageTime = DateTime.UtcNow;
+                long lastMessageTicks = DateTime.UtcNow.Ticks; // Thread-safe via Interlocked
                 // Link idle watchdog to shutdown token so both can stop the subscriber
                 var idleWatchdogCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownCts.Token);
+
+                // Helper: safely stop subscriber exactly once
+                async Task StopSubscriberOnce(SubscriberClient sub, string reason)
+                {
+                    if (Interlocked.CompareExchange(ref subscriberStopping, 1, 0) == 0)
+                    {
+                        SimpleLogger.LogInfo($"⏹ Stopping subscriber: {reason}");
+                        try { await sub.StopAsync(CancellationToken.None); } catch { }
+                    }
+                }
 
                 // Background task that monitors for idle timeout or shutdown
                 var watchdogTask = Task.Run(async () =>
@@ -172,35 +325,73 @@ public partial class Program
                         {
                             if (shutdownCts.IsCancellationRequested)
                             {
-                                SimpleLogger.LogInfo("⏹ Watchdog: Shutdown detected. Stopping subscriber...");
-                                try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                                await StopSubscriberOnce(subscriber, "Shutdown detected by watchdog");
                             }
                             break;
                         }
 
                         if (shutdownCts.IsCancellationRequested)
                         {
-                            // Graceful shutdown requested — stop the subscriber
-                            try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                            await StopSubscriberOnce(subscriber, "Graceful shutdown requested");
                             break;
                         }
 
-                        var idleMinutes = (DateTime.UtcNow - lastMessageTime).TotalMinutes;
+                        var idleMinutes = (DateTime.UtcNow - new DateTime(Interlocked.Read(ref lastMessageTicks), DateTimeKind.Utc)).TotalMinutes;
                         if (idleMinutes >= idleTimeoutMinutes)
                         {
                             SimpleLogger.LogWarning($"⚠ Idle watchdog: No messages for {idleMinutes:F0} minutes. Forcing reconnect...");
-                            try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                            await StopSubscriberOnce(subscriber, $"Idle timeout ({idleMinutes:F0} min)");
                             break;
                         }
                     }
                 }, idleWatchdogCts.Token);
 
+                // Background task: periodically check subscription backlog for waiting messages
+                if (!pubSubConfig.EnableBacklogMonitor)
+                    SimpleLogger.LogInfo("ℹ Backlog monitor disabled via config (EnableBacklogMonitor=false)");
+                var backlogMonitorTask = pubSubConfig.EnableBacklogMonitor ? Task.Run(async () =>
+                {
+                    // Initial delay to let the subscriber establish its stream
+                    try { await Task.Delay(TimeSpan.FromMinutes(2), idleWatchdogCts.Token); }
+                    catch (OperationCanceledException) { return; }
+
+                    while (!idleWatchdogCts.Token.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            long backlog = await GetUndeliveredMessageCountAsync(projectId, subscriptionId);
+                            if (backlog > 0)
+                            {
+                                SimpleLogger.LogWarning($"⚠ Subscription backlog: {backlog} undelivered message(s) waiting");
+                                if (backlog > 1000)
+                                {
+                                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl,
+                                        $"⚠ HIGH BACKLOG: {backlog} undelivered messages in subscription {subscriptionId}");
+                                }
+                            }
+                            else if (backlog == 0)
+                            {
+                                if (debugLog) { SimpleLogger.LogDebug("Backlog check: 0 undelivered messages"); }
+                            }
+                            // backlog == -1 means check failed (already logged in the method)
+                        }
+                        catch (Exception ex)
+                        {
+                            SimpleLogger.LogWarning($"⚠ Backlog monitor error: {ex.Message}");
+                        }
+
+                        try { await Task.Delay(TimeSpan.FromMinutes(5), idleWatchdogCts.Token); }
+                        catch (OperationCanceledException) { break; }
+                    }
+                }, idleWatchdogCts.Token) : Task.CompletedTask;
+
                 // Start subscribing - this Task completes when the subscriber stops
+                var subscriberStartTime = DateTime.UtcNow;
                 await subscriber.StartAsync(async (message, cancellationToken) =>
                 {
                     try
                     {
-                        lastMessageTime = DateTime.UtcNow; // Reset idle watchdog on each message
+                        Interlocked.Exchange(ref lastMessageTicks, DateTime.UtcNow.Ticks); // Thread-safe idle watchdog reset
 
                         if (debugLog) { SimpleLogger.LogDebug($">>> Message callback invoked for MessageId={message.MessageId}"); }
 
@@ -255,6 +446,10 @@ public partial class Program
                                 string errorMessage = $"ORAE validation failed with {validationErrors.Count} error(s):\n" +
                                                     string.Join("\n", validationErrors);
                                 SimpleLogger.LogError(errorMessage);
+                                string alertMsg = $"✗ ORAE VALIDATION FAILED: {validationErrors.Count} error(s) on message {message.MessageId}:\n" +
+                                    string.Join("\n", validationErrors.Take(5));
+                                if (alertMsg.Length > 500) alertMsg = alertMsg[..500] + "...";
+                                await SendSlackAlertImmediate(pubSubConfig.SlackWebhookUrl, alertMsg);
                                 SimpleLogger.LogInfo($"✓ Message {message.MessageId} acknowledged (ORAE validation failed, will not be redelivered)");
                                 return SubscriberClient.Reply.Ack; // ACK to prevent redelivery of invalid ORAE data
                             }
@@ -342,7 +537,7 @@ public partial class Program
                             try
                             {
                                 if (debugLog) { SimpleLogger.LogDebug($"Calling publisher.PublishAsync (attempt {attempt}/{maxRetries})..."); }
-                                string publishedId = await publisher.PublishAsync(responseMessage);
+                                string publishedId = await publisher!.PublishAsync(responseMessage);
                                 if (debugLog) { SimpleLogger.LogDebug($"PublishAsync returned, MessageId={publishedId}"); }
                                 SimpleLogger.LogInfo($"✓ Published response: {publishedId} with {responseMessage.Attributes.Count} attributes");
                                 break; // Success — exit retry loop
@@ -363,6 +558,20 @@ public partial class Program
                     {
                         SimpleLogger.LogError($"✗ Error: {ex.Message}");
                         if (debugLog) { SimpleLogger.LogDebug($"Returning Nack for MessageId={message.MessageId} due to exception: {ex.Message}"); }
+
+                        // Check if publish failure is auth-related
+                        bool isPublishAuth = ex is Grpc.Core.RpcException rpc
+                            && (rpc.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpc.StatusCode == Grpc.Core.StatusCode.PermissionDenied || rpc.StatusCode == Grpc.Core.StatusCode.NotFound);
+                        if (!isPublishAuth)
+                            isPublishAuth = ex.Message.Contains("credential", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                                || ex.Message.Contains("does not have access", StringComparison.OrdinalIgnoreCase);
+                        if (isPublishAuth)
+                            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, $"✗ AUTHENTICATION FAILED: Publish to PubSub failed. Check credentials. {ScrubExceptionMessage(ex.Message)}");
+
                         return SubscriberClient.Reply.Nack;
                     }
                 });
@@ -379,13 +588,82 @@ public partial class Program
                 }
                 else
                 {
-                    SimpleLogger.LogWarning("⚠ Subscriber stopped. Reconnecting...");
+                    var subscriberUptime = DateTime.UtcNow - subscriberStartTime;
+                    var disconnectTime = DateTime.UtcNow;
+
+                    // Check backlog during reconnect gap so we know if transactions are waiting
+                    if (pubSubConfig.EnableBacklogMonitor)
+                    {
+                        long backlog = await GetUndeliveredMessageCountAsync(projectId, subscriptionId);
+                        if (backlog > 0)
+                            SimpleLogger.LogWarning($"⚠ RECONNECT GAP: {backlog} message(s) waiting in subscription while disconnected");
+                        else if (backlog == 0)
+                            SimpleLogger.LogInfo("  Backlog check: 0 messages waiting during reconnect");
+                    }
+
+                    if (subscriberUptime.TotalSeconds < 30)
+                    {
+                        // Subscriber stopped almost immediately — likely an auth/connection failure
+                        authFailureCount++;
+                        SimpleLogger.LogWarning($"⚠ Subscriber stopped after {subscriberUptime.TotalSeconds:F0}s (possible auth failure {authFailureCount}/{maxAuthRetries}). Reconnecting...");
+                        if (authFailureCount >= maxAuthRetries)
+                        {
+                            string alertMsg = $"✗ AUTHENTICATION FAILED: PubSub subscriber failed to stay connected after {maxAuthRetries} attempts (last uptime: {subscriberUptime.TotalSeconds:F0}s). Check credentials and project configuration.";
+                            SimpleLogger.LogError(alertMsg);
+                            await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                            authFailureCount = 0;
+                        }
+                        try { await Task.Delay(TimeSpan.FromSeconds(30), shutdownCts.Token); }
+                        catch (OperationCanceledException) { }
+                    }
+                    else
+                    {
+                        authFailureCount = 0; // Was connected long enough — not an auth issue
+                        SimpleLogger.LogWarning($"⚠ Subscriber stopped after {subscriberUptime.TotalMinutes:F1} min uptime. Reconnecting...");
+                    }
+
+                    var gapDuration = DateTime.UtcNow - disconnectTime;
+                    SimpleLogger.LogInfo($"  Reconnect gap duration: {gapDuration.TotalSeconds:F0}s");
                 }
+            }
+            catch (Grpc.Core.RpcException rpcEx) when (rpcEx.StatusCode == Grpc.Core.StatusCode.Unauthenticated || rpcEx.StatusCode == Grpc.Core.StatusCode.PermissionDenied || rpcEx.StatusCode == Grpc.Core.StatusCode.NotFound)
+            {
+                authFailureCount++;
+                SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {rpcEx.Message}", rpcEx);
+                if (authFailureCount >= maxAuthRetries)
+                {
+                    string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(rpcEx.Message)}";
+                    SimpleLogger.LogError(alertMsg, rpcEx);
+                    await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                    authFailureCount = 0; // Reset so next cycle can retry
+                }
+                try { await Task.Delay(TimeSpan.FromSeconds(30), shutdownCts.Token); }
+                catch (OperationCanceledException) { }
             }
             catch (Exception ex)
             {
-                SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
-                try { await Task.Delay(TimeSpan.FromSeconds(5), shutdownCts.Token); }
+                bool isAuthError = ex.Message.Contains("credential", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("does not have access", StringComparison.OrdinalIgnoreCase);
+                if (isAuthError)
+                {
+                    authFailureCount++;
+                    SimpleLogger.LogError($"✗ Subscriber auth failure {authFailureCount}/{maxAuthRetries}: {ex.Message}", ex);
+                    if (authFailureCount >= maxAuthRetries)
+                    {
+                        string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub subscriber after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(ex.Message)}";
+                        SimpleLogger.LogError(alertMsg, ex);
+                        await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
+                        authFailureCount = 0; // Reset so next cycle can retry
+                    }
+                }
+                else
+                    SimpleLogger.LogError($"✗ Subscriber error: {ex.Message}. Reconnecting in 5 seconds...", ex);
+
+                try { await Task.Delay(TimeSpan.FromSeconds(isAuthError ? 30 : 5), shutdownCts.Token); }
                 catch (OperationCanceledException) { } // Shutdown requested during delay
             }
             finally
@@ -394,11 +672,11 @@ public partial class Program
                 activeSubscriber = null;
                 if (subscriber != null)
                 {
-                    try
+                    // Use Interlocked to ensure StopAsync is only called once across all paths
+                    if (Interlocked.CompareExchange(ref subscriberStopping, 1, 0) == 0)
                     {
-                        await subscriber.StopAsync(CancellationToken.None);
+                        try { await subscriber.StopAsync(CancellationToken.None); } catch { }
                     }
-                    catch { }
                 }
             }
         }
@@ -407,7 +685,7 @@ public partial class Program
         SimpleLogger.LogInfo("⏹ Shutting down publisher...");
         try
         {
-            await publisher.ShutdownAsync(TimeSpan.FromSeconds(10));
+            await publisher!.ShutdownAsync(TimeSpan.FromSeconds(10));
             SimpleLogger.LogInfo("✓ Publisher shut down cleanly.");
         }
         catch (Exception ex)

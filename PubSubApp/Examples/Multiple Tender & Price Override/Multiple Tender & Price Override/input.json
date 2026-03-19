@@ -1,0 +1,195 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventId": "7422501634671419752",
+	"occurredAt": "2026-01-29T04:55:00Z",
+	"ingestedAt": "2026-01-29T04:55:02Z",
+	"businessContext": {
+		"businessDay": "2026-01-29",
+		"channel": "STORE",
+		"fulfillment": "CARRYOUT",
+		"store": {
+			"currency": "CAD",
+			"storeId": "55010",
+			"taxArea": "ON"
+		},
+		"workstation": {
+			"registerId": "85",
+			"sequenceNumber": 616,
+			"type": "POS"
+		}
+	},
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionSale",
+	"transaction": {
+		"transactionType": "SALE",
+		"items": [
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "PAINT INTERIOR WH.GLOSS 3.78L",
+					"sku": "000491013",
+					"gtin": "12345678"
+				},
+				"lineId": "17696623045431301446",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "9.00"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "44.99"
+					},
+					"priceOverride": {
+						"approvedBy": "2",
+						"overridden": true,
+						"overrideUnitPrice": {
+							"currency": "CAD",
+							"value": "9.00"
+						},
+						"reason": "INCORRECT_PRICE"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "9.00"
+					}
+				},
+				"quantity": {
+					"uom": "EA",
+					"value": 1
+				},
+				"taxes": [
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "1.17"
+						},
+						"taxCode": "SALES"
+					},
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "0.00"
+						},
+						"jurisdiction": {
+							"region": "HON"
+						},
+						"taxCode": "HST"
+					}
+				]
+			}
+		],
+		"tenders": [
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "1.10"
+				},
+				"card": {
+					"authCode": "0987654",
+					"emv": {
+						"tags": {
+							"magStrip": "S"
+						}
+					},
+					"entryMode": "SWIPED",
+					"last4": "2346",
+					"responseCode": "1[49]",
+					"scheme": "VISA"
+				},
+				"entryMethod": "SWIPED",
+				"method": "CREDIT",
+				"requestedAmount": {
+					"currency": "CAD",
+					"value": "1.10"
+				},
+				"tenderId": "VI"
+			},
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "8.49"
+				},
+				"card": {
+					"authCode": "0668512",
+					"emv": {
+						"tags": {
+							"magStrip": "S"
+						}
+					},
+					"entryMode": "SWIPED",
+					"last4": "4902",
+					"responseCode": "1[49]",
+					"scheme": "GC"
+				},
+				"entryMethod": "SWIPED",
+				"giftCard": {
+					"cardToken": "6006497092249904902"
+				},
+				"method": "GIFTCARD",
+				"requestedAmount": {
+					"currency": "CAD",
+					"value": "8.49"
+				},
+				"tenderId": "PG"
+			},
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "0.58"
+				},
+				"card": {
+					"authCode": "0752846",
+					"emv": {
+						"tags": {
+							"magStrip": "S"
+						}
+					},
+					"entryMode": "SWIPED",
+					"last4": "9871",
+					"responseCode": "1[49]",
+					"scheme": "DEBITATM"
+				},
+				"entryMethod": "SWIPED",
+				"method": "DEBIT",
+				"requestedAmount": {
+					"currency": "CAD",
+					"value": "0.58"
+				},
+				"tenderId": "DC"
+			}
+		],
+		"totals": {
+			"discounts": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"gross": {
+				"currency": "CAD",
+				"value": "9.00"
+			},
+			"net": {
+				"currency": "CAD",
+				"value": "10.17"
+			},
+			"tax": {
+				"currency": "CAD",
+				"value": "1.17"
+			}
+		}
+	},
+	"promotions": [],
+	"actor": {
+		"cashier": {
+			"loginId": "1"
+		},
+		"customer": {
+			"customerIdToken": ""
+		}
+	}
+}

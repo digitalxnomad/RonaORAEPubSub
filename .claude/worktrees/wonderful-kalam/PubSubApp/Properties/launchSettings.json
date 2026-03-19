@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PubSubApp": {
+      "commandName": "Project",
+      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\ORAE\\UnitTestTransactions\\0764 Dump and round up donation\\0764 Input Dump SKU Retest.json\""
+    }
+  }
+}

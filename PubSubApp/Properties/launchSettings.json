@@ -2,7 +2,7 @@
   "profiles": {
     "PubSubApp": {
       "commandName": "Project",
-      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\ORAE\\UnitTestTransactions\\0764 Dump and round up donation\\0764 Input Dump SKU Retest.json\""
+      "commandLineArgs": "--test \"C:\\Users\\cwils\\Downloads\\Ecofee SKU + Manual Override\\Ecofee SKU + Manual Override\\input.json\""
     }
   }
 }

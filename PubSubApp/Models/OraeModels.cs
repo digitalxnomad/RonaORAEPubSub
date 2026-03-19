@@ -154,8 +154,26 @@ public class TransactionItem
     [JsonPropertyName("taxes")]
     public List<TaxDetail>? Taxes { get; set; }
 
+    [JsonPropertyName("fees")]
+    public List<Fee>? Fees { get; set; }
+
     [JsonPropertyName("attributes")]
     public Dictionary<string, string>? Attributes { get; set; }
+}
+
+public class Fee
+{
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("amount")]
+    public CurrencyAmount? Amount { get; set; }
+
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
+
+    [JsonPropertyName("authority")]
+    public string? Authority { get; set; }
 }
 
 public class Item

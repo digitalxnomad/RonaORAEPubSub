@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PubSubApp v1.0.36 - Change Report (02/02/2026)</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 40px; color: #1a1a1a; font-size: 11pt; line-height: 1.5; }
+  h1 { color: #1a3a5c; border-bottom: 3px solid #1a3a5c; padding-bottom: 8px; font-size: 20pt; margin-bottom: 5px; }
+  .subtitle { color: #555; font-size: 11pt; margin-bottom: 25px; }
+  h2 { color: #2a5a8c; border-bottom: 2px solid #ccc; padding-bottom: 4px; font-size: 14pt; margin-top: 25px; }
+  h3 { color: #3a6a9c; font-size: 12pt; margin-top: 18px; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 15px 0; font-size: 10pt; }
+  th { background: #1a3a5c; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f5f8fc; }
+  tr:nth-child(odd) { background: #ffffff; }
+  .old { color: #c0392b; text-decoration: line-through; }
+  .new { color: #27ae60; font-weight: 600; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 9.5pt; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 10px 14px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 9pt; line-height: 1.4; white-space: pre; overflow-x: auto; margin: 8px 0 15px 0; }
+  .section { margin-bottom: 20px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 8pt; font-weight: 600; margin-right: 5px; }
+  .badge-new { background: #27ae60; color: white; }
+  .badge-changed { background: #e67e22; color: white; }
+  .badge-fixed { background: #c0392b; color: white; }
+  ul { margin: 5px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  .summary-box { background: #eef3f9; border: 1px solid #b0c4de; border-radius: 5px; padding: 12px 16px; margin: 15px 0; }
+  .summary-box strong { color: #1a3a5c; }
+  .page-break { page-break-before: always; }
+  .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 9pt; color: #888; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>PubSubApp v1.0.36 &mdash; Change Report</h1>
+<div class="subtitle">Date: February 2, 2026 &nbsp;|&nbsp; Branch: <code>latest1</code> &nbsp;|&nbsp; Files Changed: 2 &nbsp;|&nbsp; +365 / -169 lines</div>
+
+<div class="summary-box">
+  <strong>Summary:</strong> Corrected SLFTTP/SLFLNT transaction type mappings, added Customer and TaxJurisdiction models,
+  implemented TBLFLD TAXTXC tax authority to line type mapping, enhanced ORAE 2.0.0 validation with Money type checks,
+  and updated multiple SDISLF field mappings (SLFNUM, SLFACD, SLFTCD, SLFRSN, SLFSCN, SLFUPC, TNFRDS).
+</div>
+
+<!-- ============================================ -->
+<h2>1. SLFTTP &mdash; Transaction Type Mapping</h2>
+<span class="badge badge-fixed">CORRECTED</span>
+<p>Corrected all transaction type codes to match the SDISLF specification:</p>
+<table>
+  <tr><th>Transaction Type</th><th>Old Code</th><th>New Code</th><th>Description</th></tr>
+  <tr><td>SALE</td><td>01</td><td>01</td><td>Regular Sale (unchanged)</td></tr>
+  <tr><td>SALE (Employee)</td><td class="old">01 (temp)</td><td class="new">04</td><td>Employee Sale (restored)</td></tr>
+  <tr><td>RETURN</td><td class="old">02</td><td class="new">11</td><td>Return</td></tr>
+  <tr><td>AR_PAYMENT</td><td class="old">(missing)</td><td class="new">43</td><td>AR Payment (new)</td></tr>
+  <tr><td>VOID</td><td class="old">11</td><td class="new">87</td><td>Current Transaction Void</td></tr>
+  <tr><td>POST_VOID</td><td class="old">(was CLOSE=88)</td><td class="new">88</td><td>Post Void</td></tr>
+</table>
+<p>Default changed from <code>"Unknown: " + input</code> to <code>"01"</code>.</p>
+
+<div class="code-block">private string MapTransTypeSLFTTP(string input, bool hasEmployeeDiscount)
+{
+    if (input == "SALE" &amp;&amp; hasEmployeeDiscount)
+        return "04";
+
+    return input switch
+    {
+        "SALE"       =&gt; "01",
+        "RETURN"     =&gt; "11",
+        "AR_PAYMENT" =&gt; "43",
+        "VOID"       =&gt; "87",
+        "POST_VOID"  =&gt; "88",
+        _            =&gt; "01"
+    };
+}</div>
+
+<!-- ============================================ -->
+<h2>2. SLFLNT &mdash; Line Type Mapping</h2>
+<span class="badge badge-fixed">CORRECTED</span>
+<p>Updated line type logic and removed unused transaction types (LAYAWAY_*, SPECIAL_ORDER, etc.):</p>
+<table>
+  <tr><th>Condition</th><th>Old Code</th><th>New Code</th><th>Description</th></tr>
+  <tr><td>SALE (regular)</td><td>01</td><td>01</td><td>Unchanged</td></tr>
+  <tr><td>SALE + Customer ID</td><td>02</td><td>02</td><td>Unchanged</td></tr>
+  <tr><td>SALE + Employee</td><td class="old">01 (temp)</td><td class="new">04</td><td>Restored</td></tr>
+  <tr><td>SALE/RETURN + Gift Card</td><td>45</td><td>45</td><td>Unchanged</td></tr>
+  <tr><td>RETURN (regular)</td><td>11</td><td>11</td><td>Unchanged</td></tr>
+  <tr><td>RETURN + Customer ID</td><td>12</td><td>12</td><td>Unchanged</td></tr>
+  <tr><td>VOID</td><td class="old">(via switch)</td><td class="new">87</td><td>Current Void</td></tr>
+  <tr><td>POST_VOID</td><td class="old">(via switch)</td><td class="new">01</td><td>Post Void</td></tr>
+</table>
+
+<!-- ============================================ -->
+<h2>3. MapTaxAuthToLineType &mdash; TBLFLD TAXTXC</h2>
+<span class="badge badge-new">NEW METHOD</span>
+<p>Tax record SLFLNT is now determined by the TBLFLD TAXTXC mapping table instead of hardcoded "XH":</p>
+<table>
+  <tr><th>Tax Authority</th><th>Line Type</th><th>Description</th></tr>
+  <tr><td>BC</td><td>XR</td><td>British Columbia PST</td></tr>
+  <tr><td>FED</td><td>XG</td><td>Federal GST</td></tr>
+  <tr><td>HNB</td><td>XN</td><td>New Brunswick HST</td></tr>
+  <tr><td>HNF</td><td>XF</td><td>Newfoundland HST</td></tr>
+  <tr><td>HNS</td><td>XV</td><td>Nova Scotia HST</td></tr>
+  <tr><td>HON</td><td>XH</td><td>Ontario HST</td></tr>
+  <tr><td>HON1</td><td>XI</td><td>Ontario GST Portion</td></tr>
+  <tr><td>HPE</td><td>XP</td><td>PEI HST</td></tr>
+  <tr><td>MB</td><td>XM</td><td>Manitoba PST</td></tr>
+  <tr><td>PQ</td><td>XQ</td><td>Quebec QST</td></tr>
+  <tr><td>SK</td><td>XS</td><td>Saskatchewan PST</td></tr>
+  <tr><td>(default)</td><td>XH</td><td>Default to Ontario HST</td></tr>
+</table>
+
+<!-- ============================================ -->
+<h2>4. Original Transaction Fields (SLFOTS/SLFOTD/SLFOTR/SLFOTT)</h2>
+<span class="badge badge-changed">UPDATED</span>
+<p>Updated all references to use corrected SLFTTP codes. Applied to order records, Ontario tax records, and non-Ontario tax records:</p>
+<table>
+  <tr><th>SLFTTP Codes</th><th>SLFOTS</th><th>SLFOTD</th><th>SLFOTR</th><th>SLFOTT</th></tr>
+  <tr><td>01, 04, 43<br/>(Sale, Employee, AR)</td><td>"00000"</td><td>"000000"</td><td>"000"</td><td>"00000"</td></tr>
+  <tr><td>11 (Return)</td><td>StoreId</td><td>yyMMdd</td><td>RegisterId</td><td>SourceTransactionId<br/>(fallback: SequenceNumber)</td></tr>
+  <tr><td>87, 88<br/>(Void, Post Void)</td><td>StoreId</td><td>yyMMdd</td><td>RegisterId</td><td>SequenceNumber</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ============================================ -->
+<h2>5. New Model Classes</h2>
+
+<h3>5a. Customer Model</h3>
+<span class="badge badge-new">NEW</span>
+<p>Added to <code>Actor</code> class for SLFNUM customer number mapping:</p>
+<div class="code-block">public class Customer
+{
+    [JsonPropertyName("customerIdToken")]
+    public string? CustomerIdToken { get; set; }
+}</div>
+
+<h3>5b. TaxJurisdiction Model</h3>
+<span class="badge badge-new">NEW</span>
+<p>Added to <code>TaxDetail</code> class for SLFACD and SLFTCD tax record mapping:</p>
+<div class="code-block">public class TaxJurisdiction
+{
+    [JsonPropertyName("country")]
+    public string? Country { get; set; }
+
+    [JsonPropertyName("region")]
+    public string? Region { get; set; }
+
+    [JsonPropertyName("locality")]
+    public string? Locality { get; set; }
+
+    [JsonPropertyName("authorityId")]
+    public string? AuthorityId { get; set; }
+
+    [JsonPropertyName("authorityName")]
+    public string? AuthorityName { get; set; }
+}</div>
+
+<!-- ============================================ -->
+<h2>6. SDISLF Field Mapping Changes</h2>
+
+<table>
+  <tr><th>Field</th><th>Record Type</th><th>Change</th><th>Source / Logic</th></tr>
+  <tr>
+    <td><strong>SLFNUM</strong><br/>Customer Number</td>
+    <td>Order</td>
+    <td><span class="badge badge-new">NEW</span></td>
+    <td><code>actor.customer.customerIdToken</code><br/>10-digit with leading zeros; blank if no customer</td>
+  </tr>
+  <tr>
+    <td><strong>SLFACD</strong><br/>Tax Auth Code</td>
+    <td>Order<br/>Tax</td>
+    <td><span class="badge badge-changed">UPDATED</span></td>
+    <td>Order: always blank <code>""</code><br/>Tax: <code>taxes.jurisdiction.region</code> (was DetermineTaxAuthority)</td>
+  </tr>
+  <tr>
+    <td><strong>SLFTCD</strong><br/>Tax Rate Code</td>
+    <td>Order<br/>Tax</td>
+    <td><span class="badge badge-changed">UPDATED</span></td>
+    <td>Order: always blank <code>""</code><br/>Tax: first <code>taxes.taxCode</code> that has a <code>jurisdiction</code> object (was HST detection)</td>
+  </tr>
+  <tr>
+    <td><strong>SLFRSN</strong><br/>Reason Code</td>
+    <td>Order</td>
+    <td><span class="badge badge-changed">UPDATED</span></td>
+    <td>Default: 16 blank spaces<br/>RETURN&rarr;RRT0, VOID&rarr;VOD0, Override&rarr;POV0, Manual Discount&rarr;IDS0</td>
+  </tr>
+  <tr>
+    <td><strong>SLFSCN</strong><br/>Item Scanned</td>
+    <td>Order<br/>Tax</td>
+    <td><span class="badge badge-changed">UPDATED</span></td>
+    <td>Order: <code>Y</code> if item.gtin &gt; 0, <code>N</code> otherwise<br/>Tax: always blank (was UOM-based)</td>
+  </tr>
+  <tr>
+    <td><strong>SLFUPC</strong><br/>UPC Code</td>
+    <td>Order</td>
+    <td><span class="badge badge-changed">UPDATED</span></td>
+    <td><code>item.gtin</code> padded to 13 digits; <code>"0000000000000"</code> if no value</td>
+  </tr>
+  <tr>
+    <td><strong>TNFRDS</strong><br/>Reference Desc</td>
+    <td>Tender</td>
+    <td><span class="badge badge-changed">UPDATED</span></td>
+    <td>Always blank for all tender types (was TenderId for non-credit/debit)</td>
+  </tr>
+</table>
+
+<!-- ============================================ -->
+<h2>7. ValidateOraeCompliance &mdash; Enhanced</h2>
+<span class="badge badge-changed">UPDATED</span>
+
+<p>Updated to align with ORAE 2.0.0 JSON schema specification:</p>
+<ul>
+  <li><strong>New <code>ValidateMoney()</code> method</strong> &mdash; validates <code>currency</code> (ISO-4217, 3 uppercase letters) and <code>value</code> (signed decimal pattern <code>^-?[0-9]{1,18}(\.[0-9]{1,4})?$</code>)</li>
+  <li><strong>Money validation applied to:</strong>
+    <ul>
+      <li><code>totals.gross</code>, <code>totals.discounts</code>, <code>totals.tax</code>, <code>totals.net</code></li>
+      <li><code>pricing.unitPrice</code>, <code>pricing.extendedPrice</code></li>
+      <li><code>tender.amount</code></li>
+      <li><code>taxes[].amount</code> (per TaxComponent)</li>
+    </ul>
+  </li>
+  <li><strong><code>store.currency</code></strong> &mdash; ISO-4217 format check (3 uppercase letters)</li>
+  <li><strong><code>workstation.sequenceNumber</code></strong> &mdash; must be &ge; 0 if present</li>
+  <li><strong>Error messages improved</strong> &mdash; enum values listed (e.g., "Must be one of: ORIGINAL, CORRECTION...")</li>
+  <li><strong>Schema comments</strong> &mdash; added throughout for traceability</li>
+</ul>
+
+<!-- ============================================ -->
+<h2>8. Error Handling</h2>
+<span class="badge badge-changed">UPDATED</span>
+<p>Messages that fail validation (&gt;10 errors) are now <strong>ACKed</strong> instead of NACKed/thrown, preventing infinite redelivery loops in Pub/Sub.</p>
+
+<!-- ============================================ -->
+<h2>9. GetCustomerId &mdash; Updated</h2>
+<span class="badge badge-changed">UPDATED</span>
+<p>Previously returned empty string with a TODO comment. Now extracts customer ID from ORAE:</p>
+<div class="code-block">private string GetCustomerId(RetailEvent retailEvent)
+{
+    return retailEvent.Actor?.Customer?.CustomerIdToken ?? "";
+}</div>
+
+<!-- ============================================ -->
+<h2>10. Version &amp; README</h2>
+<ul>
+  <li>Version bumped: <code>v1.0.35</code> &rarr; <code>v1.0.36</code></li>
+  <li>Date updated: <code>01/30/26</code> &rarr; <code>02/02/26</code></li>
+  <li>README.md updated with corrected mapping tables, new TBLFLD TAXTXC table, v1.0.36 version history</li>
+</ul>
+
+<!-- ============================================ -->
+<h2>Commits</h2>
+<table>
+  <tr><th>Hash</th><th>Message</th></tr>
+  <tr><td><code>cb3dc63</code></td><td>Update SLFTTP/SLFLNT mappings, add Customer/TaxJurisdiction models, tax auth line type mapping</td></tr>
+  <tr><td><code>1a8d05e</code></td><td>Update (user edit)</td></tr>
+  <tr><td><code>3a4c8fe</code></td><td>Update README with v1.0.36 changes and corrected field mapping tables</td></tr>
+</table>
+
+<div class="summary-box">
+  <strong>Files Modified:</strong> PubSubApp/Program.cs (+279/-129), README.md (+84/-39)<br/>
+  <strong>Total:</strong> 365 insertions, 169 deletions
+</div>
+
+<div class="footer">
+  PubSubApp v1.0.36 Change Report &mdash; Generated 02/02/2026 &mdash; RonaORAEPubSub / latest1 branch
+</div>
+
+</body>
+</html>
