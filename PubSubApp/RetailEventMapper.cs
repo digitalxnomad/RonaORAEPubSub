@@ -1661,7 +1661,7 @@ class RetailEventMapper
                         continue;
 
                     // Map tax type/category to ChargedTax1-4 flags
-                    string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
+                    string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper() ?? tax.TaxCode?.ToUpper();
 
                     // Alberta: GST-only province, all taxes are federal GST -> SLFTX2 = Y
                     if (isGstOnlyProvince)
