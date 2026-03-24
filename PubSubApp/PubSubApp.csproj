@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="C:\Projects_2017\RonaORAEPubSub\RonaPubSubQA.bat" />
+    <Exec Command="C:\CurrentProjects\TT\RonaORAEPubSub\RonaPubSubQA.bat" />
   </Target>
 
 </Project>

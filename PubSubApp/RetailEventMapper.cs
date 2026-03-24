@@ -831,7 +831,7 @@ class RetailEventMapper
                         {
                             if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
                             {
-                                string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper();
+                                string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper() ?? tax.TaxCode?.ToUpper();
 
                                 bool isFederal = taxType is "GST" or "FEDERAL" or "VAT" or "NATIONAL";
                                 bool isProvincial = taxType is "PST" or "QST" or "PROVINCIAL" or "STATE" or "QUEBEC";
