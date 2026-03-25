@@ -65,6 +65,10 @@ public static class RecordSetValidator
                 if (string.IsNullOrEmpty(order.ExtendedValue))
                     errors.Add($"{prefix}: SLFEXT (ExtendedValue) is required");
 
+                // HST (SLFTX3) and Partial HST (SLFTX4) are mutually exclusive on the same record
+                if (order.ChargedTax3 == "Y" && order.ChargedTax4 == "Y")
+                    errors.Add($"{prefix}: SLFTX3 (HST) and SLFTX4 (Partial HST) cannot both be 'Y' on the same SKU record");
+
                 // Validate all string field lengths using reflection
                 ValidateStringFieldLengths(order, typeof(OrderRecord), prefix, errors);
             }

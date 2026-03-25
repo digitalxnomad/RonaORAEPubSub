@@ -152,6 +152,45 @@ public static class OraeValidator
                 errors.Add("transaction.items[] must have at least one item for non-CANCEL/VOID transactions");
             }
 
+            // ── Ontario transaction-level HST consistency check ──
+            // All items in an Ontario transaction must use the same HST type.
+            // Mixing full-HST (13%, HON → XH) and Partial-HST (5%, HON1 → XI) items
+            // in the same transaction produces both an XH and XI consolidated tax record,
+            // which is not permitted.
+            if (retailEvent.Transaction.Items != null &&
+                IsOntarioTaxArea(retailEvent.BusinessContext?.Store?.TaxArea))
+            {
+                bool txHasFullHst    = false;
+                bool txHasPartialHst = false;
+
+                foreach (var txItem in retailEvent.Transaction.Items)
+                {
+                    foreach (var tax in txItem.Taxes ?? new List<TaxDetail>())
+                    {
+                        if (!string.IsNullOrEmpty(tax.RatePercent) &&
+                            decimal.TryParse(tax.RatePercent, out decimal rp))
+                        {
+                            if (rp >= 10) txHasFullHst    = true;
+                            else          txHasPartialHst = true;
+                        }
+                        else if (tax.TaxRate != null)
+                        {
+                            if (tax.TaxRate.Value >= 0.10m) txHasFullHst    = true;
+                            else                            txHasPartialHst = true;
+                        }
+                        else if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                        {
+                            string region = tax.Jurisdiction.Region.ToUpper();
+                            if (region == "HON1")                               txHasPartialHst = true;
+                            else if (region == "HON" || region.Contains("HST")) txHasFullHst    = true;
+                        }
+                    }
+                }
+
+                if (txHasFullHst && txHasPartialHst)
+                    errors.Add("Ontario transaction cannot mix full HST (13%, HON) and Partial HST (5%, HON1) items — all items must use the same HST type to prevent both XH and XI tax records being generated");
+            }
+
             // ── LineItem validation (schema: $defs/LineItem) ──
             if (retailEvent.Transaction.Items != null)
             {
@@ -211,6 +250,38 @@ public static class OraeValidator
                             else
                                 ValidateMoney(tax.TaxAmount, $"{prefix}.taxes[{t}].amount", errors);
                         }
+
+                        // Ontario: a single SKU cannot carry both full HST (13%) and Partial HST (5%)
+                        // simultaneously — that would produce both an XH and XI consolidated tax record.
+                        if (IsOntarioTaxArea(retailEvent.BusinessContext?.Store?.TaxArea) && item.Taxes.Count > 1)
+                        {
+                            bool hasFullHst    = false;
+                            bool hasPartialHst = false;
+
+                            foreach (var tax in item.Taxes)
+                            {
+                                if (!string.IsNullOrEmpty(tax.RatePercent) &&
+                                    decimal.TryParse(tax.RatePercent, out decimal rp))
+                                {
+                                    if (rp >= 10) hasFullHst    = true;
+                                    else          hasPartialHst = true;
+                                }
+                                else if (tax.TaxRate != null)
+                                {
+                                    if (tax.TaxRate.Value >= 0.10m) hasFullHst    = true;
+                                    else                            hasPartialHst = true;
+                                }
+                                else if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                                {
+                                    string region = tax.Jurisdiction.Region.ToUpper();
+                                    if (region == "HON1")                            hasPartialHst = true;
+                                    else if (region == "HON" || region.Contains("HST")) hasFullHst = true;
+                                }
+                            }
+
+                            if (hasFullHst && hasPartialHst)
+                                errors.Add($"{prefix}: SKU cannot be charged both full HST (13%) and Partial HST (5%) — only one tax type is allowed per SKU record");
+                        }
                     }
                 }
             }
@@ -260,5 +331,16 @@ public static class OraeValidator
     private static bool IsValidEnum(string value, string[] validValues)
     {
         return validValues.Contains(value);
+    }
+
+    // Returns true when the store's TaxArea identifies Ontario —
+    // mirrors the province-detection logic used by RetailEventMapper.GetProvince().
+    private static bool IsOntarioTaxArea(string? taxArea)
+    {
+        if (string.IsNullOrEmpty(taxArea)) return false;
+        string upper = taxArea.ToUpper();
+        if (upper.Length >= 2 && upper.Substring(0, 2) == "ON") return true;
+        if (upper.Contains("ONTARIO") || upper.Contains("HON"))  return true;
+        return false;
     }
 }
