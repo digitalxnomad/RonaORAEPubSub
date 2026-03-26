@@ -582,12 +582,12 @@ class RetailEventMapper
                         // 1. Place parent SKU item record only
                         PlaceItemRecord(txIdx);
                         // 2. Place each EPP child item record only
-                        foreach (int eppTxIdx in eppChildMap[txItem.LineId])
+                        foreach (int eppTxIdx in eppChildMap[txItem.LineId!])
                             PlaceItemRecord(eppTxIdx);
                         // 3. Place parent SKU eco fees
                         PlaceEcoFeeRecords(txIdx);
                         // 4. Place EPP child eco fees
-                        foreach (int eppTxIdx in eppChildMap[txItem.LineId])
+                        foreach (int eppTxIdx in eppChildMap[txItem.LineId!])
                             PlaceEcoFeeRecords(eppTxIdx);
                     }
                     else
