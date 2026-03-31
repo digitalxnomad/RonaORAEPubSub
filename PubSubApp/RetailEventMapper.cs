@@ -540,7 +540,7 @@ class RetailEventMapper
                 }
             }
 
-            // Helper to place all records in a transaction item's range
+            // Helper to place all records in a transaction item's range (item + eco fees as a block)
             void PlaceRange(int txIdx)
             {
                 if (placedRanges.Contains(txIdx)) return;
@@ -551,11 +551,29 @@ class RetailEventMapper
                     reorderedRecords.Add(itemRecords[i]);
             }
 
+            // Helper to place only the item record (index 0 of range), leaving eco fees for later
+            void PlaceItemRecord(int txIdx)
+            {
+                reorderedRecords.Add(itemRecords[itemRangeStart[txIdx]]);
+            }
+
+            // Helper to place only the eco fee records (indices 1+ of range) and mark the range as placed
+            void PlaceEcoFeeRecords(int txIdx)
+            {
+                placedRanges.Add(txIdx);
+                int start = itemRangeStart[txIdx];
+                int count = itemRangeCount[txIdx];
+                for (int i = start + 1; i < start + count && i < itemRecords.Count; i++)
+                    reorderedRecords.Add(itemRecords[i]);
+            }
+
             // Build ordered list
             if (retailEvent.Transaction?.Items != null)
             {
                 for (int txIdx = 0; txIdx < retailEvent.Transaction.Items.Count; txIdx++)
                 {
+                    if (placedRanges.Contains(txIdx)) continue;
+
                     var txItem = retailEvent.Transaction.Items[txIdx];
                     string? covId = GetEPPCoverageIdentifier(txItem);
 
@@ -563,14 +581,26 @@ class RetailEventMapper
                     if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
                         continue;
 
-                    // Place this item and its eco fee records
-                    PlaceRange(txIdx);
+                    bool hasEppChildren = !string.IsNullOrEmpty(txItem.LineId) && eppChildMap.ContainsKey(txItem.LineId);
 
-                    // Insert any EPP-9 children that reference this item's lineId (with their eco fees)
-                    if (!string.IsNullOrEmpty(txItem.LineId) && eppChildMap.ContainsKey(txItem.LineId))
+                    if (hasEppChildren)
                     {
-                        foreach (int eppTxIdx in eppChildMap[txItem.LineId])
-                            PlaceRange(eppTxIdx);
+                        // Required order: SKU line → EPP line → Eco fee line
+                        // 1. Place parent SKU item record only
+                        PlaceItemRecord(txIdx);
+                        // 2. Place each EPP child item record only
+                        foreach (int eppTxIdx in eppChildMap[txItem.LineId!])
+                            PlaceItemRecord(eppTxIdx);
+                        // 3. Place parent SKU eco fees
+                        PlaceEcoFeeRecords(txIdx);
+                        // 4. Place EPP child eco fees
+                        foreach (int eppTxIdx in eppChildMap[txItem.LineId!])
+                            PlaceEcoFeeRecords(eppTxIdx);
+                    }
+                    else
+                    {
+                        // No EPP children - place item and eco fees as a standard block
+                        PlaceRange(txIdx);
                     }
                 }
             }
