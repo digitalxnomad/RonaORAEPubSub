@@ -1620,6 +1620,7 @@ class RetailEventMapper
             tenderRecord.Amount = "00000000000";
             tenderRecord.AmountNegativeSign = " ";
             tenderRecord.TransactionSeq = "00001";
+            tenderRecord.CustomerMember = "00000000";
 
             // Log audit info
             string auditCode = retailEvent.Audit?.Code ?? "";
