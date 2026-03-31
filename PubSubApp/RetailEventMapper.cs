@@ -10,6 +10,13 @@ class RetailEventMapper
 {
     public RecordSet MapRetailEventToRecordSet(RetailEvent retailEvent)
     {
+        // ── transactionBurned: early-return path ──
+        // Burned transactions produce only a single TenderRecord with TNFTTP = "99"
+        if (retailEvent.EventSubType == "transactionBurned")
+        {
+            return MapTransactionBurned(retailEvent);
+        }
+
         // Check for employee discount (will set SLFPVC and affect SLFTTP/SLFLNT)
         bool hasEmployeeDiscount = HasEmployeeDiscount(retailEvent);
 
@@ -1553,7 +1560,50 @@ class RetailEventMapper
             return false;
         }
 
-       // Get date as integer in YYMMDD format
+       // Maps a transactionBurned event to a RecordSet with a single TenderRecord (TNFTTP = "99")
+        private RecordSet MapTransactionBurned(RetailEvent retailEvent)
+        {
+            // Parse storeId as integer for PolledStore fields
+            int? polledStoreInt = null;
+            if (int.TryParse(retailEvent.BusinessContext?.Store?.StoreId, out int storeId))
+            {
+                polledStoreInt = storeId;
+            }
+
+            // Apply timezone adjustment
+            DateTime transactionDateTime = ApplyTimezoneAdjustment(
+                retailEvent.OccurredAt,
+                retailEvent.BusinessContext?.Store?.TimeZone,
+                retailEvent.BusinessContext?.Store?.StoreId);
+
+            int pollCen = 1;
+            int pollDate = GetDateAsInt(transactionDateTime);
+            int createCen = 1;
+            int createDate = pollDate;
+            int createTime = GetTimeAsInt(transactionDateTime);
+
+            var tenderRecord = CreateBaseTenderRecord(
+                transactionDateTime, "99", retailEvent,
+                polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+
+            tenderRecord.FundCode = "  ";
+            tenderRecord.Amount = "00000000000";
+            tenderRecord.AmountNegativeSign = " ";
+            tenderRecord.TransactionSeq = "00001";
+
+            // Log audit info
+            string auditCode = retailEvent.Audit?.Code ?? "";
+            string auditMessage = retailEvent.Audit?.Message ?? "";
+            SimpleLogger.LogInfo($"transactionBurned: audit.code={auditCode}, audit.message={auditMessage}");
+
+            return new RecordSet
+            {
+                OrderRecords = new List<OrderRecord>(),
+                TenderRecords = new List<TenderRecord> { tenderRecord }
+            };
+        }
+
+        // Get date as integer in YYMMDD format
         private int GetDateAsInt(DateTime date)
         {
             return int.Parse(date.ToString("yyMMdd"));

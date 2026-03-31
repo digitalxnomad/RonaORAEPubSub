@@ -1,0 +1,26 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionBurned",
+	"eventId": "bc68b330-da3b-491e-b873-65f3f78ee711",
+	"occurredAt": "2026-03-26T08:27:45-04:00",
+	"ingestedAt": "2026-03-26T08:27:45-04:00",
+	"businessContext": {
+		"businessDay": "2026-03-26",
+		"channel": "STORE",
+		"store": {
+			"storeId": "87853"
+		},
+		"workstation": {
+			"registerId": "04",
+			"sequenceNumber": 5373,
+			"type": "POS"
+		}
+	},
+	"audit": {
+		"code": "payment_declined",
+		"message": "burn type is payment_declined"
+	}
+}
