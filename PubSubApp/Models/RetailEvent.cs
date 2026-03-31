@@ -36,11 +36,14 @@ public class RetailEvent
     public string? SchemaVersion { get; set; }
 
     [JsonPropertyName("transaction")]
-    public required Transaction Transaction { get; set; }
+    public Transaction? Transaction { get; set; }
 
     [JsonPropertyName("promotions")]
     public List<JsonElement>? Promotions { get; set; }
 
     [JsonPropertyName("actor")]
     public Actor? Actor { get; set; }
+
+    [JsonPropertyName("audit")]
+    public Audit? Audit { get; set; }
 }

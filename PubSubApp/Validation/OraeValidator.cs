@@ -91,6 +91,18 @@ public static class OraeValidator
                 errors.Add("Missing required field: businessContext.channel");
         }
 
+        // ── transactionBurned: skip transaction validation entirely ──
+        if (retailEvent.EventSubType == "transactionBurned")
+        {
+            // Burned transactions have no transaction object — only audit info
+            if (retailEvent.Audit == null)
+                errors.Add("eventSubType 'transactionBurned' requires audit object");
+            else if (string.IsNullOrEmpty(retailEvent.Audit.Code))
+                errors.Add("Missing required field: audit.code for transactionBurned");
+
+            return errors;
+        }
+
         // ── Category-specific payload validation (schema: anyOf) ──
         // At least one typed payload object must be present
         if (retailEvent.EventCategory == "TRANSACTION" && retailEvent.Transaction == null)

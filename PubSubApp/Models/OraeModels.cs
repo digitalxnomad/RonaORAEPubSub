@@ -325,3 +325,12 @@ public class CurrencyAmount
     [JsonPropertyName("value")]
     public string? Value { get; set; }  // Using string? to match JSON, or use decimal if preferred
 }
+
+public class Audit
+{
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
+
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+}
