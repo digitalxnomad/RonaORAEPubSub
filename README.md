@@ -372,7 +372,6 @@ Log entries include:
 | WEB_SALE          | PL   | PayLater            |
 | PENNY_ROUNDING    | PR   | Penny Rounding      |
 | CHANGE            | ZZ   | Change              |
-| EXTENDED          | LC   | Extended            |
 
 ## Version History
 

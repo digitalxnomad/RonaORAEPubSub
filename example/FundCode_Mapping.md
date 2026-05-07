@@ -64,7 +64,6 @@ Maps the `tender.method` string to a 2-letter fund code. This method exists as a
 | `WEB_SALE` | `PL` | Web Sale |
 | `PENNY_ROUNDING` | `PR` | Penny Rounding |
 | `CHANGE` | `ZZ` | Change |
-| `EXTENDED` | `LC` | Extended |
 | _(unknown)_ | `CA` | Default to Cash |
 
 ### MapCardSchemeToFundCode
