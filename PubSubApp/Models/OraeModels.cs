@@ -97,6 +97,9 @@ public class Tender
     [JsonPropertyName("method")]
     public string? Method { get; set; }
 
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
     [JsonPropertyName("amount")]
     public CurrencyAmount? Amount { get; set; }
 

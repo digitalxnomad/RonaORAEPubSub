@@ -1363,8 +1363,12 @@ class RetailEventMapper
                         transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
                         polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
 
-                    // TNFFCD - Fund code: Use TenderId directly from incoming ORAE data
-                    tenderRecord.FundCode = tender.TenderId ?? "";
+                    // TNFFCD - Fund code: Use TenderId directly from incoming ORAE data,
+                    // unless tender.type overrides it (e.g. EXTENDED → LC)
+                    if (tender.Type?.ToUpper() == "EXTENDED")
+                        tenderRecord.FundCode = "LC";
+                    else
+                        tenderRecord.FundCode = tender.TenderId ?? "";
 
                     // Tender amount with sign
                     if (tender.Amount?.Value != null)

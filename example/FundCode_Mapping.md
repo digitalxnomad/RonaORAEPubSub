@@ -66,6 +66,8 @@ Maps the `tender.method` string to a 2-letter fund code. This method exists as a
 | `CHANGE` | `ZZ` | Change |
 | _(unknown)_ | `CA` | Default to Cash |
 
+> **Override by `tender.type`:** If `tender.type` is `EXTENDED`, the fund code is set to `LC` regardless of `tender.tenderId`.
+
 ### MapCardSchemeToFundCode
 
 Maps the `tender.card.scheme` string to a 2-letter fund code. Used as a secondary lookup when card scheme information is available.
