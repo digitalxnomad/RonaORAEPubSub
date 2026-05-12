@@ -220,6 +220,10 @@ public class Program
         Output("");
         Output($"Report generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         Output($"Log file:         {logPath}");
+
+        Console.WriteLine();
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
     }
 }
 
