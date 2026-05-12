@@ -4,10 +4,41 @@ using Microsoft.Extensions.Configuration;
 
 namespace TransactionReport;
 
+public static class ReportLogger
+{
+    private static string _logFilePath = "";
+    private static readonly object _lock = new();
+
+    public static string Initialize()
+    {
+        string exeDir = AppContext.BaseDirectory;
+        _logFilePath = Path.Combine(exeDir, $"TransactionReport_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+        File.WriteAllText(_logFilePath, "");
+        return _logFilePath;
+    }
+
+    public static void Log(string message)
+    {
+        if (string.IsNullOrEmpty(_logFilePath)) return;
+        lock (_lock)
+        {
+            File.AppendAllText(_logFilePath, message + Environment.NewLine);
+        }
+    }
+}
+
 public class Program
 {
+    static void Output(string message)
+    {
+        Console.WriteLine(message);
+        ReportLogger.Log(message);
+    }
+
     public static void Main(string[] args)
     {
+        string logPath = ReportLogger.Initialize();
+
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -33,30 +64,38 @@ public class Program
             return;
         }
 
-        Console.WriteLine($"ORAE Transaction Report");
-        Console.WriteLine($"=======================");
-        Console.WriteLine($"Scanning: {inputPath}");
-        Console.WriteLine($"Pattern:  {filePattern}");
-        Console.WriteLine($"Subdirs:  {(searchSubdirs ? "Yes" : "No")}");
-        Console.WriteLine();
+        ReportLogger.Log($"Log file: {logPath}");
+        ReportLogger.Log("");
+
+        Output($"ORAE Transaction Report");
+        Output($"=======================");
+        Output($"Scanning: {inputPath}");
+        Output($"Pattern:  {filePattern}");
+        Output($"Subdirs:  {(searchSubdirs ? "Yes" : "No")}");
+        Output($"Log file: {logPath}");
+        Output("");
 
         var searchOption = searchSubdirs ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
         var jsonFiles = Directory.GetFiles(inputPath, filePattern, searchOption);
 
         if (jsonFiles.Length == 0)
         {
-            Console.WriteLine("No files found matching the pattern.");
+            Output("No files found matching the pattern.");
             return;
         }
+
 
         // StoreId -> (RegisterId -> count)
         var storeRegisterCounts = new SortedDictionary<string, SortedDictionary<string, int>>();
         int totalTransactions = 0;
         int parseErrors = 0;
         var eventTypes = new SortedDictionary<string, int>();
+        var parseErrorFiles = new List<(string file, string reason)>();
 
         foreach (var file in jsonFiles)
         {
+            string fileName = Path.GetFileName(file);
+
             try
             {
                 string json = File.ReadAllText(file);
@@ -64,6 +103,7 @@ public class Program
 
                 if (retailEvent?.BusinessContext?.Store?.StoreId == null)
                 {
+                    parseErrorFiles.Add((fileName, "Missing businessContext or storeId"));
                     parseErrors++;
                     continue;
                 }
@@ -72,6 +112,7 @@ public class Program
 
                 string storeId = retailEvent.BusinessContext.Store.StoreId;
                 string registerId = retailEvent.BusinessContext.Workstation?.RegisterId ?? "UNKNOWN";
+                string eventType = retailEvent.EventType ?? "UNKNOWN";
 
                 if (!storeRegisterCounts.ContainsKey(storeId))
                     storeRegisterCounts[storeId] = new SortedDictionary<string, int>();
@@ -81,83 +122,96 @@ public class Program
 
                 storeRegisterCounts[storeId][registerId]++;
 
-                string eventType = retailEvent.EventType ?? "UNKNOWN";
                 if (!eventTypes.ContainsKey(eventType))
                     eventTypes[eventType] = 0;
                 eventTypes[eventType]++;
             }
-            catch (JsonException)
+            catch (JsonException jex)
             {
+                parseErrorFiles.Add((fileName, $"JSON parse error: {jex.Message}"));
                 parseErrors++;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error reading {Path.GetFileName(file)}: {ex.Message}");
+                parseErrorFiles.Add((fileName, $"{ex.GetType().Name}: {ex.Message}"));
                 parseErrors++;
             }
         }
 
         // Report Header
-        Console.WriteLine($"Files scanned:     {jsonFiles.Length}");
-        Console.WriteLine($"Valid transactions: {totalTransactions}");
+        Output($"Files scanned:     {jsonFiles.Length}");
+        Output($"Valid transactions: {totalTransactions}");
         if (parseErrors > 0)
-            Console.WriteLine($"Parse errors:      {parseErrors}");
-        Console.WriteLine();
+            Output($"Parse errors:      {parseErrors}");
+        Output("");
 
         // Store Summary
-        Console.WriteLine("STORE SUMMARY");
-        Console.WriteLine(new string('-', 60));
-        Console.WriteLine($"{"Store ID",-15} {"Transaction Count",20}");
-        Console.WriteLine(new string('-', 60));
+        Output("STORE SUMMARY");
+        Output(new string('-', 60));
+        Output($"{"Store ID",-15} {"Transaction Count",20}");
+        Output(new string('-', 60));
 
         foreach (var store in storeRegisterCounts)
         {
             int storeTotal = store.Value.Values.Sum();
-            Console.WriteLine($"{store.Key,-15} {storeTotal,20:N0}");
+            Output($"{store.Key,-15} {storeTotal,20:N0}");
         }
 
-        Console.WriteLine(new string('-', 60));
-        Console.WriteLine($"{"TOTAL",-15} {totalTransactions,20:N0}");
-        Console.WriteLine();
+        Output(new string('-', 60));
+        Output($"{"TOTAL",-15} {totalTransactions,20:N0}");
+        Output("");
 
         // Register Detail by Store
-        Console.WriteLine("REGISTER DETAIL BY STORE");
-        Console.WriteLine(new string('-', 60));
+        Output("REGISTER DETAIL BY STORE");
+        Output(new string('-', 60));
 
         foreach (var store in storeRegisterCounts)
         {
             int storeTotal = store.Value.Values.Sum();
-            Console.WriteLine();
-            Console.WriteLine($"Store: {store.Key}  (Total: {storeTotal:N0})");
-            Console.WriteLine($"  {"Register",-15} {"Count",20}");
-            Console.WriteLine($"  {new string('-', 55)}");
+            Output("");
+            Output($"Store: {store.Key}  (Total: {storeTotal:N0})");
+            Output($"  {"Register",-15} {"Count",20}");
+            Output($"  {new string('-', 55)}");
 
             foreach (var register in store.Value)
             {
-                Console.WriteLine($"  {register.Key,-15} {register.Value,20:N0}");
+                Output($"  {register.Key,-15} {register.Value,20:N0}");
             }
         }
 
-        Console.WriteLine();
+        Output("");
 
         // Event Type Breakdown
         if (eventTypes.Count > 0)
         {
-            Console.WriteLine("EVENT TYPE BREAKDOWN");
-            Console.WriteLine(new string('-', 60));
-            Console.WriteLine($"{"Event Type",-35} {"Count",20}");
-            Console.WriteLine(new string('-', 60));
+            Output("EVENT TYPE BREAKDOWN");
+            Output(new string('-', 60));
+            Output($"{"Event Type",-35} {"Count",20}");
+            Output(new string('-', 60));
 
             foreach (var et in eventTypes)
             {
-                Console.WriteLine($"{et.Key,-35} {et.Value,20:N0}");
+                Output($"{et.Key,-35} {et.Value,20:N0}");
             }
 
-            Console.WriteLine(new string('-', 60));
+            Output(new string('-', 60));
         }
 
-        Console.WriteLine();
-        Console.WriteLine($"Report generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        if (parseErrorFiles.Count > 0)
+        {
+            Output("");
+            Output("PARSE ERRORS");
+            Output(new string('-', 60));
+            foreach (var (file, reason) in parseErrorFiles)
+            {
+                Output($"  {file}");
+                Output($"    {reason}");
+            }
+        }
+
+        Output("");
+        Output($"Report generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        Output($"Log file:         {logPath}");
     }
 }
 
