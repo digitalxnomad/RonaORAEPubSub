@@ -39,6 +39,17 @@ public class Program
     {
         string logPath = ReportLogger.Initialize();
 
+        string configPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+        if (!File.Exists(configPath))
+        {
+            string msg = $"Configuration file not found: {configPath}";
+            Console.Error.WriteLine(msg);
+            ReportLogger.Log($"ERROR: {msg}");
+            Console.WriteLine("\nPress any key to exit...");
+            Console.ReadKey();
+            return;
+        }
+
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
