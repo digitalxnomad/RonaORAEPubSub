@@ -124,10 +124,15 @@ public class Program
                     continue;
                 }
 
+                string registerId = retailEvent.BusinessContext.Workstation?.RegisterId ?? "UNKNOWN";
+
+                // ACO only: skip SCO transactions (register starts with "8")
+                if (registerId.StartsWith("8"))
+                    continue;
+
                 totalTransactions++;
 
                 string storeId = retailEvent.BusinessContext.Store.StoreId;
-                string registerId = retailEvent.BusinessContext.Workstation?.RegisterId ?? "UNKNOWN";
                 string eventType = retailEvent.EventType ?? "UNKNOWN";
 
                 if (!storeRegisterCounts.ContainsKey(storeId))
