@@ -107,8 +107,8 @@ public class Program
         foreach (var file in jsonFiles)
         {
             fileCount++;
-            Console.Write($"\rProcessing file {fileCount} / {jsonFiles.Length}...");
             string fileName = Path.GetFileName(file);
+            Console.WriteLine($"  [{fileCount}/{jsonFiles.Length}] {fileName}");
 
             try
             {
@@ -160,7 +160,7 @@ public class Program
             }
         }
 
-        Console.Write("\r" + new string(' ', 40) + "\r");
+        Console.WriteLine();
 
         // Report Header
         Output($"Files scanned:     {jsonFiles.Length}");
