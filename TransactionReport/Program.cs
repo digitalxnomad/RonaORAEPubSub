@@ -78,8 +78,8 @@ public class Program
         ReportLogger.Log($"Log file: {logPath}");
         ReportLogger.Log("");
 
-        Output($"ORAE Transaction Report");
-        Output($"=======================");
+        Output($"Assisted Checkout (ACO) Totals");
+        Output($"==============================");
         Output($"Scanning: {inputPath}");
         Output($"Pattern:  {filePattern}");
         Output($"Subdirs:  {(searchSubdirs ? "Yes" : "No")}");
