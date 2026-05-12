@@ -103,8 +103,11 @@ public class Program
         var eventTypes = new SortedDictionary<string, int>();
         var parseErrorFiles = new List<(string file, string reason)>();
 
+        int fileCount = 0;
         foreach (var file in jsonFiles)
         {
+            fileCount++;
+            Console.Write($"\rProcessing file {fileCount} / {jsonFiles.Length}...");
             string fileName = Path.GetFileName(file);
 
             try
@@ -156,6 +159,8 @@ public class Program
                 parseErrors++;
             }
         }
+
+        Console.Write("\r" + new string(' ', 40) + "\r");
 
         // Report Header
         Output($"Files scanned:     {jsonFiles.Length}");
