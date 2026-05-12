@@ -103,7 +103,9 @@ public class Program
 
                 if (retailEvent?.BusinessContext?.Store?.StoreId == null)
                 {
-                    parseErrorFiles.Add((fileName, "Missing businessContext or storeId"));
+                    string reason = "Missing businessContext or storeId";
+                    parseErrorFiles.Add((fileName, reason));
+                    ReportLogger.Log($"ERROR: {fileName} - {reason}");
                     parseErrors++;
                     continue;
                 }
@@ -128,12 +130,18 @@ public class Program
             }
             catch (JsonException jex)
             {
-                parseErrorFiles.Add((fileName, $"JSON parse error: {jex.Message}"));
+                string reason = $"JSON parse error: {jex.Message}";
+                parseErrorFiles.Add((fileName, reason));
+                ReportLogger.Log($"ERROR: {fileName} - {reason}");
                 parseErrors++;
             }
             catch (Exception ex)
             {
-                parseErrorFiles.Add((fileName, $"{ex.GetType().Name}: {ex.Message}"));
+                string reason = $"{ex.GetType().Name}: {ex.Message}";
+                parseErrorFiles.Add((fileName, reason));
+                ReportLogger.Log($"ERROR: {fileName} - {reason}");
+                if (ex.StackTrace != null)
+                    ReportLogger.Log($"  StackTrace: {ex.StackTrace}");
                 parseErrors++;
             }
         }
