@@ -192,7 +192,7 @@ public class BusinessContextMinimal
     public WorkstationMinimal? Workstation { get; set; }
 
     [JsonPropertyName("businessDay")]
-    public DateTime? BusinessDay { get; set; }
+    public string? BusinessDay { get; set; }
 }
 
 public class StoreMinimal
