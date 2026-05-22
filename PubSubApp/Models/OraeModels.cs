@@ -159,6 +159,45 @@ public class TransactionItem
 
     [JsonPropertyName("attributes")]
     public Dictionary<string, string>? Attributes { get; set; }
+
+    [JsonPropertyName("giftCard")]
+    public GiftCardInfo? GiftCard { get; set; }
+
+    [JsonPropertyName("discounts")]
+    public List<ItemDiscount>? Discounts { get; set; }
+}
+
+public class GiftCardInfo
+{
+    [JsonPropertyName("action")]
+    public string? Action { get; set; }
+
+    [JsonPropertyName("amount")]
+    public CurrencyAmount? Amount { get; set; }
+
+    [JsonPropertyName("cardToken")]
+    public string? CardToken { get; set; }
+}
+
+public class ItemDiscount
+{
+    [JsonPropertyName("discountId")]
+    public string? DiscountId { get; set; }
+
+    [JsonPropertyName("appliedAmount")]
+    public CurrencyAmount? AppliedAmount { get; set; }
+
+    [JsonPropertyName("method")]
+    public string? Method { get; set; }
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("value")]
+    public string? Value { get; set; }
 }
 
 public class Fee
