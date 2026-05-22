@@ -388,6 +388,74 @@ class RetailEventMapper
                     lineIdToIndex[item.LineId] = itemRecords.Count - 1;
                 }
 
+                // ── GC Activation: add an additional SLF line (SLFLNT = "45") per GC item ──
+                if (IsGiftCardActivation(item))
+                {
+                    // Activation amount comes from giftCard.amount (the loaded value)
+                    string gcAmountStr = item.GiftCard?.Amount?.Value ?? "0.00";
+
+                    var gcActivationRecord = new OrderRecord
+                    {
+                        TransType = "01",
+                        LineType = "45",
+                        TransDate = transactionDateTime.ToString("yyMMdd"),
+                        TransTime = transactionDateTime.ToString("HHmmss"),
+                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                        TransSeq = "00000", // Placeholder - updated after grouping
+                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                        Clerk = salesPersonId,
+                        PolledStore = polledStoreInt,
+                        PollCen = pollCen,
+                        PollDate = pollDate,
+                        CreateCen = createCen,
+                        CreateDate = createDate,
+                        CreateTime = createTime,
+                        Status = " ",
+                        SKUNumber = PadNumeric(item.Item?.Sku, 9),
+                        Quantity = orderRecord.Quantity,
+                        QuantityNegativeSign = orderRecord.QuantityNegativeSign,
+                        OriginalPrice = FormatCurrency(gcAmountStr, 9),
+                        OriginalPriceNegativeSign = "",
+                        ItemSellPrice = FormatCurrency(gcAmountStr, 9),
+                        SellPriceNegativeSign = "",
+                        ExtendedValue = FormatCurrency(gcAmountStr, 11),
+                        ExtendedValueNegativeSign = "",
+                        OriginalRetail = FormatCurrency(gcAmountStr, 9),
+                        OriginalRetailNegativeSign = "",
+                        AdCode = "0000",
+                        AdPrice = "000000000",
+                        AdPriceNegativeSign = "",
+                        OverridePrice = "000000000",
+                        OverridePriceNegativeSign = "",
+                        DiscountAmount = "000000000",
+                        DiscountAmountNegativeSign = "",
+                        DiscountType = "",
+                        ChargedTax1 = "N",
+                        ChargedTax2 = "N",
+                        ChargedTax3 = "N",
+                        ChargedTax4 = "N",
+                        UPCCode = "0000000000000",
+                        SalesPerson = salesPersonId,
+                        OriginalSalesperson = "00000",
+                        OriginalStore = "00000",
+                        GroupDiscAmount = "000000000",
+                        GroupDiscSign = "",
+                        GroupDiscReason = "00",
+                        RegDiscReason = "00",
+                        ItemScanned = "N",
+                        ZipCode = PadOrTruncate("0", 10),
+                        ReasonCode = "                ",
+                        OrderNumber = "",
+                        ProjectNumber = "",
+                        SalesStore = 0,
+                        InvStore = 0,
+                        EReceiptEmail = "",
+                        EmployeeCardNumber = 0
+                    };
+                    itemRecords.Add(gcActivationRecord);
+                    SimpleLogger.LogInfo($"  ✓ GC Activation SLF line added (SLFLNT=45) for SKU {item.Item?.Sku}, activation amount={gcAmountStr}");
+                }
+
                 // Generate eco fee records for this item
                 if (item.Fees != null)
                 {
@@ -509,6 +577,8 @@ class RetailEventMapper
                     itemRangeStart.Add(recIdx);
                     var txItem = retailEvent.Transaction.Items[txIdx];
                     int count = 1; // the item record itself
+                    // Count GC activation record for this item
+                    if (IsGiftCardActivation(txItem)) count++;
                     // Count eco fee records for this item
                     if (txItem.Fees != null)
                     {
@@ -1453,6 +1523,39 @@ class RetailEventMapper
                 recordSet.TenderRecords.Add(tenderRecord);
             }
 
+            // ── GC Activation: add PP and PC tender lines per decision matrix ──
+            // PP (promo GC value) appears only when a Promo GC is activated
+            // PC (activation) appears for every transaction containing any GC activation
+            if (HasGiftCardActivation(retailEvent))
+            {
+                // PP line — Promo GC value (only if promo GC activations exist)
+                if (HasPromoGiftCardActivation(retailEvent))
+                {
+                    decimal promoTotal = GetPromoGiftCardTotal(retailEvent);
+                    var ppRecord = CreateBaseTenderRecord(
+                        transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                        polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+                    ppRecord.FundCode = "PP";
+                    var (ppAmount, ppSign) = FormatCurrencyWithSign(promoTotal.ToString("F2"), 11);
+                    ppRecord.Amount = ppAmount;
+                    ppRecord.AmountNegativeSign = ppSign;
+                    recordSet.TenderRecords.Add(ppRecord);
+                    SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PP) amount={promoTotal:F2}");
+                }
+
+                // PC line — activation event (always present when any GC activation exists)
+                decimal activationTotal = GetTotalGiftCardActivationAmount(retailEvent);
+                var pcRecord = CreateBaseTenderRecord(
+                    transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                    polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+                pcRecord.FundCode = "PC";
+                var (pcAmount, pcSign) = FormatCurrencyWithSign(activationTotal.ToString("F2"), 11);
+                pcRecord.Amount = pcAmount;
+                pcRecord.AmountNegativeSign = pcSign;
+                recordSet.TenderRecords.Add(pcRecord);
+                SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) amount={activationTotal:F2}");
+            }
+
             // Update all tender record sequences (continuing from last OrderRecord sequence)
             foreach (var tenderRecord in recordSet.TenderRecords)
             {
@@ -1531,6 +1634,77 @@ class RetailEventMapper
                 }
             }
             return false;
+        }
+
+        // ── Gift Card Activation detection ──
+
+        // Check if a transaction item is a GC activation (has giftCard object)
+        private bool IsGiftCardActivation(TransactionItem item)
+        {
+            return item.GiftCard != null;
+        }
+
+        // Check if a GC activation is Promotional (discounts[].discountId == "PromoGiftCard")
+        private bool IsPromoGiftCard(TransactionItem item)
+        {
+            if (item.Discounts == null) return false;
+            return item.Discounts.Any(d => d.DiscountId == "PromoGiftCard");
+        }
+
+        // Check if transaction contains any GC activation items
+        private bool HasGiftCardActivation(RetailEvent retailEvent)
+        {
+            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard != null) ?? false;
+        }
+
+        // Check if transaction contains any Promo GC activations
+        private bool HasPromoGiftCardActivation(RetailEvent retailEvent)
+        {
+            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard != null && IsPromoGiftCard(i)) ?? false;
+        }
+
+        // Check if transaction contains any Standard GC activations
+        private bool HasStandardGiftCardActivation(RetailEvent retailEvent)
+        {
+            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard != null && !IsPromoGiftCard(i)) ?? false;
+        }
+
+        // Check if transaction contains any regular (non-GC) items
+        private bool HasRegularItems(RetailEvent retailEvent)
+        {
+            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard == null) ?? false;
+        }
+
+        // Calculate total activation amount for all GC items in the transaction
+        private decimal GetTotalGiftCardActivationAmount(RetailEvent retailEvent)
+        {
+            decimal total = 0;
+            if (retailEvent.Transaction?.Items == null) return total;
+            foreach (var item in retailEvent.Transaction.Items)
+            {
+                if (item.GiftCard?.Amount?.Value != null &&
+                    decimal.TryParse(item.GiftCard.Amount.Value, out decimal gcAmount))
+                {
+                    total += gcAmount;
+                }
+            }
+            return total;
+        }
+
+        // Calculate total promo GC value (for PP tender line)
+        private decimal GetPromoGiftCardTotal(RetailEvent retailEvent)
+        {
+            decimal total = 0;
+            if (retailEvent.Transaction?.Items == null) return total;
+            foreach (var item in retailEvent.Transaction.Items)
+            {
+                if (item.GiftCard != null && IsPromoGiftCard(item) && item.GiftCard.Amount?.Value != null &&
+                    decimal.TryParse(item.GiftCard.Amount.Value, out decimal gcAmount))
+                {
+                    total += gcAmount;
+                }
+            }
+            return total;
         }
 
         // Get customer ID from transaction
