@@ -901,7 +901,11 @@ public class RetailEvent
                 var firstTender = retailEvent.Transaction.Tenders[0];
 
                 // Map tender method to fund code
-                recordSet.TenderRecord.FundCode = MapTenderMethodToFundCode(firstTender.Method);
+                // EXTENDED tenderId overrides the method-based mapping
+                if (firstTender.TenderId?.ToUpper() == "EXTENDED")
+                    recordSet.TenderRecord.FundCode = "LC";
+                else
+                    recordSet.TenderRecord.FundCode = MapTenderMethodToFundCode(firstTender.Method);
 
                 // Tender amount with sign
                 if (firstTender.Amount?.Value != null)
