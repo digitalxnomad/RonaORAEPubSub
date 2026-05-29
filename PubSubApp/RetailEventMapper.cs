@@ -1471,6 +1471,7 @@ class RetailEventMapper
                     var (ppAmount, ppSign) = FormatCurrencyWithSign(promoTotal.ToString("F2"), 11);
                     ppRecord.Amount = ppAmount;
                     ppRecord.AmountNegativeSign = ppSign;
+                    ppRecord.CreditCardNumber = PadOrTruncate(GetPromoGiftCardToken(retailEvent), 19);
                     recordSet.TenderRecords.Add(ppRecord);
                     SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PP) amount={promoTotal:F2}");
                 }
@@ -1484,6 +1485,7 @@ class RetailEventMapper
                 var (pcAmount, pcSign) = FormatCurrencyWithSign(activationTotal.ToString("F2"), 11);
                 pcRecord.Amount = pcAmount;
                 pcRecord.AmountNegativeSign = pcSign;
+                pcRecord.CreditCardNumber = PadOrTruncate(GetFirstGiftCardToken(retailEvent), 19);
                 recordSet.TenderRecords.Add(pcRecord);
                 SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) amount={activationTotal:F2}");
             }
@@ -1623,20 +1625,43 @@ class RetailEventMapper
             return total;
         }
 
-        // Calculate total promo GC value (for PP tender line)
+        // Calculate total promo GC value (for PP tender line).
+        // PP = "promotional value being booked" per Gift_Card_Activation_Rules.docx, which is the
+        // PromoGiftCard discount applied amount (the value funded by the promo) — NOT the gift card's
+        // resulting balance (giftCard.amount.value).
         private decimal GetPromoGiftCardTotal(RetailEvent retailEvent)
         {
             decimal total = 0;
             if (retailEvent.Transaction?.Items == null) return total;
             foreach (var item in retailEvent.Transaction.Items)
             {
-                if (item.GiftCard != null && IsPromoGiftCard(item) && item.GiftCard.Amount?.Value != null &&
-                    decimal.TryParse(item.GiftCard.Amount.Value, out decimal gcAmount))
+                if (item.GiftCard == null || !IsPromoGiftCard(item) || item.Discounts == null) continue;
+                foreach (var discount in item.Discounts)
                 {
-                    total += gcAmount;
+                    if (discount.DiscountId == "PromoGiftCard" && discount.AppliedAmount?.Value != null &&
+                        decimal.TryParse(discount.AppliedAmount.Value, out decimal promoAmount))
+                    {
+                        total += promoAmount;
+                    }
                 }
             }
             return total;
+        }
+
+        // Gift card token (giftCard.cardToken) for the first promo GC activation — used as TNFCCD on the PP line
+        private string GetPromoGiftCardToken(RetailEvent retailEvent)
+        {
+            var promoItem = retailEvent.Transaction?.Items?
+                .FirstOrDefault(i => i.GiftCard != null && IsPromoGiftCard(i));
+            return promoItem?.GiftCard?.CardToken ?? "";
+        }
+
+        // Gift card token (giftCard.cardToken) for the first GC activation — used as TNFCCD on the PC line
+        private string GetFirstGiftCardToken(RetailEvent retailEvent)
+        {
+            var gcItem = retailEvent.Transaction?.Items?
+                .FirstOrDefault(i => i.GiftCard != null);
+            return gcItem?.GiftCard?.CardToken ?? "";
         }
 
         // Get customer ID from transaction
