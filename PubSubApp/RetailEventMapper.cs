@@ -1609,15 +1609,39 @@ class RetailEventMapper
             return retailEvent.Transaction?.Items?.Any(i => i.GiftCard == null) ?? false;
         }
 
-        // Calculate total activation amount for all GC items in the transaction
+        // Sum of an item's PromoGiftCard discount applied amounts — the promotional value booked for that GC.
+        private decimal GetItemPromoDiscountAmount(TransactionItem item)
+        {
+            decimal total = 0;
+            if (item.Discounts == null) return total;
+            foreach (var discount in item.Discounts)
+            {
+                if (discount.DiscountId == "PromoGiftCard" && discount.AppliedAmount?.Value != null &&
+                    decimal.TryParse(discount.AppliedAmount.Value, out decimal promoAmount))
+                {
+                    total += promoAmount;
+                }
+            }
+            return total;
+        }
+
+        // Calculate total activation amount across all GC items (for PC tender line).
+        // PC = "gift card activation (the load event)" per Gift_Card_Activation_Rules.docx.
+        // Promo GCs contribute the promotional value booked (same source as PP); standard GCs
+        // contribute the loaded card value (giftCard.amount.value).
         private decimal GetTotalGiftCardActivationAmount(RetailEvent retailEvent)
         {
             decimal total = 0;
             if (retailEvent.Transaction?.Items == null) return total;
             foreach (var item in retailEvent.Transaction.Items)
             {
-                if (item.GiftCard?.Amount?.Value != null &&
-                    decimal.TryParse(item.GiftCard.Amount.Value, out decimal gcAmount))
+                if (item.GiftCard == null) continue;
+                if (IsPromoGiftCard(item))
+                {
+                    total += GetItemPromoDiscountAmount(item);
+                }
+                else if (item.GiftCard.Amount?.Value != null &&
+                         decimal.TryParse(item.GiftCard.Amount.Value, out decimal gcAmount))
                 {
                     total += gcAmount;
                 }
@@ -1635,15 +1659,8 @@ class RetailEventMapper
             if (retailEvent.Transaction?.Items == null) return total;
             foreach (var item in retailEvent.Transaction.Items)
             {
-                if (item.GiftCard == null || !IsPromoGiftCard(item) || item.Discounts == null) continue;
-                foreach (var discount in item.Discounts)
-                {
-                    if (discount.DiscountId == "PromoGiftCard" && discount.AppliedAmount?.Value != null &&
-                        decimal.TryParse(discount.AppliedAmount.Value, out decimal promoAmount))
-                    {
-                        total += promoAmount;
-                    }
-                }
+                if (item.GiftCard == null || !IsPromoGiftCard(item)) continue;
+                total += GetItemPromoDiscountAmount(item);
             }
             return total;
         }
