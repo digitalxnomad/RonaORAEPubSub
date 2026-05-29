@@ -89,8 +89,9 @@ class RetailEventMapper
                 {
                     // Required Fields - per CSV specs
                     // EPP items (x-epp-coverage-identifier = "9") get SLFTTP = "21" and SLFLNT = "21"
-                    TransType = GetEPPCoverageIdentifier(item) == "9" ? "21" : mappedTransactionTypeSLFTTP,
-                    LineType = GetEPPCoverageIdentifier(item) == "9" ? "21" : mappedTransactionTypeSLFLNT,
+                    // GC activation items get SLFTTP = "01" and SLFLNT = "45"
+                    TransType = GetEPPCoverageIdentifier(item) == "9" ? "21" : IsGiftCardActivation(item) ? "01" : mappedTransactionTypeSLFTTP,
+                    LineType = GetEPPCoverageIdentifier(item) == "9" ? "21" : IsGiftCardActivation(item) ? "45" : mappedTransactionTypeSLFLNT,
                     TransDate = transactionDateTime.ToString("yyMMdd"), // TNFTDT - Use timezone-adjusted date
                     TransTime = transactionDateTime.ToString("HHmmss"),
                     // Transaction Identification - with proper padding
@@ -388,73 +389,6 @@ class RetailEventMapper
                     lineIdToIndex[item.LineId] = itemRecords.Count - 1;
                 }
 
-                // ── GC Activation: add an additional SLF line (SLFLNT = "45") per GC item ──
-                if (IsGiftCardActivation(item))
-                {
-                    // Activation amount comes from giftCard.amount (the loaded value)
-                    string gcAmountStr = item.GiftCard?.Amount?.Value ?? "0.00";
-
-                    var gcActivationRecord = new OrderRecord
-                    {
-                        TransType = "01",
-                        LineType = "45",
-                        TransDate = transactionDateTime.ToString("yyMMdd"),
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000", // Placeholder - updated after grouping
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                        Clerk = salesPersonId,
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
-                        SKUNumber = PadNumeric(item.Item?.Sku, 9),
-                        Quantity = orderRecord.Quantity,
-                        QuantityNegativeSign = orderRecord.QuantityNegativeSign,
-                        OriginalPrice = FormatCurrency(gcAmountStr, 9),
-                        OriginalPriceNegativeSign = "",
-                        ItemSellPrice = FormatCurrency(gcAmountStr, 9),
-                        SellPriceNegativeSign = "",
-                        ExtendedValue = FormatCurrency(gcAmountStr, 11),
-                        ExtendedValueNegativeSign = "",
-                        OriginalRetail = FormatCurrency(gcAmountStr, 9),
-                        OriginalRetailNegativeSign = "",
-                        AdCode = "0000",
-                        AdPrice = "000000000",
-                        AdPriceNegativeSign = "",
-                        OverridePrice = "000000000",
-                        OverridePriceNegativeSign = "",
-                        DiscountAmount = "000000000",
-                        DiscountAmountNegativeSign = "",
-                        DiscountType = "",
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        UPCCode = "0000000000000",
-                        SalesPerson = salesPersonId,
-                        OriginalSalesperson = "00000",
-                        OriginalStore = "00000",
-                        GroupDiscAmount = "000000000",
-                        GroupDiscSign = "",
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        ItemScanned = "N",
-                        ZipCode = PadOrTruncate("0", 10),
-                        ReasonCode = "                ",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        EReceiptEmail = "",
-                        EmployeeCardNumber = 0
-                    };
-                    itemRecords.Add(gcActivationRecord);
-                    SimpleLogger.LogInfo($"  ✓ GC Activation SLF line added (SLFLNT=45) for SKU {item.Item?.Sku}, activation amount={gcAmountStr}");
-                }
 
                 // Generate eco fee records for this item
                 if (item.Fees != null)
@@ -577,8 +511,6 @@ class RetailEventMapper
                     itemRangeStart.Add(recIdx);
                     var txItem = retailEvent.Transaction.Items[txIdx];
                     int count = 1; // the item record itself
-                    // Count GC activation record for this item
-                    if (IsGiftCardActivation(txItem)) count++;
                     // Count eco fee records for this item
                     if (txItem.Fees != null)
                     {
