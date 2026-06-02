@@ -1477,17 +1477,27 @@ class RetailEventMapper
                 }
 
                 // PC line — activation event (always present when any GC activation exists)
-                decimal activationTotal = GetTotalGiftCardActivationAmount(retailEvent);
+                // Amount is always zero (activation, not a payment); AuthNumber and ReferenceDesc
+                // carry the unit price so downstream systems know the loaded value.
+                decimal activationUnitPrice = GetFirstGiftCardUnitPrice(retailEvent);
                 var pcRecord = CreateBaseTenderRecord(
                     transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
                     polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
                 pcRecord.FundCode = "PC";
-                var (pcAmount, pcSign) = FormatCurrencyWithSign(activationTotal.ToString("F2"), 11);
-                pcRecord.Amount = pcAmount;
-                pcRecord.AmountNegativeSign = pcSign;
+                pcRecord.Amount = "00000000000";
+                pcRecord.AmountNegativeSign = "";
                 pcRecord.CreditCardNumber = PadOrTruncate(GetFirstGiftCardToken(retailEvent), 19);
+
+                // AuthNumber = unit price in cents, zero-padded to 6 digits
+                long authCents = (long)Math.Round(Math.Abs(activationUnitPrice) * 100, MidpointRounding.AwayFromZero);
+                pcRecord.AuthNumber = authCents.ToString().PadLeft(6, '0');
+
+                // ReferenceDesc = dollar amount zero-padded to 14 chars with decimal + " A" (16 chars total)
+                string refDollars = Math.Abs(activationUnitPrice).ToString("F2");
+                pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " A";
+
                 recordSet.TenderRecords.Add(pcRecord);
-                SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) amount={activationTotal:F2}");
+                SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) unitPrice={activationUnitPrice:F2}");
             }
 
             // Update all tender record sequences (continuing from last OrderRecord sequence)
@@ -1554,7 +1564,7 @@ class RetailEventMapper
             return false;
         }
 
-        // Check if transaction has gift card tender
+        // Check if transaction has gift card tender or gift card activation item
         private bool HasGiftCardTender(RetailEvent retailEvent)
         {
             if (retailEvent.Transaction?.Tenders != null)
@@ -1567,6 +1577,18 @@ class RetailEventMapper
                     }
                 }
             }
+
+            if (retailEvent.Transaction?.Items != null)
+            {
+                foreach (var item in retailEvent.Transaction.Items)
+                {
+                    if (item.GiftCard != null)
+                    {
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }
 
@@ -1679,6 +1701,19 @@ class RetailEventMapper
             var gcItem = retailEvent.Transaction?.Items?
                 .FirstOrDefault(i => i.GiftCard != null);
             return gcItem?.GiftCard?.CardToken ?? "";
+        }
+
+        // Unit price of the first GC activation item — used for PC tender AuthNumber and ReferenceDesc
+        private decimal GetFirstGiftCardUnitPrice(RetailEvent retailEvent)
+        {
+            var gcItem = retailEvent.Transaction?.Items?
+                .FirstOrDefault(i => i.GiftCard != null);
+            if (gcItem?.Pricing?.UnitPrice?.Value != null &&
+                decimal.TryParse(gcItem.Pricing.UnitPrice.Value, out decimal price))
+            {
+                return price;
+            }
+            return 0;
         }
 
         // Get customer ID from transaction

@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7467210536165908915",
+  "occurredAt": "2026-06-01T13:49:34Z",
+  "ingestedAt": "2026-06-01T13:49:37Z",
+  "businessContext": {
+    "businessDay": "2026-06-01",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "61700",
+      "taxArea": "BC"
+    },
+    "workstation": {
+      "registerId": "33",
+      "sequenceNumber": 33,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "giftCard": {
+          "action": "ISSUE",
+          "amount": {
+            "currency": "CAD",
+            "value": "890.00"
+          },
+          "cardToken": "600649*********7617"
+        },
+        "item": {
+          "description": "CARD GIFT RONA",
+          "sku": "051121671"
+        },
+        "lineId": "1780321725943541147195",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "150.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "150.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "150.00"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        }
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "150.00"
+        },
+        "card": {
+          "authCode": "002326",
+          "emv": {
+            "tags": {
+              "magStrip": "t"
+            }
+          },
+          "entryMode": "TAP_ICC",
+          "last4": "0119",
+          "responseCode": "1[49]",
+          "scheme": "VISA"
+        },
+        "entryMethod": "TAP_ICC",
+        "method": "CREDIT",
+        "tenderId": "VI"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "150.00"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "150.00"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "0.00"
+      }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": {
+      "loginId": "1"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}
