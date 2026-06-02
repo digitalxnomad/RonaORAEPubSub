@@ -376,7 +376,16 @@ Log entries include:
 
 ## Version History
 
-### v1.0.36 (02/02/26) ✨ Current
+### v1.0.77 (06/02/26) ✨ Current
+**Gift Card Activation Tender Fixes (PP/PC):**
+- 🔧 **PP amount (TNFAMT)** - Now the promotional value being booked, sourced from the `PromoGiftCard` discount `appliedAmount`, instead of the gift card's resulting balance (`giftCard.amount.value`)
+  - Example promo GC activation: PP changes from `$725.00` (balance) to `$75.00` (promo value)
+- 🔧 **PC amount (TNFAMT)** - Per-item activation total: promo GCs contribute the promotional value (same source as PP); standard GCs still contribute the loaded card value (`giftCard.amount.value`)
+  - Example promo GC activation: PC changes from `$725.00` to `$75.00`; standard-GC activations unchanged
+- ✨ **TNFCCD (CreditCardNumber)** - PP and PC lines now populated from `giftCard.cardToken` (e.g. `600649*********7617`) instead of blank
+- ✨ **GetItemPromoDiscountAmount** - Shared helper for the `PromoGiftCard` discount lookup used by both PP and PC
+
+### v1.0.36 (02/02/26)
 **SLFTTP/SLFLNT Mapping Corrections & New Model Enhancements:**
 - ✨ **SLFTTP Corrected** - Proper transaction type codes:
   - RETURN → "11" (was "02"), VOID → "87" (was "11"), POST_VOID → "88", AR_PAYMENT → "43"

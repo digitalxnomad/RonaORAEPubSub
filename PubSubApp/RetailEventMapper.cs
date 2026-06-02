@@ -1647,30 +1647,6 @@ class RetailEventMapper
             return total;
         }
 
-        // Calculate total activation amount across all GC items (for PC tender line).
-        // PC = "gift card activation (the load event)" per Gift_Card_Activation_Rules.docx.
-        // Promo GCs contribute the promotional value booked (same source as PP); standard GCs
-        // contribute the loaded card value (giftCard.amount.value).
-        private decimal GetTotalGiftCardActivationAmount(RetailEvent retailEvent)
-        {
-            decimal total = 0;
-            if (retailEvent.Transaction?.Items == null) return total;
-            foreach (var item in retailEvent.Transaction.Items)
-            {
-                if (item.GiftCard == null) continue;
-                if (IsPromoGiftCard(item))
-                {
-                    total += GetItemPromoDiscountAmount(item);
-                }
-                else if (item.GiftCard.Amount?.Value != null &&
-                         decimal.TryParse(item.GiftCard.Amount.Value, out decimal gcAmount))
-                {
-                    total += gcAmount;
-                }
-            }
-            return total;
-        }
-
         // Calculate total promo GC value (for PP tender line).
         // PP = "promotional value being booked" per Gift_Card_Activation_Rules.docx, which is the
         // PromoGiftCard discount applied amount (the value funded by the promo) — NOT the gift card's
