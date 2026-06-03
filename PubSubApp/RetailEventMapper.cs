@@ -1372,6 +1372,15 @@ class RetailEventMapper
                     else
                         tenderRecord.FundCode = tender.TenderId ?? "";
 
+                    // TNFRDS - For EXTERNAL method (LC fund code), populate from
+                    // tender.externalRefs.acquirerTransactionId (right-padded to 16 chars).
+                    if (tender.Method?.ToUpper() == "EXTERNAL" &&
+                        !string.IsNullOrEmpty(tender.ExternalRefs?.AcquirerTransactionId))
+                    {
+                        tenderRecord.ReferenceDesc = PadOrTruncate(
+                            tender.ExternalRefs.AcquirerTransactionId, 16);
+                    }
+
                     // Tender amount with sign
                     if (tender.Amount?.Value != null)
                     {
