@@ -102,6 +102,15 @@ public class Tender
 
     [JsonPropertyName("card")]
     public Card? Card { get; set; }
+
+    [JsonPropertyName("externalRefs")]
+    public ExternalRefs? ExternalRefs { get; set; }
+}
+
+public class ExternalRefs
+{
+    [JsonPropertyName("acquirerTransactionId")]
+    public string? AcquirerTransactionId { get; set; }
 }
 
 public class Card
