@@ -302,13 +302,31 @@ public partial class Program
                 // Link idle watchdog to shutdown token so both can stop the subscriber
                 var idleWatchdogCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownCts.Token);
 
-                // Helper: safely stop subscriber exactly once
+                // Helper: safely stop subscriber exactly once, with a bounded timeout.
+                // SubscriberClient.StopAsync can hang indefinitely when the underlying
+                // StreamingPull gRPC stream has silently stalled — exactly the case the
+                // watchdog is detecting. If StopAsync doesn't unwind in time, abandon it
+                // so the outer loop can build a fresh SubscriberClient with a new channel.
                 async Task StopSubscriberOnce(SubscriberClient sub, string reason)
                 {
-                    if (Interlocked.CompareExchange(ref subscriberStopping, 1, 0) == 0)
+                    if (Interlocked.CompareExchange(ref subscriberStopping, 1, 0) != 0) return;
+
+                    SimpleLogger.LogInfo($"⏹ Stopping subscriber: {reason}");
+
+                    var stopTimeout = TimeSpan.FromSeconds(30);
+                    using var stopCts = new CancellationTokenSource(stopTimeout);
+                    var stopTask = sub.StopAsync(stopCts.Token);
+                    var completed = await Task.WhenAny(stopTask, Task.Delay(stopTimeout + TimeSpan.FromSeconds(5)));
+
+                    if (completed != stopTask)
                     {
-                        SimpleLogger.LogInfo($"⏹ Stopping subscriber: {reason}");
-                        try { await sub.StopAsync(CancellationToken.None); } catch { }
+                        SimpleLogger.LogWarning($"⚠ StopAsync did not complete within {stopTimeout.TotalSeconds:F0}s — abandoning subscriber and forcing reconnect.");
+                        // Observe any later faulting to keep the orphaned task from raising UnobservedTaskException.
+                        _ = stopTask.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
+                    }
+                    else
+                    {
+                        try { await stopTask; } catch { /* errors during shutdown are non-fatal */ }
                     }
                 }
 
@@ -668,14 +686,29 @@ public partial class Program
             }
             finally
             {
-                // Clean up the subscriber before creating a new one or exiting
+                // Clean up the subscriber before creating a new one or exiting.
+                // Bounded stop here too: if the watchdog already abandoned a hung StopAsync,
+                // the Interlocked flag will short-circuit this path. Otherwise we apply the
+                // same timeout so a wedged stop can never block the reconnect loop.
                 activeSubscriber = null;
                 if (subscriber != null)
                 {
-                    // Use Interlocked to ensure StopAsync is only called once across all paths
                     if (Interlocked.CompareExchange(ref subscriberStopping, 1, 0) == 0)
                     {
-                        try { await subscriber.StopAsync(CancellationToken.None); } catch { }
+                        var stopTimeout = TimeSpan.FromSeconds(30);
+                        using var stopCts = new CancellationTokenSource(stopTimeout);
+                        var stopTask = subscriber.StopAsync(stopCts.Token);
+                        var completed = await Task.WhenAny(stopTask, Task.Delay(stopTimeout + TimeSpan.FromSeconds(5)));
+
+                        if (completed != stopTask)
+                        {
+                            SimpleLogger.LogWarning($"⚠ Final StopAsync did not complete within {stopTimeout.TotalSeconds:F0}s — abandoning subscriber.");
+                            _ = stopTask.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
+                        }
+                        else
+                        {
+                            try { await stopTask; } catch { /* errors during shutdown are non-fatal */ }
+                        }
                     }
                 }
             }

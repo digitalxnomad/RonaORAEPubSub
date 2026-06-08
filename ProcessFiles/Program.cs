@@ -491,7 +491,7 @@ public class OrderRecord
 public class RetailEvent
     {
         [JsonPropertyName("businessContext")]
-        public BusinessContext BusinessContext { get; set; }
+        public BusinessContext? BusinessContext { get; set; }
 
         [JsonPropertyName("eventCategory")]
         public string? EventCategory { get; set; }
@@ -515,13 +515,13 @@ public class RetailEvent
         public DateTime OccurredAt { get; set; }
 
         [JsonPropertyName("references")]
-        public References References { get; set; }
+        public References? References { get; set; }
 
         [JsonPropertyName("schemaVersion")]
         public string? SchemaVersion { get; set; }
 
         [JsonPropertyName("transaction")]
-        public Transaction Transaction { get; set; }
+        public Transaction? Transaction { get; set; }
     }
 
     public class BusinessContext
@@ -536,10 +536,10 @@ public class RetailEvent
         public string? Fulfillment { get; set; }
 
         [JsonPropertyName("store")]
-        public Store Store { get; set; }
+        public Store? Store { get; set; }
 
         [JsonPropertyName("workstation")]
-        public Workstation Workstation { get; set; }
+        public Workstation? Workstation { get; set; }
     }
 
     public class Store
@@ -581,13 +581,13 @@ public class RetailEvent
         public string? TransactionType { get; set; }
 
         [JsonPropertyName("items")]
-        public List<TransactionItem> Items { get; set; }
+        public List<TransactionItem>? Items { get; set; }
 
         [JsonPropertyName("tenders")]
         public List<Tender>? Tenders { get; set; }
 
         [JsonPropertyName("totals")]
-        public Totals Totals { get; set; }
+        public Totals? Totals { get; set; }
     }
 
     public class Tender
@@ -605,16 +605,16 @@ public class RetailEvent
     public class TransactionItem
     {
         [JsonPropertyName("item")]
-        public Item Item { get; set; }
+        public Item? Item { get; set; }
 
         [JsonPropertyName("lineId")]
         public string? LineId { get; set; }
 
         [JsonPropertyName("pricing")]
-        public Pricing Pricing { get; set; }
+        public Pricing? Pricing { get; set; }
 
         [JsonPropertyName("quantity")]
-        public Quantity Quantity { get; set; }
+        public Quantity? Quantity { get; set; }
     }
 
     public class Item
@@ -629,13 +629,13 @@ public class RetailEvent
     public class Pricing
     {
         [JsonPropertyName("extendedPrice")]
-        public CurrencyAmount ExtendedPrice { get; set; }
+        public CurrencyAmount? ExtendedPrice { get; set; }
 
         [JsonPropertyName("originalUnitPrice")]
-        public CurrencyAmount OriginalUnitPrice { get; set; }
+        public CurrencyAmount? OriginalUnitPrice { get; set; }
 
         [JsonPropertyName("unitPrice")]
-        public CurrencyAmount UnitPrice { get; set; }
+        public CurrencyAmount? UnitPrice { get; set; }
     }
 
     public class Quantity
@@ -687,6 +687,11 @@ public class RetailEvent
     {
         RecordSet recordSet = new RecordSet();
         RetailEvent? retailEvent = null;
+
+        public static void Main(string[] args)
+        {
+            new MainClass().Main1(args);
+        }
 
         public void Main1(string?[] args)
         {
