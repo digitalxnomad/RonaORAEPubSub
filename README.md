@@ -376,7 +376,14 @@ Log entries include:
 
 ## Version History
 
-### v1.0.77 (06/02/26) ✨ Current
+### v1.0.78 (06/09/26) ✨ Current
+**StreamingPull Watchdog Deadlock Fix & ProcessFiles Build Restore:**
+- 🔧 **Bounded `StopAsync`** - The idle watchdog correctly detected a stalled StreamingPull but then deadlocked inside `SubscriberClient.StopAsync` when the dead gRPC stream couldn't drain pending ack/modify-ack ops, producing multi-day silence that only a process restart cleared. `StopAsync` is now bounded to 30s in both the watchdog helper and the `finally` cleanup; if it doesn't unwind, the orphaned task is abandoned (and observed to avoid `UnobservedTaskException`) so the reconnect loop can build a fresh `SubscriberClient` with a new channel
+- 🔧 **IdleTimeoutMinutes 10 → 30** - Raised in `appsettings.json` to reduce false positives during legitimately quiet periods
+- 🔧 **ProcessFiles entry point** - Added a static `Main` delegating to `MainClass.Main1` so the project has an entry point (fixes CS5001)
+- 🔧 **Nullable DTO properties** - Marked JSON DTO reference properties on `RetailEvent` / `BusinessContext` / `Transaction` / `TransactionItem` / `Pricing` as nullable to match the mapper's null-conditional access; clears 13 CS8618 warnings without forcing required-field semantics on the deserializer
+
+### v1.0.77 (06/02/26)
 **Gift Card Activation Tender Fixes (PP/PC):**
 - 🔧 **PP amount (TNFAMT)** - Now the promotional value being booked, sourced from the `PromoGiftCard` discount `appliedAmount`, instead of the gift card's resulting balance (`giftCard.amount.value`)
   - Example promo GC activation: PP changes from `$725.00` (balance) to `$75.00` (promo value)
