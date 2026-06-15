@@ -376,7 +376,18 @@ Log entries include:
 
 ## Version History
 
-### v1.0.78 (06/09/26) ✨ Current
+### v1.0.80 (06/15/26) ✨ Current
+**Payment On Account (POA) SLF Mapping:**
+- ✨ **POA detection** - A transaction is POA when `order.externalIds[]` contains `system=TACTILL` with `id=PAYMENT_ON_ACCOUNT_ORDER`
+- ✨ **POA SLF field overrides** - When POA, only these SLF fields are modified (all others keep normal mapping; tender file unaffected):
+  - `SLFLNT` → `43` (AR payment)
+  - `SLFSKU` → `000000000` (9 zeros, no SKU for POA)
+  - `SLFADP` → `000000000` (9 zeros, no ad price)
+  - `SLFORG` / `SLFOVR` → payment amount from `items.pricing.extendedPrice`
+  - `SLFORT` → follows `SLFORG` (spec: `=SLFORG`)
+- ✨ **New model** - `Order` / `ExternalId` classes added to `RetailEvent`
+
+### v1.0.78 (06/09/26)
 **StreamingPull Watchdog Deadlock Fix & ProcessFiles Build Restore:**
 - 🔧 **Bounded `StopAsync`** - The idle watchdog correctly detected a stalled StreamingPull but then deadlocked inside `SubscriberClient.StopAsync` when the dead gRPC stream couldn't drain pending ack/modify-ack ops, producing multi-day silence that only a process restart cleared. `StopAsync` is now bounded to 30s in both the watchdog helper and the `finally` cleanup; if it doesn't unwind, the orphaned task is abandoned (and observed to avoid `UnobservedTaskException`) so the reconnect loop can build a fresh `SubscriberClient` with a new channel
 - 🔧 **IdleTimeoutMinutes 10 → 30** - Raised in `appsettings.json` to reduce false positives during legitimately quiet periods

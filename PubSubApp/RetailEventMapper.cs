@@ -20,6 +20,10 @@ class RetailEventMapper
         // Check for employee discount (will set SLFPVC and affect SLFTTP/SLFLNT)
         bool hasEmployeeDiscount = HasEmployeeDiscount(retailEvent);
 
+        // Payment On Account (POA): order.externalIds contains TACTILL / PAYMENT_ON_ACCOUNT_ORDER.
+        // When true, specific SLF fields are overridden per the POA mapping spec (tender file unaffected).
+        bool isPaymentOnAccount = IsPaymentOnAccount(retailEvent);
+
         // Check for gift card tender
         bool hasGiftCardTender = HasGiftCardTender(retailEvent);
 
@@ -379,6 +383,27 @@ class RetailEventMapper
                 orderRecord.ProjectNumber = ""; // ASFPRO - Always blank
                 orderRecord.SalesStore = 0; // ASFSST - Always blank (0)
                 orderRecord.InvStore = 0; // ASFIST - Always blank (0)
+
+                // Payment On Account override — modify only the POA-specific SLF fields per spec.
+                // All other fields keep their normal mapping (e.g. SLFPVC/SLFREF from the REG:ORG feed).
+                if (isPaymentOnAccount)
+                {
+                    orderRecord.LineType = "43";          // SLFLNT - AR payment
+                    orderRecord.SKUNumber = "000000000";  // SLFSKU - 9 zeros (no SKU for POA)
+                    orderRecord.AdPrice = "000000000";    // SLFADP - 9 zeros (no ad price)
+
+                    // SLFORG and SLFOVR - payment amount from items.pricing.extendedPrice
+                    if (item.Pricing?.ExtendedPrice?.Value != null)
+                    {
+                        var (poaAmount, poaSign) = FormatCurrencyWithSign(item.Pricing.ExtendedPrice.Value, 9);
+                        orderRecord.OriginalPrice = poaAmount;          // SLFORG
+                        orderRecord.OriginalPriceNegativeSign = poaSign;
+                        orderRecord.OverridePrice = poaAmount;          // SLFOVR
+                        orderRecord.OverridePriceNegativeSign = poaSign;
+                        orderRecord.OriginalRetail = poaAmount;         // SLFORT - spec: = SLFORG
+                        orderRecord.OriginalRetailNegativeSign = poaSign;
+                    }
+                }
 
                 // Add this OrderRecord to the item records list
                 itemRecords.Add(orderRecord);
@@ -1571,6 +1596,15 @@ class RetailEventMapper
                 }
             }
             return false;
+        }
+
+        // Check if transaction is a Payment On Account (POA):
+        // order.externalIds[] contains system "TACTILL" with id "PAYMENT_ON_ACCOUNT_ORDER".
+        private bool IsPaymentOnAccount(RetailEvent retailEvent)
+        {
+            return retailEvent.Order?.ExternalIds?.Any(e =>
+                string.Equals(e.System, "TACTILL", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.Id, "PAYMENT_ON_ACCOUNT_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
         }
 
         // Check if transaction has gift card tender or gift card activation item

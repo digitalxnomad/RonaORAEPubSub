@@ -188,6 +188,21 @@ public class GiftCardInfo
     public string? CardToken { get; set; }
 }
 
+public class Order
+{
+    [JsonPropertyName("externalIds")]
+    public List<ExternalId>? ExternalIds { get; set; }
+}
+
+public class ExternalId
+{
+    [JsonPropertyName("system")]
+    public string? System { get; set; }
+
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+}
+
 public class ItemDiscount
 {
     [JsonPropertyName("discountId")]

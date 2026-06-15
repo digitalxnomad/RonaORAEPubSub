@@ -44,6 +44,9 @@ public class RetailEvent
     [JsonPropertyName("actor")]
     public Actor? Actor { get; set; }
 
+    [JsonPropertyName("order")]
+    public Order? Order { get; set; }
+
     [JsonPropertyName("audit")]
     public Audit? Audit { get; set; }
 }
