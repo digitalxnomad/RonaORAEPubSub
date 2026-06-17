@@ -1607,7 +1607,8 @@ class RetailEventMapper
                 string.Equals(e.Id, "PAYMENT_ON_ACCOUNT_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
         }
 
-        // Check if transaction has gift card tender or gift card activation item
+        // Check if transaction has a gift card TENDER (customer paying with a gift card).
+        // Item-level gift card activations are handled per-item via IsGiftCardActivation().
         private bool HasGiftCardTender(RetailEvent retailEvent)
         {
             if (retailEvent.Transaction?.Tenders != null)
@@ -1620,18 +1621,6 @@ class RetailEventMapper
                     }
                 }
             }
-
-            if (retailEvent.Transaction?.Items != null)
-            {
-                foreach (var item in retailEvent.Transaction.Items)
-                {
-                    if (item.GiftCard != null)
-                    {
-                        return true;
-                    }
-                }
-            }
-
             return false;
         }
 

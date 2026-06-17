@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7470847764518195069",
+  "occurredAt": "2026-06-11T14:42:17Z",
+  "ingestedAt": "2026-06-11T14:42:19Z",
+  "businessContext": {
+    "businessDay": "2026-06-11",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "61700",
+      "taxArea": "BC"
+    },
+    "workstation": {
+      "registerId": "33",
+      "sequenceNumber": 87,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "giftCard": {
+          "action": "ISSUE",
+          "amount": {
+            "currency": "CAD",
+            "value": "292.74"
+          },
+          "cardToken": "600649*********7617"
+        },
+        "item": {
+          "description": "CARD GIFT RONA",
+          "sku": "051121671"
+        },
+        "lineId": "1781188908757123984676",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "100.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "100.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "100.00"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        }
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "WEEDER ORANGE/BK STAND UP",
+          "sku": "051127338"
+        },
+        "lineId": "178118891542131268010",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "39.99"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "39.99"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "39.99"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "2.00"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "ratePercent": "5",
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "2.80"
+            },
+            "jurisdiction": {
+              "region": "BC"
+            },
+            "ratePercent": "7",
+            "taxCode": "PST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "144.79"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "139.99"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "144.79"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "4.80"
+      }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": {
+      "loginId": "2"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}
