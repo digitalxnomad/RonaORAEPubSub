@@ -1,9 +1,8 @@
-PPR-Output-MOVD-0662
 {
   "RIMSLF": [
     {
-      "SLFTTP": "04",
-      "SLFLNT": "04",
+      "SLFTTP": "01",
+      "SLFLNT": "01",
       "SLFTDT": "260202",
       "SLFTTM": "143556",
       "SLFCLK": "00085",
@@ -18,7 +17,7 @@ PPR-Output-MOVD-0662
       "SLFADC": "####",
       "SLFADP": "000000000",
       "SLFADN": "",
-      "SLFOVR": "000000000",
+      "SLFOVR": "000000980",
       "SLFOVN": "",
       "SLFDST": "",
       "SLFDSA": "000000000",
@@ -36,10 +35,10 @@ PPR-Output-MOVD-0662
       "SLFUPC": "0000000000000",
       "SLFSPS": "00085",
       "SLFSTS": " ",
-      "SLFZIP": "         9",
+      "SLFZIP": "         0",
       "SLFCNM": "",
       "SLFNUM": "",
-      "SLFRSN": "IDS0            ",
+      "SLFRSN": "IDS01701        ",
       "SLFOSP": "00000",
       "SLFOST": "00000",
       "SLFGDA": "000000000",
@@ -74,7 +73,7 @@ PPR-Output-MOVD-0662
       "SLFECN": 0
     },
     {
-      "SLFTTP": "04",
+      "SLFTTP": "01",
       "SLFLNT": "XH",
       "SLFTDT": "260202",
       "SLFTTM": "143556",
@@ -148,7 +147,7 @@ PPR-Output-MOVD-0662
   ],
   "RIMTNF": [
     {
-      "TNFTTP": "04",
+      "TNFTTP": "01",
       "TNFTDT": "260202",
       "TNFTTM": "143556",
       "TNFCLK": "00085",
@@ -165,7 +164,7 @@ PPR-Output-MOVD-0662
       "TNFRDS": "",
       "TNFMBR": "",
       "TNFSTS": " ",
-      "TNFESI": "#####",
+      "TNFESI": "",
       "TNFZIP": "",
       "TNFMSR": "S",
       "TNFEML": "",
