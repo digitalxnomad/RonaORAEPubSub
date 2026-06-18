@@ -368,3 +368,6 @@ FodyWeavers.xsd
 *service-account*.json
 rona_pubsub_dev.json
 rona_pubsub_qa.json
+
+# Claude Code session worktrees and local state
+.claude/
