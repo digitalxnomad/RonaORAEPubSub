@@ -1,4 +1,3 @@
-Output - 0667 - MB - PPR
 {
   "RIMSLF": [
     {
@@ -36,7 +35,7 @@ Output - 0667 - MB - PPR
       "SLFUPC": "0000000000000",
       "SLFSPS": "00085",
       "SLFSTS": " ",
-      "SLFZIP": "         9",
+      "SLFZIP": "         0",
       "SLFCNM": "",
       "SLFNUM": "",
       "SLFRSN": "                ",
@@ -108,7 +107,7 @@ Output - 0667 - MB - PPR
       "SLFUPC": "0000000000000",
       "SLFSPS": "00085",
       "SLFSTS": " ",
-      "SLFZIP": "         9",
+      "SLFZIP": "         0",
       "SLFCNM": "",
       "SLFNUM": "",
       "SLFRSN": "                ",
