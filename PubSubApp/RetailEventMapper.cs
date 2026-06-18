@@ -24,6 +24,13 @@ class RetailEventMapper
         // When true, specific SLF fields are overridden per the POA mapping spec (tender file unaffected).
         bool isPaymentOnAccount = IsPaymentOnAccount(retailEvent);
 
+        // SODA order: order.externalIds contains TACTILL / SODA_ORDER. Subtype Deposit (refId ends "00")
+        // vs Tender (ends > "00") drives SLFORG handling; other SODA SLF overrides apply to both.
+        // Tender file unaffected.
+        bool isSodaOrder = IsSodaOrder(retailEvent);
+        bool isSodaDeposit = isSodaOrder && IsSodaDeposit(retailEvent);
+        string sodaRefId = isSodaOrder ? (GetSodaReferenceId(retailEvent) ?? "") : "";
+
         // Check for gift card tender
         bool hasGiftCardTender = HasGiftCardTender(retailEvent);
 
@@ -402,6 +409,74 @@ class RetailEventMapper
                         orderRecord.OverridePriceNegativeSign = poaSign;
                         orderRecord.OriginalRetail = poaAmount;         // SLFORT - spec: = SLFORG
                         orderRecord.OriginalRetailNegativeSign = poaSign;
+                    }
+                }
+
+                // SODA order override — apply highlighted deviations from SODA mapping spec.
+                // Tax line emission (if item.taxes present) is preserved via ParseItemTaxes above.
+                if (isSodaOrder)
+                {
+                    orderRecord.LineType = "30";                  // SLFLNT
+                    orderRecord.SKUNumber = "000000000";          // SLFSKU - 9 zeros
+                    orderRecord.AdPrice = "000000000";            // SLFADP - 9 zeros
+                    orderRecord.AdPriceNegativeSign = "";
+                    orderRecord.OverridePrice = "000000000";      // SLFOVR - 9 zeros
+                    orderRecord.OverridePriceNegativeSign = "";
+                    orderRecord.OriginalRetail = "000000000";     // SLFORT - 9 zeros
+                    orderRecord.OriginalRetailNegativeSign = "";
+                    orderRecord.UPCCode = "0000000000000";        // SLFUPC - 13 zeros
+                    orderRecord.ChargedTax1 = "N";                // SLFTX1-4 - always N on SODA item line
+                    orderRecord.ChargedTax2 = "N";
+                    orderRecord.ChargedTax3 = "N";
+                    orderRecord.ChargedTax4 = "N";
+                    orderRecord.ReferenceDesc = PadOrTruncate(sodaRefId, 16);  // SLFRFD - raw refid padded
+                    orderRecord.ZipCode = "          ";            // SLFZIP - 10 blanks
+                    orderRecord.ItemScanned = "";                  // SLFSCN - blank
+                    orderRecord.PriceVehicleCode = "REG ";         // SLFPVC
+                    orderRecord.PriceVehicleReference = "ORG         "; // SLFREF
+
+                    if (isSodaDeposit)
+                    {
+                        // SLFORG - Deposits always 9 zeros
+                        orderRecord.OriginalPrice = "000000000";
+                        orderRecord.OriginalPriceNegativeSign = "";
+                    }
+                    else
+                    {
+                        // Tender: SLFORG = unit price (zeros if $0)
+                        if (item.Pricing?.UnitPrice?.Value != null &&
+                            decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal sodaUnitOrg) &&
+                            sodaUnitOrg != 0)
+                        {
+                            var (orgAmt, orgSign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
+                            orderRecord.OriginalPrice = orgAmt;
+                            orderRecord.OriginalPriceNegativeSign = orgSign;
+                        }
+                        else
+                        {
+                            orderRecord.OriginalPrice = "000000000";
+                            orderRecord.OriginalPriceNegativeSign = "";
+                        }
+                    }
+
+                    // SLFSEL / SLFEXT - unit price (zeros if $0) for both Deposit and Tender
+                    if (item.Pricing?.UnitPrice?.Value != null &&
+                        decimal.TryParse(item.Pricing.UnitPrice.Value, out decimal sodaUnit) &&
+                        sodaUnit != 0)
+                    {
+                        var (selAmt, selSign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 9);
+                        orderRecord.ItemSellPrice = selAmt;
+                        orderRecord.SellPriceNegativeSign = selSign;
+                        var (extAmt, extSign) = FormatCurrencyWithSign(item.Pricing.UnitPrice.Value, 11);
+                        orderRecord.ExtendedValue = extAmt;
+                        orderRecord.ExtendedValueNegativeSign = extSign;
+                    }
+                    else
+                    {
+                        orderRecord.ItemSellPrice = "000000000";
+                        orderRecord.SellPriceNegativeSign = "";
+                        orderRecord.ExtendedValue = "00000000000";
+                        orderRecord.ExtendedValueNegativeSign = "";
                     }
                 }
 
@@ -1605,6 +1680,29 @@ class RetailEventMapper
             return retailEvent.Order?.ExternalIds?.Any(e =>
                 string.Equals(e.System, "TACTILL", StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(e.Id, "PAYMENT_ON_ACCOUNT_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // SODA Order detection: order.externalIds[] contains system "TACTILL" with id "SODA_ORDER".
+        private bool IsSodaOrder(RetailEvent retailEvent)
+        {
+            return retailEvent.Order?.ExternalIds?.Any(e =>
+                string.Equals(e.System, "TACTILL", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.Id, "SODA_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // SODA reference id: order.externalIds[] entry with system "ReferenceDescription".
+        // Subtype: last 2 chars == "00" → Deposit; else → Tender.
+        private string? GetSodaReferenceId(RetailEvent retailEvent)
+        {
+            return retailEvent.Order?.ExternalIds?.FirstOrDefault(e =>
+                string.Equals(e.System, "ReferenceDescription", StringComparison.OrdinalIgnoreCase))?.Id;
+        }
+
+        private bool IsSodaDeposit(RetailEvent retailEvent)
+        {
+            string? refId = GetSodaReferenceId(retailEvent);
+            return !string.IsNullOrEmpty(refId) && refId.Length >= 2 &&
+                   refId.Substring(refId.Length - 2) == "00";
         }
 
         // Check if transaction has a gift card TENDER (customer paying with a gift card).

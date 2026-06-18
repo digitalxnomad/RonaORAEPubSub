@@ -376,7 +376,23 @@ Log entries include:
 
 ## Version History
 
-### v1.0.80 (06/15/26) ✨ Current
+### v1.0.82 (06/18/26) ✨ Current
+**SODA Order SLF Mapping (Deposit + Tender):**
+- ✨ **SODA detection** - A transaction is a SODA order when `order.externalIds[]` contains `system=TACTILL` with `id=SODA_ORDER`. Subtype derives from the last 2 chars of the `system=ReferenceDescription` id: `00` → Deposit, `>00` → Tender
+- ✨ **SODA SLF field overrides** - Applied to every item line on a SODA order (tax lines still emit; tender file unaffected):
+  - `SLFLNT` → `30`
+  - `SLFSKU` → `000000000` (9 zeros)
+  - `SLFADP` / `SLFOVR` / `SLFORT` → `000000000` (9 zeros)
+  - `SLFUPC` → `0000000000000` (13 zeros)
+  - `SLFTX1`–`SLFTX4` → `N`
+  - `SLFRFD` → raw `ReferenceDescription` id, right-padded to 16
+  - `SLFZIP` → 10 blanks, `SLFSCN` → blank
+  - `SLFPVC` → `REG `, `SLFREF` → `ORG         `
+  - **Deposit:** `SLFORG` → `000000000`
+  - **Tender:** `SLFORG` → `pad9(item.pricing.unitPrice)`, zeros if `$0`
+  - `SLFSEL` → `pad9(item.pricing.unitPrice)`, `SLFEXT` → `pad11(item.pricing.unitPrice)`, zeros if `$0`
+
+### v1.0.80 (06/15/26)
 **Payment On Account (POA) SLF Mapping:**
 - ✨ **POA detection** - A transaction is POA when `order.externalIds[]` contains `system=TACTILL` with `id=PAYMENT_ON_ACCOUNT_ORDER`
 - ✨ **POA SLF field overrides** - When POA, only these SLF fields are modified (all others keep normal mapping; tender file unaffected):
