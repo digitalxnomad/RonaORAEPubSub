@@ -374,7 +374,13 @@ Log entries include:
 
 ## Version History
 
-### v1.0.82 (06/18/26) ✨ Current
+### v1.0.83 (06/23/26) ✨ Current
+**Promo Gift Card Activation mapping fixes:**
+- 🔧 **`SLFSEL` / `SLFEXT`** - Gift card activation item lines now use `items.pricing.originalUnitPrice` (the value loaded onto the card) instead of `unitPrice`. For a Promo GC the customer pays `$0` (`unitPrice=0`) while the card is loaded with `originalUnitPrice`; standard GCs are unaffected since the two are equal.
+- 🔧 **`TNFAUT` / `TNFRDS` (PC tender line)** - Now derived from `originalUnitPrice` instead of `unitPrice`, so the activation auth amount and reference description carry the correct loaded value.
+- 🔧 **`TNFMSR` and `TNFRDS` activation flag** - Both now populated from `transaction.items[n].attributes["x-giftcard-activation"]` (e.g. `A`). Left blank when the attribute is absent.
+
+### v1.0.82 (06/18/26)
 **SODA Order SLF Mapping (Deposit + Tender):**
 - ✨ **SODA detection** - A transaction is a SODA order when `order.externalIds[]` contains `system=TACTILL` with `id=SODA_ORDER`. Subtype derives from the last 2 chars of the `system=ReferenceDescription` id: `00` → Deposit, `>00` → Tender
 - ✨ **SODA SLF field overrides** - Applied to every item line on a SODA order (tax lines still emit; tender file unaffected):

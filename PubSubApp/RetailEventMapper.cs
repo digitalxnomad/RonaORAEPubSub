@@ -175,9 +175,16 @@ class RetailEventMapper
                     overridePriceValue = item.Pricing.Override.Value;
                 }
 
-                string? sellPriceSource = hasOverride
-                    ? overridePriceValue
-                    : item.Pricing?.UnitPrice?.Value;
+                // Gift card activation items: SLFSEL/SLFEXT use OriginalUnitPrice (the value loaded
+                // onto the card), not UnitPrice. For a Promo GC the customer pays $0 (UnitPrice=0)
+                // while the card is loaded with OriginalUnitPrice; for a standard GC the two are equal.
+                bool isGiftCardActivationItem = IsGiftCardActivation(item);
+
+                string? sellPriceSource = isGiftCardActivationItem
+                    ? item.Pricing?.OriginalUnitPrice?.Value
+                    : hasOverride
+                        ? overridePriceValue
+                        : item.Pricing?.UnitPrice?.Value;
 
                 if (sellPriceSource != null)
                 {
@@ -193,7 +200,12 @@ class RetailEventMapper
                 {
                     decimal quantity = item.Quantity.Value;
 
-                    if (hasOverride)
+                    if (isGiftCardActivationItem &&
+                        decimal.TryParse(item.Pricing?.OriginalUnitPrice?.Value, out decimal gcOriginalUnitPrice))
+                    {
+                        extendedValue = quantity * gcOriginalUnitPrice;
+                    }
+                    else if (hasOverride)
                     {
                         extendedValue = quantity * overridePrice;
                     }
@@ -1588,7 +1600,7 @@ class RetailEventMapper
                 // PC line — activation event (always present when any GC activation exists)
                 // Amount is always zero (activation, not a payment); AuthNumber and ReferenceDesc
                 // carry the unit price so downstream systems know the loaded value.
-                decimal activationUnitPrice = GetFirstGiftCardUnitPrice(retailEvent);
+                decimal activationOriginalUnitPrice = GetFirstGiftCardOriginalUnitPrice(retailEvent);
                 var pcRecord = CreateBaseTenderRecord(
                     transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
                     polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
@@ -1597,16 +1609,25 @@ class RetailEventMapper
                 pcRecord.AmountNegativeSign = "";
                 pcRecord.CreditCardNumber = PadOrTruncate(GetFirstGiftCardToken(retailEvent), 19);
 
-                // AuthNumber = unit price in cents, zero-padded to 6 digits
-                long authCents = (long)Math.Round(Math.Abs(activationUnitPrice) * 100, MidpointRounding.AwayFromZero);
+                // AuthNumber (TNFAUT) = original unit price (loaded value) in cents, zero-padded to 6 digits
+                long authCents = (long)Math.Round(Math.Abs(activationOriginalUnitPrice) * 100, MidpointRounding.AwayFromZero);
                 pcRecord.AuthNumber = authCents.ToString().PadLeft(6, '0');
 
-                // ReferenceDesc = dollar amount zero-padded to 14 chars with decimal + " A" (16 chars total)
-                string refDollars = Math.Abs(activationUnitPrice).ToString("F2");
-                pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " A";
+                // Activation flag from items[].attributes["x-giftcard-activation"] (e.g. "A").
+                // Drives both the TNFRDS trailing indicator and TNFMSR. Blank when absent.
+                string activationFlag = GetFirstGiftCardActivationFlag(retailEvent);
+                string activationFlagChar = string.IsNullOrEmpty(activationFlag) ? " " : activationFlag.Substring(0, 1);
+
+                // ReferenceDesc (TNFRDS) = dollar amount zero-padded to 14 chars + space + activation flag (16 chars total)
+                string refDollars = Math.Abs(activationOriginalUnitPrice).ToString("F2");
+                pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " " + activationFlagChar;
+
+                // TNFMSR — same activation flag; keep the base blank default when the attribute is absent.
+                if (!string.IsNullOrEmpty(activationFlag))
+                    pcRecord.MagStripeFlag = activationFlagChar;
 
                 recordSet.TenderRecords.Add(pcRecord);
-                SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) unitPrice={activationUnitPrice:F2}");
+                SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) originalUnitPrice={activationOriginalUnitPrice:F2}");
             }
 
             // Update all tender record sequences (continuing from last OrderRecord sequence)
@@ -1809,17 +1830,34 @@ class RetailEventMapper
             return gcItem?.GiftCard?.CardToken ?? "";
         }
 
-        // Unit price of the first GC activation item — used for PC tender AuthNumber and ReferenceDesc
-        private decimal GetFirstGiftCardUnitPrice(RetailEvent retailEvent)
+        // Original unit price (the value loaded onto the card) of the first GC activation item —
+        // used for the PC tender AuthNumber (TNFAUT) and ReferenceDesc (TNFRDS). Promo GCs carry the
+        // loaded value in OriginalUnitPrice while UnitPrice is $0, so OriginalUnitPrice is authoritative.
+        private decimal GetFirstGiftCardOriginalUnitPrice(RetailEvent retailEvent)
         {
             var gcItem = retailEvent.Transaction?.Items?
                 .FirstOrDefault(i => i.GiftCard != null);
-            if (gcItem?.Pricing?.UnitPrice?.Value != null &&
-                decimal.TryParse(gcItem.Pricing.UnitPrice.Value, out decimal price))
+            if (gcItem?.Pricing?.OriginalUnitPrice?.Value != null &&
+                decimal.TryParse(gcItem.Pricing.OriginalUnitPrice.Value, out decimal price))
             {
                 return price;
             }
             return 0;
+        }
+
+        // x-giftcard-activation attribute (e.g. "A") of the first GC activation item — maps to the
+        // PC tender MagStripeFlag (TNFMSR). Returns "" when the attribute is absent.
+        private string GetFirstGiftCardActivationFlag(RetailEvent retailEvent)
+        {
+            var gcItem = retailEvent.Transaction?.Items?
+                .FirstOrDefault(i => i.GiftCard != null);
+            if (gcItem?.Attributes != null &&
+                gcItem.Attributes.TryGetValue("x-giftcard-activation", out string? flag) &&
+                !string.IsNullOrEmpty(flag))
+            {
+                return flag;
+            }
+            return "";
         }
 
         // Get customer ID from transaction
