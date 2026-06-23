@@ -3,21 +3,18 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Version>1.0.82</Version>
     <AssemblyVersion>1.0.82.0</AssemblyVersion>
     <FileVersion>1.0.82.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.Cloud.PubSub.V1" Version="3.27.0" />
-    <PackageReference Include="Google.Cloud.Monitoring.V3" Version="3.12.0" />
-    <PackageReference Include="Serilog" Version="4.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
+    <PackageReference Include="Google.Cloud.PubSub.V1" />
+    <PackageReference Include="Google.Cloud.Monitoring.V3" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,7 +24,7 @@
   </ItemGroup>
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent" Condition="'$(OS)' == 'Windows_NT'">
-    <Exec Command="C:\CurrentProjects\TT\RonaORAEPubSub\RonaPubSubQA.bat" />
+    <Exec Command="&quot;$(MSBuildProjectDirectory)\..\RonaPubSubQA.bat&quot;" />
   </Target>
 
 </Project>
