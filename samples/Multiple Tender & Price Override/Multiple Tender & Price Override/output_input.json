@@ -1,8 +1,8 @@
 {
   "RIMSLF": [
     {
-      "SLFTTP": "04",
-      "SLFLNT": "04",
+      "SLFTTP": "01",
+      "SLFLNT": "01",
       "SLFTDT": "260128",
       "SLFTTM": "235500",
       "SLFCLK": "00085",
@@ -17,7 +17,7 @@
       "SLFADC": "####",
       "SLFADP": "000000000",
       "SLFADN": "",
-      "SLFOVR": "000000000",
+      "SLFOVR": "000000900",
       "SLFOVN": "",
       "SLFDST": "",
       "SLFDSA": "000000000",
@@ -35,7 +35,7 @@
       "SLFUPC": "0000012345678",
       "SLFSPS": "00085",
       "SLFSTS": " ",
-      "SLFZIP": "         9",
+      "SLFZIP": "         0",
       "SLFCNM": "",
       "SLFNUM": "",
       "SLFRSN": "                ",
@@ -73,8 +73,8 @@
       "SLFECN": 0
     },
     {
-      "SLFTTP": "04",
-      "SLFLNT": "XH",
+      "SLFTTP": "01",
+      "SLFLNT": "XI",
       "SLFTDT": "260128",
       "SLFTTM": "235500",
       "SLFCLK": "00085",
@@ -118,8 +118,8 @@
       "SLFGDR": "00",
       "SLFRDR": "00",
       "SLFSCN": "",
-      "SLFACD": "HON   ",
-      "SLFTCD": "HST   ",
+      "SLFACD": "HON1  ",
+      "SLFTCD": "SALES ",
       "SLFTE1": "",
       "SLFTE2": "",
       "SLFTEN": "",
@@ -147,7 +147,7 @@
   ],
   "RIMTNF": [
     {
-      "TNFTTP": "04",
+      "TNFTTP": "01",
       "TNFTDT": "260128",
       "TNFTTM": "235500",
       "TNFCLK": "00085",
@@ -164,7 +164,7 @@
       "TNFRDS": "",
       "TNFMBR": "",
       "TNFSTS": " ",
-      "TNFESI": "#####",
+      "TNFESI": "",
       "TNFZIP": "",
       "TNFMSR": "S",
       "TNFEML": "",
@@ -183,7 +183,7 @@
       "ATFPRO": ""
     },
     {
-      "TNFTTP": "04",
+      "TNFTTP": "01",
       "TNFTDT": "260128",
       "TNFTTM": "235500",
       "TNFCLK": "00085",
@@ -200,7 +200,7 @@
       "TNFRDS": "",
       "TNFMBR": "",
       "TNFSTS": " ",
-      "TNFESI": "#####",
+      "TNFESI": "",
       "TNFZIP": "",
       "TNFMSR": "S",
       "TNFEML": "",
@@ -219,7 +219,7 @@
       "ATFPRO": ""
     },
     {
-      "TNFTTP": "04",
+      "TNFTTP": "01",
       "TNFTDT": "260128",
       "TNFTTM": "235500",
       "TNFCLK": "00085",
@@ -236,7 +236,7 @@
       "TNFRDS": "",
       "TNFMBR": "",
       "TNFSTS": " ",
-      "TNFESI": "#####",
+      "TNFESI": "",
       "TNFZIP": "",
       "TNFMSR": "S",
       "TNFEML": "",

@@ -18,9 +18,9 @@
   "eventCategory": "TRANSACTION",
   "eventId": "1",
   "eventSubType": "SALE",
-  "eventType": "RETAIL_TRANSACTION",
+  "eventType": "ORIGINAL",
   "ingestedAt": "2025-12-15T14:30:00Z",
-  "messageType": "RETAIL_EVENT",
+  "messageType": "RetailEvent",
   "occurredAt": "2025-12-15T14:30:00Z",
   "schemaVersion": "2.0.0",
   "transaction": {
@@ -55,7 +55,7 @@
     ],
     "tenders": [
       {
-        "tenderId": "1",
+        "tenderId": "CA",
         "method": "CASH",
         "amount": {
           "currency": "USD",
@@ -67,6 +67,10 @@
       "gross": {
         "currency": "USD",
         "value": "14.18"
+      },
+      "discounts": {
+        "currency": "USD",
+        "value": "0.00"
       },
       "tax": {
         "currency": "USD",
@@ -82,7 +86,11 @@
       },
       "changeDue": {
         "currency": "USD",
-        "value": "0.00"
+        "value": "0.82"
+      },
+      "cashRounding": {
+        "currency": "USD",
+        "value": "0.02"
       }
     }
   }

@@ -18,9 +18,9 @@
   "eventCategory": "TRANSACTION",
   "eventId": "TX123",
   "eventSubType": "COMPLETED",
-  "eventType": "SALE",
+  "eventType": "ORIGINAL",
   "ingestedAt": "2025-12-15T14:30:00Z",
-  "messageType": "RETAIL_EVENT",
+  "messageType": "RetailEvent",
   "occurredAt": "2025-12-15T14:25:00Z",
   "schemaVersion": "2.0.0",
   "transaction": {
@@ -104,7 +104,7 @@
     ],
     "tenders": [
       {
-        "tenderId": "TENDER001",
+        "tenderId": "VI",
         "method": "CREDIT",
         "amount": {
           "currency": "CAD",
@@ -112,7 +112,7 @@
         }
       },
       {
-        "tenderId": "TENDER002",
+        "tenderId": "CA",
         "method": "CASH",
         "amount": {
           "currency": "CAD",
