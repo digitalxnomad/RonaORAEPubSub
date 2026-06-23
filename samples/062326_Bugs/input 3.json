@@ -1,0 +1,138 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventId": "7473094829521523008",
+	"occurredAt": "2026-06-17T19:31:26Z",
+	"ingestedAt": "2026-06-17T19:31:29Z",
+	"businessContext": {
+		"businessDay": "2026-06-17",
+		"channel": "STORE",
+		"fulfillment": "CARRYOUT",
+		"store": {
+			"currency": "CAD",
+			"storeId": "61700",
+			"taxArea": "BC"
+		},
+		"workstation": {
+			"registerId": "35",
+			"sequenceNumber": 18,
+			"type": "POS"
+		}
+	},
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionSale",
+	"transaction": {
+		"transactionType": "SALE",
+		"items": [
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0",
+					"x-giftcard-activation": "A"
+				},
+				"discounts": [
+					{
+						"appliedAmount": {
+							"currency": "CAD",
+							"value": "100.00"
+						},
+						"discountId": "PromoGiftCard",
+						"method": "AMOUNT",
+						"reason": "ProductLevelPromoGiftCardPercentageD",
+						"type": "BNuy in bulk",
+						"value": "100.00"
+					}
+				],
+				"giftCard": {
+					"action": "ISSUE",
+					"amount": {
+						"currency": "CAD",
+						"value": "492.74"
+					},
+					"cardToken": "600649*********7617"
+				},
+				"item": {
+					"description": "CARD GIFT RONA",
+					"sku": "051121671"
+				},
+				"lineId": "1781724650813822491114",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "100.00"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "100.00"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "0.00"
+					}
+				},
+				"quantity": {
+					"uom": "EA",
+					"value": 1
+				}
+			}
+		],
+		"tenders": [
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "0.00"
+				},
+				"card": {
+					"responseCode": "SETTLE"
+				},
+				"method": "CASH",
+				"tenderId": "CA"
+			}
+		],
+		"totals": {
+			"cashRounding": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"changeDue": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"discounts": {
+				"currency": "CAD",
+				"value": "-100.00"
+			},
+			"gross": {
+				"currency": "CAD",
+				"value": "100.00"
+			},
+			"net": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"tax": {
+				"currency": "CAD",
+				"value": "0.00"
+			}
+		}
+	},
+	"promotions": [
+		{
+			"code": "",
+			"description": "100% Promotional gift card",
+			"amount": {
+				"currency": "CAD",
+				"value": "100.00"
+			}
+		}
+	],
+	"actor": {
+		"cashier": {
+			"loginId": "1"
+		},
+		"customer": {
+			"customerIdToken": ""
+		}
+	}
+}
