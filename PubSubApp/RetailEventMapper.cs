@@ -446,6 +446,7 @@ class RetailEventMapper
                     orderRecord.ItemScanned = "";                  // SLFSCN - blank
                     orderRecord.PriceVehicleCode = "REG ";         // SLFPVC
                     orderRecord.PriceVehicleReference = "ORG         "; // SLFREF
+                    orderRecord.ReasonCode = new string(' ', 16);  // SLFRSN - always blank on SODA orders
 
                     if (isSodaDeposit)
                     {

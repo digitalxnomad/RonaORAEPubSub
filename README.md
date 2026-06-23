@@ -374,7 +374,11 @@ Log entries include:
 
 ## Version History
 
-### v1.0.83 (06/23/26) ✨ Current
+### v1.0.84 (06/23/26) ✨ Current
+**SODA Order SLF fix:**
+- 🔧 **`SLFRSN`** - Always blank (16 spaces) on SODA orders. Previously a SODA order that was also a price override (`priceVehicle = OVD:OVR`) leaked a `POV0…` reason code into `SLFRSN`; the SODA override block now clears it alongside the other SODA field overrides.
+
+### v1.0.83 (06/23/26)
 **Promo Gift Card Activation mapping fixes:**
 - 🔧 **`SLFSEL` / `SLFEXT`** - Gift card activation item lines now use `items.pricing.originalUnitPrice` (the value loaded onto the card) instead of `unitPrice`. For a Promo GC the customer pays `$0` (`unitPrice=0`) while the card is loaded with `originalUnitPrice`; standard GCs are unaffected since the two are equal.
 - 🔧 **`TNFAUT` / `TNFRDS` (PC tender line)** - Now derived from `originalUnitPrice` instead of `unitPrice`, so the activation auth amount and reference description carry the correct loaded value.
