@@ -1,0 +1,129 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventId": "7474834522653467802",
+	"occurredAt": "2026-06-22T14:43:55Z",
+	"ingestedAt": "2026-06-22T14:43:58Z",
+	"businessContext": {
+		"businessDay": "2026-06-22",
+		"channel": "STORE",
+		"fulfillment": "CARRYOUT",
+		"store": {
+			"currency": "CAD",
+			"storeId": "55010",
+			"taxArea": "ON"
+		},
+		"workstation": {
+			"registerId": "85",
+			"sequenceNumber": 4170,
+			"type": "POS"
+		}
+	},
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionSale",
+	"transaction": {
+		"transactionType": "SALE",
+		"items": [
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "SODA Item",
+					"gtin": "999999999999999999",
+					"sku": "999999999"
+				},
+				"lineId": "178213942597734041083",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "657.81"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "0.00"
+					},
+					"priceOverride": {
+						"approvedBy": "2",
+						"overridden": true,
+						"overrideUnitPrice": {
+							"currency": "CAD",
+							"value": "657.81"
+						},
+						"reason": "1406"
+					},
+					"priceVehicle": "OVD:OVR",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "657.81"
+					}
+				},
+				"quantity": {
+					"uom": "EA",
+					"value": 1
+				}
+			}
+		],
+		"tenders": [
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "660.00"
+				},
+				"card": {
+					"responseCode": "SETTLE"
+				},
+				"method": "CASH",
+				"tenderId": "CA"
+			}
+		],
+		"totals": {
+			"cashRounding": {
+				"currency": "CAD",
+				"value": "-0.01"
+			},
+			"changeDue": {
+				"currency": "CAD",
+				"value": "2.20"
+			},
+			"discounts": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"gross": {
+				"currency": "CAD",
+				"value": "657.81"
+			},
+			"net": {
+				"currency": "CAD",
+				"value": "657.80"
+			},
+			"tax": {
+				"currency": "CAD",
+				"value": "0.00"
+			}
+		}
+	},
+	"promotions": [],
+	"order": {
+		"externalIds": [
+			{
+				"system": "TACTILL",
+				"id": "SODA_ORDER"
+			},
+			{
+				"system": "ReferenceDescription",
+				"id": "005010240330700"
+			}
+		]
+	},
+	"actor": {
+		"cashier": {
+			"loginId": "2"
+		},
+		"customer": {
+			"customerIdToken": ""
+		}
+	}
+}
