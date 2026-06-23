@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RonaORAEPubSub — Technical Overview</title>
+<style>
+  @page { size: Letter; margin: 0.75in; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    color: #222;
+    margin: 0;
+  }
+  h1.title {
+    font-size: 26pt;
+    color: #1a3a6c;
+    margin: 0 0 2pt 0;
+  }
+  .subtitle {
+    font-size: 11pt;
+    color: #666;
+    margin-bottom: 20pt;
+    border-bottom: 2px solid #1a3a6c;
+    padding-bottom: 10pt;
+  }
+  h1 {
+    font-size: 16pt;
+    color: #1a3a6c;
+    margin-top: 20pt;
+    margin-bottom: 8pt;
+    border-bottom: 1px solid #d0d7e2;
+    padding-bottom: 4pt;
+    page-break-after: avoid;
+  }
+  h2 {
+    font-size: 12.5pt;
+    color: #2a5599;
+    margin-top: 14pt;
+    margin-bottom: 5pt;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 11pt;
+    color: #333;
+    margin-top: 10pt;
+    margin-bottom: 4pt;
+    page-break-after: avoid;
+  }
+  p { margin: 5pt 0; }
+  ul { margin: 4pt 0 8pt 0; padding-left: 22pt; }
+  li { margin: 2.5pt 0; }
+  code, .mono {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9.5pt;
+    background: #f3f4f6;
+    padding: 1pt 3pt;
+    border-radius: 2pt;
+    color: #0b4a8a;
+  }
+  pre {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9pt;
+    background: #f6f7f9;
+    border: 1px solid #dde1e6;
+    border-left: 3px solid #1a3a6c;
+    padding: 8pt 10pt;
+    margin: 6pt 0 10pt 0;
+    white-space: pre;
+    overflow: visible;
+    page-break-inside: avoid;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8pt 0 12pt 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #1a3a6c;
+    color: white;
+    text-align: left;
+    padding: 6pt 8pt;
+    font-weight: 600;
+  }
+  td {
+    padding: 5pt 8pt;
+    border-bottom: 1px solid #e4e8ee;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f6f8fb; }
+  .callout {
+    background: #eef3fb;
+    border-left: 3px solid #2a5599;
+    padding: 6pt 10pt;
+    margin: 8pt 0;
+    font-size: 10pt;
+  }
+  .file-ref {
+    color: #555;
+    font-size: 9.5pt;
+  }
+  .page-break { page-break-before: always; }
+  footer {
+    margin-top: 20pt;
+    font-size: 8.5pt;
+    color: #888;
+    font-style: italic;
+    border-top: 1px solid #e4e8ee;
+    padding-top: 6pt;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="title">RonaORAEPubSub</h1>
+<div class="subtitle">Detailed Technical Overview — JSON Transformation Pipeline</div>
+
+<h1>1. What the Software Does</h1>
+<p><strong>RonaORAEPubSub</strong> is a <strong>real-time retail transaction translator</strong>. It sits between modern point-of-sale systems (which emit rich, nested JSON events conforming to the <strong>ORAE v2.0.0</strong> standard) and a legacy merchandise management system (MMS) that expects flat, fixed-width records from two tables:</p>
+<ul>
+  <li><strong>RIMSLF</strong> — order / line-item records (items, taxes, fees)</li>
+  <li><strong>RIMTNF</strong> — tender records (payments)</li>
+</ul>
+<p>The service subscribes to one Google Cloud Pub/Sub topic, validates and transforms each message, and publishes the result to another topic for downstream warehouse ingestion.</p>
+
+<h1>2. Input — <code>RetailEvent</code> JSON</h1>
+<p class="file-ref"><strong>File:</strong> <code>PubSubApp/Models/RetailEvent.cs</code> and <code>Models/OraeModels.cs</code></p>
+<p>The incoming JSON is a deeply nested structure. Top-level shape:</p>
+<pre>{
+  "schemaVersion": "2.0.0",
+  "messageType":   "RetailEvent",
+  "eventType":     "ORIGINAL | CORRECTION | CANCELLATION | SNAPSHOT",
+  "eventCategory": "TRANSACTION | TILL | STORE | ...",
+  "eventId":       "...",
+  "occurredAt":    "UTC",
+  "ingestedAt":    "UTC",
+  "businessContext": { store, workstation, channel, sequenceNumber },
+  "actor":           { cashier, customer },
+  "transaction": {
+    "transactionType": "SALE | RETURN | VOID | POST_VOID | AR_PAYMENT | ...",
+    "items":   [ TransactionItem, ... ],
+    "tenders": [ Tender, ... ],
+    "totals":  { gross, discounts, tax, net, changeDue, cashRounding }
+  },
+  "references": { sourceTransactionId },
+  "audit":      { code, message }
+}</pre>
+
+<p>Key nested models:</p>
+<ul>
+  <li><strong>TransactionItem</strong> — <code>lineId</code>, <code>parentLineId</code> (for EPP hierarchy), <code>item</code> (SKU/GTIN/description), <code>quantity</code>, <code>pricing</code> (with <code>priceVehicle</code> formatted as <code>"CODE:REF"</code>), <code>taxes[]</code>, <code>fees[]</code>, and an <code>attributes</code> dictionary carrying markers like <code>x-epp-coverage-identifier="9"</code>.</li>
+  <li><strong>Tender</strong> — <code>tenderId</code> ("CA", "VI", "FX", "GC", …), <code>amount</code>, <code>method</code>, <code>authCode</code>, <code>emv.tags.magStrip</code>, last-4.</li>
+</ul>
+<div class="callout">
+  <strong>Deserialization entry point:</strong> <code>RetailEventMapper.ReadRecordSetFromString()</code> (lines 2229–2243) calls <code>JsonSerializer.Deserialize&lt;RetailEvent&gt;(json)</code>. <code>System.Text.Json</code> is used throughout, with <code>[JsonPropertyName]</code> attributes on every model field.
+</div>
+
+<h1>3. Validation — <code>OraeValidator.ValidateOraeCompliance()</code></h1>
+<p class="file-ref"><strong>File:</strong> <code>PubSubApp/Validation/OraeValidator.cs</code> (lines 11–288). Runs <strong>before</strong> mapping.</p>
+<ul>
+  <li>Enforces <code>schemaVersion == "2.0.0"</code> and <code>messageType == "RetailEvent"</code>.</li>
+  <li>Enforces enum membership for <code>eventType</code> (4 values) and <code>eventCategory</code> (15 values).</li>
+  <li><code>businessContext.store.currency</code> must match <strong>ISO-4217</strong> (<code>^[A-Z]{3}$</code>).</li>
+  <li>Every <code>Money</code> value must match <code>^-?[0-9]{1,18}(\.[0-9]{1,4})?$</code>.</li>
+  <li>Non-CANCEL/VOID transactions must have ≥ 1 item; every item must have <code>lineId</code>, <code>sku</code>, <code>description</code>, <code>uom</code>, <code>unitPrice</code>, <code>extendedPrice</code>.</li>
+  <li><strong>Ontario-specific rule</strong> (lines 227–257): a single SKU cannot carry both full-HST (≥10%) and partial-HST (&lt;10%) simultaneously.</li>
+  <li><strong>Early exit</strong> for <code>eventSubType == "transactionBurned"</code> — only <code>audit.code/message</code> required.</li>
+</ul>
+<p>If validation fails, the message is <strong>ACKed</strong> (not NACKed) so it doesn't redeliver forever.</p>
+
+<div class="page-break"></div>
+
+<h1>4. Transformation — <code>RetailEventMapper.MapRetailEventToRecordSet()</code></h1>
+<p class="file-ref"><strong>File:</strong> <code>PubSubApp/RetailEventMapper.cs</code> (~2,245 lines; main method 11–1460). This is the heart of the system.</p>
+
+<h2>4a. Pre-flight decisions (lines 20–67)</h2>
+<ul>
+  <li>Scan items for <strong>employee discount</strong> (<code>priceVehicle</code> contains <code>"EMP"</code>).</li>
+  <li>Scan tenders for <strong>gift card</strong>.</li>
+  <li>Check for <strong>customerId</strong>.</li>
+  <li>These three flags feed <code>MapTransTypeSLFTTP()</code> and <code>MapTransTypeSLFLNT()</code> — a decision tree mapping <code>transactionType</code> + flags to legacy 2-digit type codes (SALE=01, EMP SALE=04, RETURN=11, VOID=87, POST_VOID=88, AR_PAYMENT=43, SALE+GC=45…).</li>
+  <li><code>ApplyTimezoneAdjustment()</code> — prefers IANA (<code>America/Toronto</code>) from <code>store.timeZone</code>, falls back to a store-ID heuristic (BC/AB = −8h, ON/QC = −5h); produces local <code>YYMMDD</code> / <code>HHMMSS</code> integers.</li>
+  <li><strong>SalesPerson</strong> (SLFSPS): SCO registers (ID starts with "8") use register ID; ACO uses <code>cashier.loginId</code>.</li>
+</ul>
+
+<h2>4b. <code>transactionBurned</code> short-circuit (lines 1593–1635)</h2>
+<p>Returns a RecordSet with <strong>one</strong> TenderRecord (TNFTTP="99", FundCode="CA", zero amount). No OrderRecords.</p>
+
+<h2>4c. Item → OrderRecord loop (lines 84–493)</h2>
+<p>Per item:</p>
+<ul>
+  <li><strong>Quantity:</strong> <code>quantity.value × 100</code> → integer cents; sign is "−" for RETURN.</li>
+  <li><strong>Prices:</strong> check both new (<code>pricing.priceOverride.overrideUnitPrice</code>) and legacy (<code>pricing.override</code>) override sources. SLFSEL uses override if non-zero, else unitPrice. SLFEXT = qty × effective price.</li>
+  <li><strong>Price Vehicle:</strong> split <code>priceVehicle</code> on ":" → SLFPVC (4 chars) / SLFREF (12 chars). If employee discount without priceVehicle, force <code>SLFPVC="EMP"</code>.</li>
+  <li><strong>Ad code:</strong> SLFADC = "####" if unitPrice ≠ originalUnitPrice, else "0000".</li>
+  <li><strong>EPP marker:</strong> SLFZIP = 9 spaces + <code>x-epp-coverage-identifier</code> digit. EPP children get SLFTTP/SLFLNT = "21".</li>
+  <li><strong>Reason code</strong> (SLFRSN): "RRT0" for RETURN, "VOD0" for VOID, "POV0"+reason for override, "IDS0"+reason for manager override.</li>
+  <li><strong>Eco fees</strong> (lines 391–492): each fee with amount &gt; 0 becomes an additional OrderRecord with <code>LineType="83"</code>.</li>
+</ul>
+
+<h2>4d. EPP reordering (lines 495–612)</h2>
+<p>After the first pass, records are reordered so each EPP child (items with <code>x-epp-coverage-identifier="9"</code>) appears <strong>immediately after its parent</strong> (matched by <code>parentLineId</code>). Eco fees travel with the parent block. Uses <code>itemRangeStart</code>/<code>itemRangeCount</code> tracking plus an <code>eppChildMap</code> keyed by parent lineId.</p>
+
+<h2>4e. Tax consolidation (lines 614–1332)</h2>
+<p>The most intricate business logic. Rather than emit one tax record per item-tax, the mapper <strong>consolidates taxes per province</strong>:</p>
+<table>
+  <thead>
+    <tr><th style="width:32%">Province</th><th>Record(s) Emitted</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Ontario</td><td>HON (XH, HST ≥10%) + HON1 (XI, GST &lt;10%)</td></tr>
+    <tr><td>BC / MB / SK / QC</td><td>FED (XG, GST) + Provincial (XR / XM / XS / XQ)</td></tr>
+    <tr><td>Alberta</td><td>FED only (XG)</td></tr>
+    <tr><td>Other</td><td>One record per item tax authority</td></tr>
+  </tbody>
+</table>
+<p>Tax fields (e.g., SLFACD="HON", SLFTCD=taxCode, SLFEXT/SLFSEL = aggregated amounts in cents, 11/9 digits). OriginalTx fields (SLFOTS/SLFOTD/SLFOTR/SLFOTT) are zeroed for SALE, populated for RETURN/VOID.</p>
+
+<h2>4f. Sequence numbering (lines 1334–1350)</h2>
+<p>All item records first, then tax records, then tenders — each gets a 5-digit zero-padded <code>TransSeq</code> starting at 1.</p>
+
+<h2>4g. Tender mapping (lines 1352–1449)</h2>
+<p>Per tender in <code>transaction.tenders</code>:</p>
+<ul>
+  <li>Base record with TNFTDT/TNFTTM from <code>transactionDateTime</code>, TNFCLK/TNFREG from register, TNFTTX from sequence.</li>
+  <li>TNFFCD = <code>tender.tenderId</code> ("CA" / "VI" / "FX" / "GC" / ...).</li>
+  <li>Amount = 11-digit cents; sign stored separately.</li>
+  <li>For card tenders: TNFCCD = last-4 padded with '*' to 19 chars; TNFAUT = authCode (last 6 digits for Flexiti "FX", first 6 for others); TNFMSR = mag-strip flag.</li>
+</ul>
+<p><strong>CASH transactions spawn up to 3 records:</strong></p>
+<ul>
+  <li>Main CASH payment</li>
+  <li><strong>CA / change-due</strong> record (sign always "−")</li>
+  <li><strong>PR / penny rounding</strong> record (sign inverted from ORAE)</li>
+</ul>
+<p><strong>Fallback:</strong> if <code>tenders[]</code> is empty, synthesize one CA tender for the net total.</p>
+
+<div class="page-break"></div>
+
+<h1>5. Output — <code>RecordSet</code> JSON</h1>
+<p class="file-ref"><strong>File:</strong> <code>PubSubApp/Models/RecordSet.cs</code></p>
+<p>The output shape is intentionally flat and schema-like:</p>
+<pre>{
+  "RIMSLF": [ OrderRecord, OrderRecord, ... ],
+  "RIMTNF": [ TenderRecord, TenderRecord, ... ]
+}</pre>
+<ul>
+  <li><strong>OrderRecord</strong> — ~80 fields mirroring the MMS RIMSLF table (SLFTTP, SLFLNT, SLFTDT, SLFTTM, SLFSKU, SLFQTY, SLFORG, SLFSEL, SLFEXT, SLFDSA, SLFTX1–4, SLFRSN, ASFPRO / SST / IST, …). <code>SourceLineId</code> / <code>SourceParentLineId</code> are <code>[JsonIgnore]</code>'d — only used during EPP reordering.</li>
+  <li><strong>TenderRecord</strong> — ~40 fields mirroring RIMTNF (TNFTTP, TNFFCD, TNFAMT, TNFCCD, TNFEXP, TNFAUT, TNFMBR, TNFZIP, TNFEML, ATFSST / IST / ORD / PRO, …).</li>
+</ul>
+<div class="callout">
+  <strong>Formatting discipline:</strong> every currency field is 11-digit zero-padded cents. Every string is exact-width (space- or zero-padded). <code>[StringLength]</code> and <code>[Range]</code> attributes on the models enforce the contract; null lists are omitted via <code>JsonIgnoreCondition.WhenWritingNull</code>.
+</div>
+
+<h2>Publishing (<code>PubSubApp/Program.cs</code> ~line 500)</h2>
+<p>The outgoing Pub/Sub message:</p>
+<ul>
+  <li><strong>Body</strong> = <code>JsonSerializer.Serialize(recordSet)</code></li>
+  <li><strong>Attributes</strong> = input attributes forwarded verbatim + response metadata (original messageId, processing status, timestamps, etc.)</li>
+</ul>
+
+<h1>6. Core Design Principles of the Converter</h1>
+<table>
+  <thead>
+    <tr><th style="width:6%">#</th><th style="width:24%">Principle</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Units</strong></td><td>Decimals become integer cents (×100) stored as zero-padded strings.</td></tr>
+    <tr><td>2</td><td><strong>Consolidation</strong></td><td>Item-level taxes collapse into province-specific aggregate records, not a 1:1 passthrough.</td></tr>
+    <tr><td>3</td><td><strong>Hierarchy preservation</strong></td><td>EPP items reorder under their parent line, respecting <code>parentLineId</code>.</td></tr>
+    <tr><td>4</td><td><strong>Tender expansion</strong></td><td>CASH tenders can fan out into main + change + rounding records.</td></tr>
+    <tr><td>5</td><td><strong>Timezone fidelity</strong></td><td>Store-local dates/times (IANA-aware) rather than UTC.</td></tr>
+    <tr><td>6</td><td><strong>Fixed-width contract</strong></td><td>Every field is padded/truncated to exact MMS-schema widths, enforced by model attributes.</td></tr>
+    <tr><td>7</td><td><strong>Fail-safe ACKing</strong></td><td>Semantic failures (bad JSON, failed validation) ACK to prevent infinite redelivery; only transient/infrastructure failures NACK.</td></tr>
+  </tbody>
+</table>
+
+<footer>Generated 2026-04-21 from the <code>kind-cray</code> worktree.</footer>
+
+</body>
+</html>
