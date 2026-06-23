@@ -21,22 +21,20 @@ The application follows this workflow:
 
 ```
 RonaORAEPubSub/
-├── PubSubApp/
-│   ├── Program.cs                    # Main application entry point
+├── RonaORAEPubSub.sln                # Solution (4 projects)
+├── PubSubApp/                        # Main Pub/Sub subscriber + ORAE→RecordSet transform
+│   ├── Program.cs                    # Entry point (subscriber loop + --test mode)
+│   ├── RetailEventMapper.cs          # ORAE RetailEvent → RecordSet (SDISLF/SDITNF) mapping
 │   ├── Logging.cs                    # Simple file-based logging
-│   ├── appsettings.json             # Configuration (ProjectId, TopicId, SubscriptionId)
-│   ├── Models/
-│   │   └── PubSubConfiguration.cs   # Configuration model
-│   ├── Services/
-│   │   ├── PubSubPublisher.cs       # Publisher service
-│   │   └── PubSubSubscriber.cs      # Subscriber service
-│   └── Interfaces/
-│       ├── IPubSubPublisher.cs      # Publisher interface
-│       └── IPubSubSubscriber.cs     # Subscriber interface
-├── ProcessFiles/
-│   ├── Program.cs                    # File processing logic
-│   └── ProcessFiles.csproj
-└── build.bat                         # Build script
+│   ├── appsettings.json              # Configuration (ProjectId, TopicId, SubscriptionId)
+│   ├── Models/                       # RetailEvent, RecordSet, OrderRecord, TenderRecord, …
+│   └── Validation/                   # OraeValidator, RecordSetValidator
+├── ProcessFiles/                     # Standalone file-processing utility
+├── TestPublisher/                    # Publishes test messages to the topic
+├── TransactionReport/                # Reporting utility
+├── samples/                          # Example ORAE inputs + expected outputs (see samples/README.md)
+├── docs/                             # Specs, mapping docs, change reports, overviews
+└── build.bat                         # Build helper script
 ```
 
 ## Data Models
