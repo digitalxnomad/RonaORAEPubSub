@@ -1749,7 +1749,15 @@ class RetailEventMapper
         // Check if a transaction item is a GC activation (has giftCard object)
         private bool IsGiftCardActivation(TransactionItem item)
         {
-            return item.GiftCard != null;
+            if (item.GiftCard != null) return true;
+
+            // Some ORAE payloads signal a GC activation only via the item attribute,
+            // with no giftCard node (e.g. promo gift cards). Treat any non-empty,
+            // non-"0" x-giftcard-activation flag as an activation.
+            return item.Attributes != null &&
+                item.Attributes.TryGetValue("x-giftcard-activation", out string? flag) &&
+                !string.IsNullOrWhiteSpace(flag) &&
+                flag != "0";
         }
 
         // Check if a GC activation is Promotional (discounts[].discountId == "PromoGiftCard")
@@ -1762,25 +1770,25 @@ class RetailEventMapper
         // Check if transaction contains any GC activation items
         private bool HasGiftCardActivation(RetailEvent retailEvent)
         {
-            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard != null) ?? false;
+            return retailEvent.Transaction?.Items?.Any(IsGiftCardActivation) ?? false;
         }
 
         // Check if transaction contains any Promo GC activations
         private bool HasPromoGiftCardActivation(RetailEvent retailEvent)
         {
-            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard != null && IsPromoGiftCard(i)) ?? false;
+            return retailEvent.Transaction?.Items?.Any(i => IsGiftCardActivation(i) && IsPromoGiftCard(i)) ?? false;
         }
 
         // Check if transaction contains any Standard GC activations
         private bool HasStandardGiftCardActivation(RetailEvent retailEvent)
         {
-            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard != null && !IsPromoGiftCard(i)) ?? false;
+            return retailEvent.Transaction?.Items?.Any(i => IsGiftCardActivation(i) && !IsPromoGiftCard(i)) ?? false;
         }
 
         // Check if transaction contains any regular (non-GC) items
         private bool HasRegularItems(RetailEvent retailEvent)
         {
-            return retailEvent.Transaction?.Items?.Any(i => i.GiftCard == null) ?? false;
+            return retailEvent.Transaction?.Items?.Any(i => !IsGiftCardActivation(i)) ?? false;
         }
 
         // Sum of an item's PromoGiftCard discount applied amounts — the promotional value booked for that GC.
@@ -1809,7 +1817,7 @@ class RetailEventMapper
             if (retailEvent.Transaction?.Items == null) return total;
             foreach (var item in retailEvent.Transaction.Items)
             {
-                if (item.GiftCard == null || !IsPromoGiftCard(item)) continue;
+                if (!IsGiftCardActivation(item) || !IsPromoGiftCard(item)) continue;
                 total += GetItemPromoDiscountAmount(item);
             }
             return total;
@@ -1819,7 +1827,7 @@ class RetailEventMapper
         private string GetPromoGiftCardToken(RetailEvent retailEvent)
         {
             var promoItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(i => i.GiftCard != null && IsPromoGiftCard(i));
+                .FirstOrDefault(i => IsGiftCardActivation(i) && IsPromoGiftCard(i));
             return promoItem?.GiftCard?.CardToken ?? "";
         }
 
@@ -1827,7 +1835,7 @@ class RetailEventMapper
         private string GetFirstGiftCardToken(RetailEvent retailEvent)
         {
             var gcItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(i => i.GiftCard != null);
+                .FirstOrDefault(IsGiftCardActivation);
             return gcItem?.GiftCard?.CardToken ?? "";
         }
 
@@ -1837,7 +1845,7 @@ class RetailEventMapper
         private decimal GetFirstGiftCardOriginalUnitPrice(RetailEvent retailEvent)
         {
             var gcItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(i => i.GiftCard != null);
+                .FirstOrDefault(IsGiftCardActivation);
             if (gcItem?.Pricing?.OriginalUnitPrice?.Value != null &&
                 decimal.TryParse(gcItem.Pricing.OriginalUnitPrice.Value, out decimal price))
             {
@@ -1851,7 +1859,7 @@ class RetailEventMapper
         private string GetFirstGiftCardActivationFlag(RetailEvent retailEvent)
         {
             var gcItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(i => i.GiftCard != null);
+                .FirstOrDefault(IsGiftCardActivation);
             if (gcItem?.Attributes != null &&
                 gcItem.Attributes.TryGetValue("x-giftcard-activation", out string? flag) &&
                 !string.IsNullOrEmpty(flag))
