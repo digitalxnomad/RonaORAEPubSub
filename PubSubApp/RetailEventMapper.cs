@@ -1593,7 +1593,8 @@ class RetailEventMapper
                     var (ppAmount, ppSign) = FormatCurrencyWithSign(promoTotal.ToString("F2"), 11);
                     ppRecord.Amount = ppAmount;
                     ppRecord.AmountNegativeSign = ppSign;
-                    ppRecord.CreditCardNumber = PadOrTruncate(GetPromoGiftCardToken(retailEvent), 19);
+                    // TNFCCD (card number) stays blank on the PP line (base default = 19 spaces).
+                    ppRecord.MagStripeFlag = "S";
                     recordSet.TenderRecords.Add(ppRecord);
                     SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PP) amount={promoTotal:F2}");
                 }
@@ -1614,18 +1615,14 @@ class RetailEventMapper
                 long authCents = (long)Math.Round(Math.Abs(activationOriginalUnitPrice) * 100, MidpointRounding.AwayFromZero);
                 pcRecord.AuthNumber = authCents.ToString().PadLeft(6, '0');
 
-                // Activation flag from items[].attributes["x-giftcard-activation"] (e.g. "A").
-                // Drives both the TNFRDS trailing indicator and TNFMSR. Blank when absent.
-                string activationFlag = GetFirstGiftCardActivationFlag(retailEvent);
-                string activationFlagChar = string.IsNullOrEmpty(activationFlag) ? " " : activationFlag.Substring(0, 1);
-
-                // ReferenceDesc (TNFRDS) = dollar amount zero-padded to 14 chars + space + activation flag (16 chars total)
+                // ReferenceDesc (TNFRDS) = dollar amount zero-padded to 14 chars + " A" (16 chars total).
+                // The trailing "A" is a constant activation marker for every GC activation, whether or
+                // not the item carries an x-giftcard-activation attribute.
                 string refDollars = Math.Abs(activationOriginalUnitPrice).ToString("F2");
-                pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " " + activationFlagChar;
+                pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " A";
 
-                // TNFMSR — same activation flag; keep the base blank default when the attribute is absent.
-                if (!string.IsNullOrEmpty(activationFlag))
-                    pcRecord.MagStripeFlag = activationFlagChar;
+                // TNFMSR — constant "S" for every GC activation PC line.
+                pcRecord.MagStripeFlag = "S";
 
                 recordSet.TenderRecords.Add(pcRecord);
                 SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) originalUnitPrice={activationOriginalUnitPrice:F2}");
@@ -1823,14 +1820,6 @@ class RetailEventMapper
             return total;
         }
 
-        // Gift card token (giftCard.cardToken) for the first promo GC activation — used as TNFCCD on the PP line
-        private string GetPromoGiftCardToken(RetailEvent retailEvent)
-        {
-            var promoItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(i => IsGiftCardActivation(i) && IsPromoGiftCard(i));
-            return promoItem?.GiftCard?.CardToken ?? "";
-        }
-
         // Gift card token (giftCard.cardToken) for the first GC activation — used as TNFCCD on the PC line
         private string GetFirstGiftCardToken(RetailEvent retailEvent)
         {
@@ -1852,21 +1841,6 @@ class RetailEventMapper
                 return price;
             }
             return 0;
-        }
-
-        // x-giftcard-activation attribute (e.g. "A") of the first GC activation item — maps to the
-        // PC tender MagStripeFlag (TNFMSR). Returns "" when the attribute is absent.
-        private string GetFirstGiftCardActivationFlag(RetailEvent retailEvent)
-        {
-            var gcItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(IsGiftCardActivation);
-            if (gcItem?.Attributes != null &&
-                gcItem.Attributes.TryGetValue("x-giftcard-activation", out string? flag) &&
-                !string.IsNullOrEmpty(flag))
-            {
-                return flag;
-            }
-            return "";
         }
 
         // Get customer ID from transaction

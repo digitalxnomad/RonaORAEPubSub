@@ -1,4 +1,4 @@
-{
+﻿{
   "RIMSLF": [
     {
       "SLFTTP": "01",
@@ -130,7 +130,7 @@
       "TNFSTS": " ",
       "TNFESI": "",
       "TNFZIP": "",
-      "TNFMSR": " ",
+      "TNFMSR": "S",
       "TNFEML": "",
       "TNFHSH": "",
       "TNFPLC": 41100,
@@ -166,7 +166,7 @@
       "TNFSTS": " ",
       "TNFESI": "",
       "TNFZIP": "",
-      "TNFMSR": "A",
+      "TNFMSR": "S",
       "TNFEML": "",
       "TNFHSH": "",
       "TNFPLC": 41100,

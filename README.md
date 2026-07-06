@@ -374,7 +374,11 @@ Log entries include:
 
 ## Version History
 
-### v1.0.87 (07/06/26) ✨ Current
+### v1.0.88 (07/06/26) ✨ Current
+**PP tender TNFMSR fix:**
+- 🔧 **`TNFMSR` (PP line) → `"S"`** - The promo gift card (`PP`) tender line now emits `TNFMSR = "S"`, matching the `PC` line. Previously it inherited the default blank space from the base tender record.
+
+### v1.0.87 (07/06/26)
 **Fix SLFLNT for merchandise in mixed GC activation transactions:**
 - 🔧 **`SLFLNT` (non-GC items)** - In transactions containing both a gift card activation and regular merchandise, non-GC items incorrectly received `SLFLNT = "45"` (gift card line type) instead of `"01"` (regular sale). Caused by `HasGiftCardTender()` detecting item-level `giftCard` objects, which set the transaction-wide line type to `"45"`. Reverted to only check tenders for `method == "GIFT_CARD"`; per-item GC activation is already handled by `IsGiftCardActivation()`.
 
