@@ -374,7 +374,18 @@ Log entries include:
 
 ## Version History
 
-### v1.0.85 (06/30/26) ✨ Current
+### v1.0.87 (07/06/26) ✨ Current
+**Fix SLFLNT for merchandise in mixed GC activation transactions:**
+- 🔧 **`SLFLNT` (non-GC items)** - In transactions containing both a gift card activation and regular merchandise, non-GC items incorrectly received `SLFLNT = "45"` (gift card line type) instead of `"01"` (regular sale). Caused by `HasGiftCardTender()` detecting item-level `giftCard` objects, which set the transaction-wide line type to `"45"`. Reverted to only check tenders for `method == "GIFT_CARD"`; per-item GC activation is already handled by `IsGiftCardActivation()`.
+
+### v1.0.86 (07/02/26)
+**Gift Card Activation PP/PC tender flag fixes:**
+- 🔧 **`TNFMSR` (PC line) → constant `"S"`** - The activation PC tender line now always emits `S` in the mag-stripe flag for every GC activation, instead of echoing the `x-giftcard-activation` attribute value (which produced `A` for promo GCs and blank for standard GCs whose item has only a `giftCard` node).
+- 🔧 **`TNFRDS` (PC line) trailing marker → constant `"A"`** - The reference-description activation marker is now always `A` (e.g. `00000000100.00 A`), regardless of whether the item carries an `x-giftcard-activation` attribute. Previously standard GC activations left it blank.
+- 🔧 **`TNFCCD` (PP line) → blank** - The promo (`PP`) tender line no longer copies the gift card token into the card-number field; it stays blank. The `PC` line still carries the token.
+- 🧹 Removed the now-unused `GetPromoGiftCardToken` and `GetFirstGiftCardActivationFlag` helpers. Added a `Standard GC Activation` regression baseline; refreshed the promo baselines.
+
+### v1.0.85 (06/30/26)
 **Attribute-only Gift Card activation detection:**
 - 🔧 **`IsGiftCardActivation`** - Now also recognizes activations signaled solely by the `transaction.items[n].attributes["x-giftcard-activation"]` flag (non-empty, non-`0`), in addition to the existing `giftCard` node. Some ORAE payloads — notably 100% Promo Gift Cards — carry no `giftCard` object at all, so these transactions previously fell through to the default line type instead of `45` and emitted no PP/PC tender lines.
 - 🔧 **`SLFLNT = 45` + PP/PC lines restored** - All GC-activation helpers (`HasGiftCardActivation`, `HasPromoGiftCardActivation`, `HasStandardGiftCardActivation`, `HasRegularItems`, `GetPromoGiftCardTotal`, token/price/flag lookups) now route through `IsGiftCardActivation`, so attribute-only activations correctly produce the `45` order line and the PP (promo value from the `PromoGiftCard` discount `appliedAmount`) and PC tender lines. Payloads that include a `giftCard` node are unchanged.
