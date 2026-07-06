@@ -745,7 +745,7 @@ public partial class Program
             // Initialize logger
             SimpleLogger.SetLogPath(pubSubConfig.LogPath, pubSubConfig.ProjectId);
 
-            SimpleLogger.LogInfo("=== Test Mode ===");
+            SimpleLogger.LogInfo($"=== Test Mode === ({Version})");
             SimpleLogger.LogInfo($"Reading: {jsonPath}");
 
             if (!File.Exists(jsonPath))
