@@ -249,6 +249,18 @@ public class Item
 
     [JsonPropertyName("gtin")]
     public string? Gtin { get; set; }
+
+    [JsonPropertyName("altIds")]
+    public List<AltId>? AltIds { get; set; }
+}
+
+public class AltId
+{
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("value")]
+    public string? Value { get; set; }
 }
 
 public class Pricing

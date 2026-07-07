@@ -374,7 +374,13 @@ Log entries include:
 
 ## Version History
 
-### v1.0.88 (07/06/26) ✨ Current
+### v1.0.89 (07/07/26) ✨ Current
+**SODA detection moved to item-level (mixed-cart support):**
+- ✨ **Per-item SODA detection** - SODA overrides now driven by `item.altIds[]` (entries with `type=sodaType` / `value=SODA` and `type=sodaRef`) instead of `order.externalIds[]`. Mixed carts with both SODA and regular items now map correctly — only SODA items receive LineType=30 overrides, while regular items keep their normal mapping.
+- ✨ **`AltId` model** - New `AltId` class and `Item.AltIds` property added to support per-item detection.
+- 🔧 **Removed transaction-level SODA detection** - `IsSodaOrder`, `GetSodaReferenceId`, `IsSodaDeposit` (all `RetailEvent`-scoped) replaced by `IsItemSoda`, `GetItemSodaRefId`, `IsItemSodaDeposit` (all `TransactionItem`-scoped).
+
+### v1.0.88 (07/06/26)
 **PP tender TNFMSR fix:**
 - 🔧 **`TNFMSR` (PP line) → `"S"`** - The promo gift card (`PP`) tender line now emits `TNFMSR = "S"`, matching the `PC` line. Previously it inherited the default blank space from the base tender record.
 

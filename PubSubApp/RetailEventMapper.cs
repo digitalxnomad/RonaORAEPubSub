@@ -24,13 +24,6 @@ class RetailEventMapper
         // When true, specific SLF fields are overridden per the POA mapping spec (tender file unaffected).
         bool isPaymentOnAccount = IsPaymentOnAccount(retailEvent);
 
-        // SODA order: order.externalIds contains TACTILL / SODA_ORDER. Subtype Deposit (refId ends "00")
-        // vs Tender (ends > "00") drives SLFORG handling; other SODA SLF overrides apply to both.
-        // Tender file unaffected.
-        bool isSodaOrder = IsSodaOrder(retailEvent);
-        bool isSodaDeposit = isSodaOrder && IsSodaDeposit(retailEvent);
-        string sodaRefId = isSodaOrder ? (GetSodaReferenceId(retailEvent) ?? "") : "";
-
         // Check for gift card tender
         bool hasGiftCardTender = HasGiftCardTender(retailEvent);
 
@@ -96,6 +89,11 @@ class RetailEventMapper
         {
             foreach (var item in retailEvent.Transaction.Items)
             {
+                // Per-item SODA detection via item.altIds
+                bool isSodaItem = IsItemSoda(item);
+                bool isSodaDeposit = isSodaItem && IsItemSodaDeposit(item);
+                string sodaRefId = isSodaItem ? (GetItemSodaRefId(item) ?? "") : "";
+
                 var orderRecord = new OrderRecord
                 {
                     // Required Fields - per CSV specs
@@ -424,9 +422,10 @@ class RetailEventMapper
                     }
                 }
 
-                // SODA order override — apply highlighted deviations from SODA mapping spec.
-                // Tax line emission (if item.taxes present) is preserved via ParseItemTaxes above.
-                if (isSodaOrder)
+                // SODA item override — apply highlighted deviations from SODA mapping spec.
+                // Only items with altIds sodaType=SODA get these overrides; other items in
+                // the same transaction keep their normal mapping.
+                if (isSodaItem)
                 {
                     orderRecord.LineType = "30";                  // SLFLNT
                     orderRecord.SKUNumber = "000000000";          // SLFSKU - 9 zeros
@@ -1701,25 +1700,25 @@ class RetailEventMapper
                 string.Equals(e.Id, "PAYMENT_ON_ACCOUNT_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
         }
 
-        // SODA Order detection: order.externalIds[] contains system "TACTILL" with id "SODA_ORDER".
-        private bool IsSodaOrder(RetailEvent retailEvent)
+        // SODA item detection: item.altIds[] contains type="sodaType" with value="SODA".
+        private bool IsItemSoda(TransactionItem item)
         {
-            return retailEvent.Order?.ExternalIds?.Any(e =>
-                string.Equals(e.System, "TACTILL", StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(e.Id, "SODA_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
+            return item.Item?.AltIds?.Any(a =>
+                string.Equals(a.Type, "sodaType", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.Value, "SODA", StringComparison.OrdinalIgnoreCase)) ?? false;
         }
 
-        // SODA reference id: order.externalIds[] entry with system "ReferenceDescription".
-        // Subtype: last 2 chars == "00" → Deposit; else → Tender.
-        private string? GetSodaReferenceId(RetailEvent retailEvent)
+        // SODA reference id from item.altIds[] entry with type="sodaRef".
+        private string? GetItemSodaRefId(TransactionItem item)
         {
-            return retailEvent.Order?.ExternalIds?.FirstOrDefault(e =>
-                string.Equals(e.System, "ReferenceDescription", StringComparison.OrdinalIgnoreCase))?.Id;
+            return item.Item?.AltIds?.FirstOrDefault(a =>
+                string.Equals(a.Type, "sodaRef", StringComparison.OrdinalIgnoreCase))?.Value;
         }
 
-        private bool IsSodaDeposit(RetailEvent retailEvent)
+        // SODA subtype: Deposit when last 2 chars of sodaRef == "00"; Tender otherwise.
+        private bool IsItemSodaDeposit(TransactionItem item)
         {
-            string? refId = GetSodaReferenceId(retailEvent);
+            string? refId = GetItemSodaRefId(item);
             return !string.IsNullOrEmpty(refId) && refId.Length >= 2 &&
                    refId.Substring(refId.Length - 2) == "00";
         }

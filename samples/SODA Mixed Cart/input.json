@@ -2,11 +2,11 @@
 	"schemaVersion": "2.0.0",
 	"messageType": "RetailEvent",
 	"eventType": "ORIGINAL",
-	"eventId": "7474834522653467802",
-	"occurredAt": "2026-06-22T14:43:55Z",
-	"ingestedAt": "2026-06-22T14:43:58Z",
+	"eventId": "7474834522653467999",
+	"occurredAt": "2026-07-07T14:00:00Z",
+	"ingestedAt": "2026-07-07T14:00:02Z",
 	"businessContext": {
-		"businessDay": "2026-06-22",
+		"businessDay": "2026-07-07",
 		"channel": "STORE",
 		"fulfillment": "CARRYOUT",
 		"store": {
@@ -16,7 +16,7 @@
 		},
 		"workstation": {
 			"registerId": "85",
-			"sequenceNumber": 4170,
+			"sequenceNumber": 500,
 			"type": "POS"
 		}
 	},
@@ -30,8 +30,7 @@
 					"x-epp-coverage-identifier": "0"
 				},
 				"item": {
-					"description": "SODA Item",
-					"gtin": "999999999999999999",
+					"description": "SODA Deposit",
 					"sku": "999999999",
 					"altIds": [
 						{
@@ -40,46 +39,79 @@
 						},
 						{
 							"type": "sodaRef",
-							"value": "005010240330700"
+							"value": "005501024070700"
 						}
 					]
 				},
-				"lineId": "178213942597734041083",
+				"lineId": "178274628670844492116",
 				"pricing": {
 					"extendedPrice": {
 						"currency": "CAD",
-						"value": "657.81"
+						"value": "100.00"
 					},
 					"originalUnitPrice": {
 						"currency": "CAD",
-						"value": "0.00"
+						"value": "100.00"
 					},
-					"priceOverride": {
-						"approvedBy": "2",
-						"overridden": true,
-						"overrideUnitPrice": {
-							"currency": "CAD",
-							"value": "657.81"
-						},
-						"reason": "1406"
-					},
-					"priceVehicle": "OVD:OVR",
+					"priceVehicle": "REG:ORG",
 					"unitPrice": {
 						"currency": "CAD",
-						"value": "657.81"
+						"value": "100.00"
 					}
 				},
 				"quantity": {
 					"uom": "EA",
 					"value": 1
 				}
+			},
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "HAMMER 16OZ WOOD",
+					"sku": "051234567"
+				},
+				"lineId": "178274628670844492117",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "29.99"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "29.99"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "29.99"
+					}
+				},
+				"quantity": {
+					"uom": "EA",
+					"value": 1
+				},
+				"taxes": [
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "3.90"
+						},
+						"jurisdiction": {
+							"region": "ON"
+						},
+						"ratePercent": "13",
+						"taxCode": "HST"
+					}
+				]
 			}
 		],
 		"tenders": [
 			{
 				"amount": {
 					"currency": "CAD",
-					"value": "660.00"
+					"value": "133.89"
 				},
 				"card": {
 					"responseCode": "SETTLE"
@@ -91,11 +123,11 @@
 		"totals": {
 			"cashRounding": {
 				"currency": "CAD",
-				"value": "-0.01"
+				"value": "0.00"
 			},
 			"changeDue": {
 				"currency": "CAD",
-				"value": "2.20"
+				"value": "0.00"
 			},
 			"discounts": {
 				"currency": "CAD",
@@ -103,22 +135,22 @@
 			},
 			"gross": {
 				"currency": "CAD",
-				"value": "657.81"
+				"value": "129.99"
 			},
 			"net": {
 				"currency": "CAD",
-				"value": "657.80"
+				"value": "133.89"
 			},
 			"tax": {
 				"currency": "CAD",
-				"value": "0.00"
+				"value": "3.90"
 			}
 		}
 	},
 	"promotions": [],
 	"actor": {
 		"cashier": {
-			"loginId": "2"
+			"loginId": "1"
 		},
 		"customer": {
 			"customerIdToken": ""
