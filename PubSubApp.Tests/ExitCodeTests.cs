@@ -4,9 +4,10 @@ using Xunit;
 
 namespace PubSubApp.Tests;
 
-/// Exercises PubSubApp.exe as a process. The exit-code contract lives in Program.Main, which
-/// loads config from the current working directory into shared state — there is no seam to call
-/// it in-process, so these spawn the real binary the way a scheduler or script would.
+/// Exercises the app as a process. The exit-code contract lives in Program.Main, which loads
+/// config and initialises logging into shared state, so there is no seam to call it in-process.
+/// Launches via `dotnet PubSubApp.dll` rather than PubSubApp.exe so these run on the Linux CI
+/// runner as well as on Windows.
 public class ExitCodeTests
 {
     private const int Success = 0;
@@ -55,17 +56,17 @@ public class ExitCodeTests
             .Should().Be(BadInvocation);
     }
 
-    private static int Run(params string[] args) => RunIn(ExeDirectory(), args);
+    private static int Run(params string[] args) => RunIn(Path.GetDirectoryName(AppDll())!, args);
 
     private static int RunIn(string workingDirectory, params string[] args)
     {
-        string exeDir = ExeDirectory();
-        var psi = new ProcessStartInfo(Path.Combine(exeDir, "PubSubApp.exe"))
+        var psi = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        psi.ArgumentList.Add(AppDll());
         foreach (string arg in args)
             psi.ArgumentList.Add(arg);
 
@@ -78,15 +79,15 @@ public class ExitCodeTests
     }
 
     /// The app under test builds alongside this one; mirror the test project's own bin layout.
-    private static string ExeDirectory()
+    private static string AppDll()
     {
         var testBin = new DirectoryInfo(AppContext.BaseDirectory); // .../PubSubApp.Tests/bin/<cfg>/<tfm>
         string tfm = testBin.Name;
         string configuration = testBin.Parent!.Name;
         string repoRoot = testBin.Parent!.Parent!.Parent!.Parent!.FullName;
 
-        string exeDir = Path.Combine(repoRoot, "PubSubApp", "bin", configuration, tfm);
-        Directory.Exists(exeDir).Should().BeTrue($"expected PubSubApp build output at {exeDir}");
-        return exeDir;
+        string dll = Path.Combine(repoRoot, "PubSubApp", "bin", configuration, tfm, "PubSubApp.dll");
+        File.Exists(dll).Should().BeTrue($"expected PubSubApp build output at {dll}");
+        return dll;
     }
 }
