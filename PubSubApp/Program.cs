@@ -766,8 +766,11 @@ public partial class Program
                 try
                 {
                     Directory.CreateDirectory(pubSubConfig.InputSavePath);
+                    // Millisecond precision: the daemon paths stay unique via message.MessageId,
+                    // but test mode has no such id and whole-second names silently overwrite
+                    // each other when two files are processed in the same second.
                     string inputSavePath = Path.Combine(pubSubConfig.InputSavePath,
-                        $"Input_{DateTime.Now:yyyyMMddHHmmss}_test.json");
+                        $"Input_{DateTime.Now:yyyyMMddHHmmssfff}_test.json");
                     File.WriteAllText(inputSavePath, jsonContent);
                     SimpleLogger.LogInfo($"✓ Saved input to: {inputSavePath} ({jsonContent.Length} bytes)");
                 }
@@ -852,7 +855,7 @@ public partial class Program
                 {
                     Directory.CreateDirectory(pubSubConfig.OutputSavePath);
                     string outputPath = Path.Combine(pubSubConfig.OutputSavePath,
-                        $"RecordSet_{DateTime.Now:yyyyMMddHHmmss}_test.json");
+                        $"RecordSet_{DateTime.Now:yyyyMMddHHmmssfff}_test.json");
                     File.WriteAllText(outputPath, jsonOutput);
                     SimpleLogger.LogInfo($"✓ Output written to: {outputPath} ({jsonOutput.Length} bytes)");
                 }

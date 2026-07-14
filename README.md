@@ -374,7 +374,12 @@ Log entries include:
 
 ## Version History
 
-### v1.0.91 (07/14/26) ✨ Current
+### v1.0.92 (07/14/26) ✨ Current
+**Test-mode output files no longer overwrite each other:**
+- 🔧 **`--test` input/output filenames now use millisecond precision** - `Input_{timestamp}_test.json` and `RecordSet_{timestamp}_test.json` used whole-second timestamps (`yyyyMMddHHmmss`), so processing several files within the same second silently overwrote all but the last. A run takes roughly 180ms, so four consecutive `--test` invocations collapsed into a single output file. Now `yyyyMMddHHmmssfff`.
+- ℹ️ The subscriber paths were unaffected: they already disambiguate with `message.MessageId`.
+
+### v1.0.91 (07/14/26)
 **Meaningful process exit codes:**
 - 🔧 **Failures are no longer reported as success** - `Main` returned `void`-equivalent `Task`, so every failure path fell through to exit code `0`. A rejected payload, a missing input file, and a clean run were indistinguishable to any script or scheduler invoking the app. `Main` now returns `Task<int>`:
   - `0` success
