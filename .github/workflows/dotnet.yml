@@ -26,3 +26,5 @@ jobs:
       run: dotnet restore RonaORAEPubSub.sln
     - name: Build
       run: dotnet build RonaORAEPubSub.sln --no-restore --configuration Release
+    - name: Test
+      run: dotnet test RonaORAEPubSub.sln --no-build --configuration Release
