@@ -374,7 +374,16 @@ Log entries include:
 
 ## Version History
 
-### v1.0.93 (07/14/26) ✨ Current
+### v1.0.94 (07/14/26) ✨ Current
+**Transaction times no longer depend on the host timezone:**
+- 🔧 **`occurredAt` is now bound as `DateTimeOffset`** - It was a `DateTime`. System.Text.Json binds `"...Z"` to `Kind=Utc` and leaves the value alone, but binds an explicit numeric offset (`"...-04:00"`) to `Kind=Local`, **silently converting it to the host machine's timezone**. `ApplyTimezoneAdjustment` documents and relies on `occurredAt` being UTC, so for offset-bearing payloads it subtracted the store offset a second time.
+  - Affected only payloads whose `occurredAt` carries a numeric offset rather than `Z`. Among the samples that is `transactionBurned.json` alone — burn events are emitted with a local offset.
+  - The times were wrong on **every** host, not merely inconsistent between them: an Eastern host produced `032745` and a UTC host `072745` for the same event, where `072745` is correct per the store-region rule below.
+  - `Z`-suffixed payloads are unaffected; every other sample baseline is byte-for-byte unchanged.
+- 🔧 **`transactionBurned` baseline corrected** - `TNFTTM` / `TNFCTM` `032745` → `072745`.
+- ℹ️ Stores with no `timeZone` in the payload still use the fixed `-5` / `-8` region heuristic, which ignores DST by design. DST-correct handling requires the store to send an IANA `timeZone`.
+
+### v1.0.93 (07/14/26)
 **Config no longer depends on the working directory:**
 - 🔧 **`appsettings.json` resolves from the binary's directory** - Config was loaded with `SetBasePath(Directory.GetCurrentDirectory())`, so launching `PubSubApp.exe` from anywhere other than its own output folder died with an unhandled `FileNotFoundException` before any logging was initialised. Now `SetBasePath(AppContext.BaseDirectory)`, where the build already copies the file. The documented `cd PubSubApp; dotnet run --test ...` workflow is unchanged; the app can now also be invoked by absolute path from any directory.
 - 🔧 **Missing config reports cleanly** - A missing `appsettings.json` now prints an error and exits `2` (bad invocation) instead of throwing an unhandled exception.

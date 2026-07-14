@@ -48,7 +48,7 @@ class RetailEventMapper
 
         // Apply timezone adjustment using ORAE timeZone (IANA), falling back to store region heuristic
         DateTime transactionDateTime = ApplyTimezoneAdjustment(
-            retailEvent.OccurredAt,
+            retailEvent.OccurredAt.UtcDateTime,
             retailEvent.BusinessContext?.Store?.TimeZone,
             retailEvent.BusinessContext?.Store?.StoreId);
 
@@ -1933,7 +1933,7 @@ class RetailEventMapper
 
             // Apply timezone adjustment
             DateTime transactionDateTime = ApplyTimezoneAdjustment(
-                retailEvent.OccurredAt,
+                retailEvent.OccurredAt.UtcDateTime,
                 retailEvent.BusinessContext?.Store?.TimeZone,
                 retailEvent.BusinessContext?.Store?.StoreId);
 
