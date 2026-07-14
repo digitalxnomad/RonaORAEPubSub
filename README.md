@@ -4,10 +4,9 @@ A high-throughput Google Cloud Pub/Sub application for processing retail transac
 
 ## Project Overview
 
-This solution consists of two main components:
-
-1. **PubSubApp** - Main Pub/Sub application that subscribes to retail events, transforms them, and publishes responses
-2. **ProcessFiles** - Utility application for processing transaction files
+The main component is **PubSubApp** — the Pub/Sub application that subscribes to retail events,
+transforms them, and publishes responses. To map a single file by hand, use its test mode:
+`dotnet run --test <json-file-path>` (see [samples/README.md](samples/README.md)).
 
 ## Architecture
 
@@ -29,7 +28,7 @@ RonaORAEPubSub/
 │   ├── appsettings.json              # Configuration (ProjectId, TopicId, SubscriptionId)
 │   ├── Models/                       # RetailEvent, RecordSet, OrderRecord, TenderRecord, …
 │   └── Validation/                   # OraeValidator, RecordSetValidator
-├── ProcessFiles/                     # Standalone file-processing utility
+├── PubSubApp.Tests/                  # Regression suite over samples/ (dotnet test)
 ├── TestPublisher/                    # Publishes test messages to the topic
 ├── TransactionReport/                # Reporting utility
 ├── samples/                          # Example ORAE inputs + expected outputs (see samples/README.md)
@@ -258,8 +257,7 @@ Edit `PubSubApp/appsettings.json`:
 
 ## Prerequisites
 
-- .NET 9.0 SDK (for PubSubApp)
-- .NET 8.0 SDK (for ProcessFiles)
+- .NET 9.0 SDK
 - Google Cloud credentials configured
 - Access to Google Cloud Pub/Sub topics and subscriptions
 
