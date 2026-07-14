@@ -126,11 +126,22 @@ public partial class Program
     // Callers script against these, so do not reuse a code for a different meaning.
     public static async Task<int> Main(string[] args)
     {
-        // Load configuration from appsettings.json
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
+        // Load configuration from appsettings.json, which the build copies next to the binary.
+        // Resolving from AppContext.BaseDirectory rather than the current directory lets the app
+        // be launched from anywhere; the cwd is not ours to depend on.
+        IConfiguration configuration;
+        try
+        {
+            configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+        }
+        catch (FileNotFoundException ex)
+        {
+            Console.Error.WriteLine($"✗ Configuration error: {ex.Message}");
+            return 2;
+        }
 
         var pubSubConfig = new PubSubConfiguration();
         configuration.GetSection("PubSubConfiguration").Bind(pubSubConfig);
@@ -738,7 +749,7 @@ public partial class Program
         {
             // Load configuration for logging
             var configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
+                .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
 

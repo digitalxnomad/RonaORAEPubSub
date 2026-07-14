@@ -3,9 +3,9 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <Version>1.0.92</Version>
-    <AssemblyVersion>1.0.92.0</AssemblyVersion>
-    <FileVersion>1.0.92.0</FileVersion>
+    <Version>1.0.93</Version>
+    <AssemblyVersion>1.0.93.0</AssemblyVersion>
+    <FileVersion>1.0.93.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

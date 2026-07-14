@@ -374,7 +374,12 @@ Log entries include:
 
 ## Version History
 
-### v1.0.92 (07/14/26) ✨ Current
+### v1.0.93 (07/14/26) ✨ Current
+**Config no longer depends on the working directory:**
+- 🔧 **`appsettings.json` resolves from the binary's directory** - Config was loaded with `SetBasePath(Directory.GetCurrentDirectory())`, so launching `PubSubApp.exe` from anywhere other than its own output folder died with an unhandled `FileNotFoundException` before any logging was initialised. Now `SetBasePath(AppContext.BaseDirectory)`, where the build already copies the file. The documented `cd PubSubApp; dotnet run --test ...` workflow is unchanged; the app can now also be invoked by absolute path from any directory.
+- 🔧 **Missing config reports cleanly** - A missing `appsettings.json` now prints an error and exits `2` (bad invocation) instead of throwing an unhandled exception.
+
+### v1.0.92 (07/14/26)
 **Test-mode output files no longer overwrite each other:**
 - 🔧 **`--test` input/output filenames now use millisecond precision** - `Input_{timestamp}_test.json` and `RecordSet_{timestamp}_test.json` used whole-second timestamps (`yyyyMMddHHmmss`), so processing several files within the same second silently overwrote all but the last. A run takes roughly 180ms, so four consecutive `--test` invocations collapsed into a single output file. Now `yyyyMMddHHmmssfff`.
 - ℹ️ The subscriber paths were unaffected: they already disambiguate with `message.MessageId`.

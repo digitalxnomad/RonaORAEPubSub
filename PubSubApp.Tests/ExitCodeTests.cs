@@ -38,6 +38,16 @@ public class ExitCodeTests
         Run("--test").Should().Be(BadInvocation);
     }
 
+    /// appsettings.json resolves from the binary's directory, not the caller's, so the app
+    /// must run from any cwd. It previously died with an unhandled FileNotFoundException.
+    [Fact]
+    public void RunFromUnrelatedWorkingDirectory_ExitsZero()
+    {
+        SampleCase sample = SampleCase.Discover().Single(c => c.Name == "test_retailevent.json");
+
+        RunIn(Path.GetTempPath(), "--test", sample.InputPath).Should().Be(Success);
+    }
+
     [Fact]
     public void NonexistentInputFile_ExitsBadInvocation()
     {
@@ -45,12 +55,14 @@ public class ExitCodeTests
             .Should().Be(BadInvocation);
     }
 
-    private static int Run(params string[] args)
+    private static int Run(params string[] args) => RunIn(ExeDirectory(), args);
+
+    private static int RunIn(string workingDirectory, params string[] args)
     {
         string exeDir = ExeDirectory();
         var psi = new ProcessStartInfo(Path.Combine(exeDir, "PubSubApp.exe"))
         {
-            WorkingDirectory = exeDir, // Program resolves appsettings.json from the cwd
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
