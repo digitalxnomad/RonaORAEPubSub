@@ -39,7 +39,7 @@ public static class OraeValidator
         if (string.IsNullOrEmpty(retailEvent.EventId))
             errors.Add("Missing required field: eventId");
 
-        if (retailEvent.OccurredAt == default(DateTime))
+        if (retailEvent.OccurredAt == default(DateTimeOffset))
             errors.Add("Missing required field: occurredAt");
 
         if (retailEvent.IngestedAt == default(DateTime))

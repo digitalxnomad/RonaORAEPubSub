@@ -27,7 +27,10 @@ public class RetailEvent
     public string? MessageType { get; set; }
 
     [JsonPropertyName("occurredAt")]
-    public DateTime OccurredAt { get; set; }
+    // DateTimeOffset, not DateTime: System.Text.Json binds "...Z" to Kind=Utc but binds an explicit
+    // offset ("...-04:00") to Kind=Local, silently converting it to the host's timezone. Downstream
+    // mapping treats this value as UTC, so a DateTime here makes output depend on the host.
+    public DateTimeOffset OccurredAt { get; set; }
 
     [JsonPropertyName("references")]
     public References? References { get; set; }
