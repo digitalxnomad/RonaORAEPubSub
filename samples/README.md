@@ -17,11 +17,39 @@ Sample JSON file with RetailEvent v2.0.0 structure.
 
 ## How to Test
 
-### Test JSON RetailEvent
+### Regression suite (automated)
+
+```bash
+dotnet test
+```
+
+`PubSubApp.Tests` runs every sample that has a committed baseline through the same three
+gates `Program.cs` applies in production, one test each:
+
+1. `OraeValidator.ValidateOraeCompliance` returns no errors (the pre-mapping gate).
+2. Mapped output still matches its baseline, byte for byte.
+3. `RecordSetValidator.ValidateRecordSetOutput` returns no errors (field lengths, required fields).
+
+A case is any `<name>.json` with a sibling `output_<name>.json` in the same folder — drop a
+new pair anywhere under `samples/` and all three tests pick it up with no code change.
+Samples without an `output_*.json` are ignored.
+
+When a mapping change is *intended*, regenerate the baselines and review the diff before
+committing — this rewrites expectations, so an unreviewed run will happily bless a bug:
+
+```bash
+PUBSUB_UPDATE_BASELINES=1 dotnet test    # PowerShell: $env:PUBSUB_UPDATE_BASELINES=1; dotnet test
+git diff samples/
+```
+
+### Test a single JSON RetailEvent by hand
 ```bash
 cd PubSubApp
 dotnet run --test ../samples/test_retailevent.json
 ```
+
+Note that `--test` writes to `OutputSavePath` from `appsettings.json` (`C:\Data\Output`), and
+only falls back to writing `output_<name>.json` next to the input when that setting is empty.
 
 ## What the Test Mode Does
 
