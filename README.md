@@ -374,7 +374,17 @@ Log entries include:
 
 ## Version History
 
-### v1.0.90 (07/14/26) ✨ Current
+### v1.0.91 (07/14/26) ✨ Current
+**Meaningful process exit codes:**
+- 🔧 **Failures are no longer reported as success** - `Main` returned `void`-equivalent `Task`, so every failure path fell through to exit code `0`. A rejected payload, a missing input file, and a clean run were indistinguishable to any script or scheduler invoking the app. `Main` now returns `Task<int>`:
+  - `0` success
+  - `1` payload rejected by ORAE or RecordSet validation
+  - `2` bad invocation — config error, missing `--test` path, or input file not found
+  - `3` unexpected error
+- 🔧 **`--test` no longer swallows crashes** - The catch-all around the test-mode pipeline logged the exception and then returned normally, exiting `0`. It now returns `3`.
+- 🔧 **Fatal PubSub auth failure exits non-zero** - After exhausting authentication retries the daemon returned without a code, which a service supervisor read as a clean shutdown. It now returns `3`.
+
+### v1.0.90 (07/14/26)
 **Ontario First Nation partial tax exemption (3rd tax scenario):**
 - ✨ **Scenario 3 — manual First Nation partial exemption** - A fully-taxable Ontario SKU manually exempted at the register now maps to `SLFTX3="O"` / `SLFTX4="Y"`. Detected per-SKU via a `items.taxes[]` entry with `status="A"` (the zeroed HON/13% line), gated on `transaction.qualifiers.isTaxExemptTransaction`. The remaining federal 5% (HON1) continues to drive `SLFTX4="Y"`.
   - Scenario 1 (no tax, e.g. water) → `N N N N` and Scenario 2 (federal only, e.g. mask) → `N N N Y` are unchanged; all three can co-exist per-SKU on one transaction

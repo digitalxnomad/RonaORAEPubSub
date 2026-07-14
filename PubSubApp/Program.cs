@@ -121,7 +121,10 @@ public partial class Program
         }
     }
 
-    public static async Task Main(string[] args)
+    // Exit codes: 0 = success, 1 = payload rejected by validation,
+    // 2 = bad invocation (usage, config, missing input file), 3 = unexpected error.
+    // Callers script against these, so do not reuse a code for a different meaning.
+    public static async Task<int> Main(string[] args)
     {
         // Load configuration from appsettings.json
         var configuration = new ConfigurationBuilder()
@@ -142,7 +145,7 @@ public partial class Program
             Console.Error.WriteLine($"✗ Configuration error(s) in appsettings.json:");
             foreach (var error in configErrors)
                 Console.Error.WriteLine($"  - {error}");
-            return;
+            return 2;
         }
 
         // Set console window title with project ID and version
@@ -154,12 +157,11 @@ public partial class Program
             if (args.Length < 2)
             {
                 Console.WriteLine("Usage: dotnet run --test <json-file-path>");
-                return;
+                return 2;
             }
 
             string jsonPath = args[1];
-            await TestJsonFile(jsonPath);
-            return;
+            return await TestJsonFile(jsonPath);
         }
 
 
@@ -209,7 +211,7 @@ public partial class Program
                     string alertMsg = $"✗ AUTHENTICATION FAILED: Unable to connect to PubSub publisher after {maxAuthRetries} attempts. Check credentials and project configuration. {ScrubExceptionMessage(ex.Message)}";
                     SimpleLogger.LogError(alertMsg, ex);
                     await SendSlackAlert(pubSubConfig.SlackWebhookUrl, alertMsg);
-                    return;
+                    return 3;
                 }
                 int delaySeconds = (int)Math.Pow(2, pubAttempt); // 2s, 4s, 8s, 16s, 32s
                 SimpleLogger.LogInfo($"  Retrying in {delaySeconds}s...");
@@ -727,9 +729,10 @@ public partial class Program
         }
 
         SimpleLogger.LogInfo($"⏹ {Version} stopped.");
+        return 0;
     }
 
-    static Task TestJsonFile(string jsonPath)
+    static Task<int> TestJsonFile(string jsonPath)
     {
         try
         {
@@ -751,7 +754,7 @@ public partial class Program
             if (!File.Exists(jsonPath))
             {
                 SimpleLogger.LogError($"✗ File not found: {jsonPath}");
-                return Task.CompletedTask;
+                return Task.FromResult(2);
             }
 
             string jsonContent = File.ReadAllText(jsonPath);
@@ -795,7 +798,7 @@ public partial class Program
                     string errorMessage = $"✗ ORAE validation failed with {validationErrors.Count} error(s):\n" +
                                         string.Join("\n  - ", validationErrors.Prepend(""));
                     SimpleLogger.LogError(errorMessage);
-                    return Task.CompletedTask;
+                    return Task.FromResult(1);
                 }
                 SimpleLogger.LogInfo("✓ ORAE v2.0.0 validation passed");
             }
@@ -817,7 +820,7 @@ public partial class Program
                 string errorMessage = $"✗ RecordSet validation failed with {outputErrors.Count} error(s):\n" +
                                     string.Join("\n  - ", outputErrors.Prepend(""));
                 SimpleLogger.LogError(errorMessage);
-                return Task.CompletedTask;
+                return Task.FromResult(1);
             }
             SimpleLogger.LogInfo("✓ RecordSet output validation passed");
 
@@ -877,9 +880,10 @@ public partial class Program
         {
             SimpleLogger.LogError($"✗ Error: {ex.Message}");
             SimpleLogger.LogError($"Stack trace: {ex.StackTrace}");
+            return Task.FromResult(3);
         }
 
-        return Task.CompletedTask;
+        return Task.FromResult(0);
     }
 
     static void ValidateRecordSet(RecordSet recordSet)
