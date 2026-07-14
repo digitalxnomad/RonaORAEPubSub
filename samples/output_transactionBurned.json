@@ -1,0 +1,41 @@
+{
+  "RIMSLF": [],
+  "RIMTNF": [
+    {
+      "TNFTTP": "99",
+      "TNFTDT": "260326",
+      "TNFTTM": "032745",
+      "TNFCLK": "00004",
+      "TNFREG": "004",
+      "TNFTTX": "05373",
+      "TNFTSQ": "00001",
+      "TNFFCD": "CA",
+      "TNFAMT": "00000000000",
+      "TNFAMN": " ",
+      "TNFCCD": "",
+      "TNFEXP": "0000",
+      "TNFAUT": "",
+      "TNFRFC": "",
+      "TNFRDS": "",
+      "TNFMBR": "00000000",
+      "TNFSTS": " ",
+      "TNFESI": "",
+      "TNFZIP": "",
+      "TNFMSR": " ",
+      "TNFEML": "",
+      "TNFHSH": "",
+      "TNFPLC": 87853,
+      "TNFPCN": 1,
+      "TNFPDT": 260326,
+      "TNFCCN": 1,
+      "TNFCDT": 260326,
+      "TNFCTM": 32745,
+      "ATFSST": 0,
+      "ATFIST": 0,
+      "ATFOTX": "",
+      "ATFMBT": " ",
+      "ATFORD": "",
+      "ATFPRO": ""
+    }
+  ]
+}
