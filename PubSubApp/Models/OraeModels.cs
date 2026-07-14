@@ -66,6 +66,34 @@ public class Transaction
 
     [JsonPropertyName("totals")]
     public required Totals Totals { get; set; }
+
+    [JsonPropertyName("qualifiers")]
+    public Qualifiers? Qualifiers { get; set; }
+
+    [JsonPropertyName("taxExemption")]
+    public TaxExemption? TaxExemption { get; set; }
+}
+
+public class Qualifiers
+{
+    // Note: ORAE sends "isTaxExemptTransaction" (not "isTaxExemptionTransaction" as in the ticket text).
+    [JsonPropertyName("isTaxExemptTransaction")]
+    public bool? IsTaxExemptTransaction { get; set; }
+}
+
+public class TaxExemption
+{
+    [JsonPropertyName("certificateId")]
+    public string? CertificateId { get; set; }
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
+
+    [JsonPropertyName("authority")]
+    public string? Authority { get; set; }
+
+    [JsonPropertyName("program")]
+    public string? Program { get; set; }
 }
 
 public class Actor
@@ -348,6 +376,10 @@ public class TaxDetail
 
     [JsonPropertyName("exemptReason")]
     public string? ExemptReason { get; set; }
+
+    // "A" marks a tax line that was manually exempted at the register (First Nation partial exemption).
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
 }
 
 public class TaxJurisdiction

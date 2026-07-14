@@ -233,6 +233,11 @@ public static class OraeValidator
 
                             foreach (var tax in item.Taxes)
                             {
+                                // Skip lines manually exempted at the register (First Nation partial
+                                // exemption): status="A" tax lines are zeroed and don't count as charged.
+                                if (string.Equals(tax.Status, "A", StringComparison.OrdinalIgnoreCase))
+                                    continue;
+
                                 if (!string.IsNullOrEmpty(tax.RatePercent) &&
                                     decimal.TryParse(tax.RatePercent, out decimal rp))
                                 {

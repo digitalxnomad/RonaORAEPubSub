@@ -374,7 +374,18 @@ Log entries include:
 
 ## Version History
 
-### v1.0.89 (07/07/26) ✨ Current
+### v1.0.90 (07/14/26) ✨ Current
+**Ontario First Nation partial tax exemption (3rd tax scenario):**
+- ✨ **Scenario 3 — manual First Nation partial exemption** - A fully-taxable Ontario SKU manually exempted at the register now maps to `SLFTX3="O"` / `SLFTX4="Y"`. Detected per-SKU via a `items.taxes[]` entry with `status="A"` (the zeroed HON/13% line), gated on `transaction.qualifiers.isTaxExemptTransaction`. The remaining federal 5% (HON1) continues to drive `SLFTX4="Y"`.
+  - Scenario 1 (no tax, e.g. water) → `N N N N` and Scenario 2 (federal only, e.g. mask) → `N N N Y` are unchanged; all three can co-exist per-SKU on one transaction
+- ✨ **SLFTE1/SLFTE2/SLFTEN** - Populated on every merchandise SKU line when `transaction.qualifiers.isTaxExemptTransaction=true` (previously always blank):
+  - `SLFTE1` ← `transaction.taxExemption.certificateId`
+  - `SLFTE2` ← `extensions.x-tax-exemption-band`
+  - `SLFTEN` ← `extensions.x-tax-exemption-customerName`
+- ✨ **New models** - `Qualifiers` / `TaxExemption` on `Transaction`, `status` on `TaxDetail`, and a root-level `extensions` dictionary on `RetailEvent`
+- 🔧 **ORAE validation fix** - The "SKU cannot be charged both full HST (13%) and Partial HST (5%)" rule now skips `status="A"` (exempted, zeroed) tax lines, which previously rejected valid First Nation exemption transactions
+
+### v1.0.89 (07/07/26)
 **SODA detection moved to item-level (mixed-cart support):**
 - ✨ **Per-item SODA detection** - SODA overrides now driven by `item.altIds[]` (entries with `type=sodaType` / `value=SODA` and `type=sodaRef`) instead of `order.externalIds[]`. Mixed carts with both SODA and regular items now map correctly — only SODA items receive LineType=30 overrides, while regular items keep their normal mapping.
 - ✨ **`AltId` model** - New `AltId` class and `Item.AltIds` property added to support per-item detection.

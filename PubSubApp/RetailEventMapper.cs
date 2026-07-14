@@ -24,6 +24,10 @@ class RetailEventMapper
         // When true, specific SLF fields are overridden per the POA mapping spec (tender file unaffected).
         bool isPaymentOnAccount = IsPaymentOnAccount(retailEvent);
 
+        // Tax-exemption transaction (Ontario First Nation partial exemption): when true, every SKU line
+        // gets SLFTE1/2/N populated, and the SKU whose taxes[].status == "A" gets SLFTX3 = "O".
+        bool isTaxExemptTransaction = retailEvent.Transaction?.Qualifiers?.IsTaxExemptTransaction == true;
+
         // Check for gift card tender
         bool hasGiftCardTender = HasGiftCardTender(retailEvent);
 
@@ -376,10 +380,24 @@ class RetailEventMapper
                     reasonCode = "IDS0" + overrideReason;
                 orderRecord.ReasonCode = reasonCode.PadRight(16);
 
-                // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN - always empty
-                orderRecord.TaxExemptId1 = ""; // SLFTE1 - Always empty
-                orderRecord.TaxExemptId2 = ""; // SLFTE2 - Always empty
-                orderRecord.TaxExemptionName = ""; // SLFTEN - Always empty
+                // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN
+                // Populated on every SKU line when the transaction is a tax-exemption transaction
+                // (First Nation partial exemption); otherwise blank.
+                //   SLFTE1 <- transaction.taxExemption.certificateId
+                //   SLFTE2 <- extensions.x-tax-exemption-band
+                //   SLFTEN <- extensions.x-tax-exemption-customerName
+                if (isTaxExemptTransaction)
+                {
+                    orderRecord.TaxExemptId1 = PadOrTruncate(retailEvent.Transaction?.TaxExemption?.CertificateId ?? "", 20);
+                    orderRecord.TaxExemptId2 = PadOrTruncate(GetExtension(retailEvent, "x-tax-exemption-band"), 20);
+                    orderRecord.TaxExemptionName = PadOrTruncate(GetExtension(retailEvent, "x-tax-exemption-customerName"), 35);
+                }
+                else
+                {
+                    orderRecord.TaxExemptId1 = ""; // SLFTE1
+                    orderRecord.TaxExemptId2 = ""; // SLFTE2
+                    orderRecord.TaxExemptionName = ""; // SLFTEN
+                }
 
                 // Required fields with fixed values - per validation spec
                 orderRecord.OriginalSalesperson = "00000"; // SLFOSP - Required, must be "00000"
@@ -2211,7 +2229,27 @@ class RetailEventMapper
             // SLFACD - TaxAuthCode should always be blank for order records
             orderRecord.TaxAuthCode = "";
 
+            // First Nation partial exemption (Scenario 3): a tax entry flagged status="A" means the
+            // provincial/HST portion was manually First-Nation-exempted at the register. Mark SLFTX3 = "O".
+            // The remaining federal 5% (HON1) already drives SLFTX4 = "Y" via the loop above.
+            bool isTaxExemptTransaction = retailEvent.Transaction?.Qualifiers?.IsTaxExemptTransaction == true;
+            if (isTaxExemptTransaction && item.Taxes != null &&
+                item.Taxes.Any(t => string.Equals(t.Status, "A", StringComparison.OrdinalIgnoreCase)))
+            {
+                orderRecord.ChargedTax3 = "O";
+            }
+
             return taxRateCodeForTaxRecords;
+        }
+
+        // Read a value from the root-level extensions bag; returns "" when absent.
+        private string GetExtension(RetailEvent retailEvent, string key)
+        {
+            if (retailEvent.Extensions != null && retailEvent.Extensions.TryGetValue(key, out var value))
+            {
+                return value ?? "";
+            }
+            return "";
         }
 
         // Helper method to format currency values to fixed-length strings

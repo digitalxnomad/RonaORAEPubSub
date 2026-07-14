@@ -47,6 +47,10 @@ public class RetailEvent
     [JsonPropertyName("order")]
     public Order? Order { get; set; }
 
+    // Root-level extensions bag (e.g. x-tax-exemption-band, x-tax-exemption-customerName).
+    [JsonPropertyName("extensions")]
+    public Dictionary<string, string>? Extensions { get; set; }
+
     [JsonPropertyName("audit")]
     public Audit? Audit { get; set; }
 }
