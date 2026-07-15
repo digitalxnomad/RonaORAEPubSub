@@ -1,0 +1,325 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7480708104026948301",
+  "occurredAt": "2026-07-08T19:44:31Z",
+  "ingestedAt": "2026-07-08T19:44:32Z",
+  "businessContext": {
+    "businessDay": "2026-07-08",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "33",
+      "sequenceNumber": 55,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "SALE",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "1"
+        },
+        "item": {
+          "description": "BBQ GAS PROPNR 3B 36000BTU",
+          "sku": "000501876"
+        },
+        "lineId": "178353981058108620195",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "599.99"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "599.99"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "599.99"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "78.00"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "9"
+        },
+        "item": {
+          "description": "PLAN PROT.4YRS BBQ 400-699.99$",
+          "sku": "000478669"
+        },
+        "lineId": "1783539841488288477",
+        "parentLineId": "178353981058108620195",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "129.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "129.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "129.00"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "16.77"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0",
+          "x-giftcard-activation": "S"
+        },
+        "giftCard": {
+          "action": "ISSUE",
+          "amount": {
+            "currency": "CAD",
+            "value": "212.00"
+          },
+          "cardToken": "600649*********7609"
+        },
+        "item": {
+          "description": "CARD GIFT REG.",
+          "sku": "000804904"
+        },
+        "lineId": "178353982015655229565",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "22.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "22.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "22.00"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        }
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "CLEANER CARPET OXY 22OZ",
+          "gtin": "000000058342003258",
+          "sku": "000336630"
+        },
+        "lineId": "1783539799208425517032",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "11.49"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "11.49"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "11.49"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "1.49"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "CONNECTOR F CRIMP WPF RG6 PK2",
+          "gtin": "000000079000412298",
+          "sku": "000357616"
+        },
+        "lineId": "1783539796891222437733",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "7.99"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "7.99"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "7.99"
+          }
+        },
+        "quantity": {
+          "uom": "PK",
+          "value": 1
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "1.04"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0",
+          "x-giftcard-activation": "S"
+        },
+        "giftCard": {
+          "action": "ISSUE",
+          "amount": {
+            "currency": "CAD",
+            "value": "438.00"
+          },
+          "cardToken": "600649*********7583"
+        },
+        "item": {
+          "description": "CARD GIFT REG.",
+          "sku": "000804904"
+        },
+        "lineId": "1783539835089362723380",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "30.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "30.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "30.00"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 1
+        }
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "897.77"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "800.47"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "897.77"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "97.30"
+      }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": {
+      "loginId": "1"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}

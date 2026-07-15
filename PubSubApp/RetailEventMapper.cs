@@ -1616,33 +1616,37 @@ class RetailEventMapper
                     SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PP) amount={promoTotal:F2}");
                 }
 
-                // PC line — activation event (always present when any GC activation exists)
+                // PC line — one per GC activation, in item order. A cart can activate several cards
+                // (regular, promo, or a mix), and each card is its own activation event downstream.
                 // Amount is always zero (activation, not a payment); AuthNumber and ReferenceDesc
-                // carry the unit price so downstream systems know the loaded value.
-                decimal activationOriginalUnitPrice = GetFirstGiftCardOriginalUnitPrice(retailEvent);
-                var pcRecord = CreateBaseTenderRecord(
-                    transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
-                    polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
-                pcRecord.FundCode = "PC";
-                pcRecord.Amount = "00000000000";
-                pcRecord.AmountNegativeSign = "";
-                pcRecord.CreditCardNumber = PadOrTruncate(GetFirstGiftCardToken(retailEvent), 19);
+                // carry that card's unit price so downstream systems know the loaded value.
+                foreach (var gcItem in GetGiftCardActivations(retailEvent))
+                {
+                    decimal activationOriginalUnitPrice = GetGiftCardOriginalUnitPrice(gcItem);
+                    var pcRecord = CreateBaseTenderRecord(
+                        transactionDateTime, mappedTransactionTypeSLFTTP, retailEvent,
+                        polledStoreInt, pollCen, pollDate, createCen, createDate, createTime);
+                    pcRecord.FundCode = "PC";
+                    pcRecord.Amount = "00000000000";
+                    pcRecord.AmountNegativeSign = "";
+                    pcRecord.CreditCardNumber = PadOrTruncate(GetGiftCardToken(gcItem), 19);
 
-                // AuthNumber (TNFAUT) = original unit price (loaded value) in cents, zero-padded to 6 digits
-                long authCents = (long)Math.Round(Math.Abs(activationOriginalUnitPrice) * 100, MidpointRounding.AwayFromZero);
-                pcRecord.AuthNumber = authCents.ToString().PadLeft(6, '0');
+                    // AuthNumber (TNFAUT) = original unit price (loaded value) in cents, zero-padded to 6 digits
+                    long authCents = (long)Math.Round(Math.Abs(activationOriginalUnitPrice) * 100, MidpointRounding.AwayFromZero);
+                    pcRecord.AuthNumber = authCents.ToString().PadLeft(6, '0');
 
-                // ReferenceDesc (TNFRDS) = dollar amount zero-padded to 14 chars + " A" (16 chars total).
-                // The trailing "A" is a constant activation marker for every GC activation, whether or
-                // not the item carries an x-giftcard-activation attribute.
-                string refDollars = Math.Abs(activationOriginalUnitPrice).ToString("F2");
-                pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " A";
+                    // ReferenceDesc (TNFRDS) = dollar amount zero-padded to 14 chars + " A" (16 chars total).
+                    // The trailing "A" is a constant activation marker for every GC activation, whether or
+                    // not the item carries an x-giftcard-activation attribute.
+                    string refDollars = Math.Abs(activationOriginalUnitPrice).ToString("F2");
+                    pcRecord.ReferenceDesc = refDollars.PadLeft(14, '0') + " A";
 
-                // TNFMSR — constant "S" for every GC activation PC line.
-                pcRecord.MagStripeFlag = "S";
+                    // TNFMSR — constant "S" for every GC activation PC line.
+                    pcRecord.MagStripeFlag = "S";
 
-                recordSet.TenderRecords.Add(pcRecord);
-                SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) originalUnitPrice={activationOriginalUnitPrice:F2}");
+                    recordSet.TenderRecords.Add(pcRecord);
+                    SimpleLogger.LogInfo($"  ✓ GC Activation TNF line added (TNFFCD=PC) sku={gcItem.Item?.Sku} originalUnitPrice={activationOriginalUnitPrice:F2}");
+                }
             }
 
             // Update all tender record sequences (continuing from last OrderRecord sequence)
@@ -1838,22 +1842,23 @@ class RetailEventMapper
         }
 
         // Gift card token (giftCard.cardToken) for the first GC activation — used as TNFCCD on the PC line
-        private string GetFirstGiftCardToken(RetailEvent retailEvent)
-        {
-            var gcItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(IsGiftCardActivation);
-            return gcItem?.GiftCard?.CardToken ?? "";
-        }
+        // Every GC activation item in the transaction, in item order. Each one gets its own PC
+        // tender line, so a cart with two activations emits two PC lines carrying their own tokens.
+        private IEnumerable<TransactionItem> GetGiftCardActivations(RetailEvent retailEvent) =>
+            retailEvent.Transaction?.Items?.Where(IsGiftCardActivation) ?? [];
 
-        // Original unit price (the value loaded onto the card) of the first GC activation item —
-        // used for the PC tender AuthNumber (TNFAUT) and ReferenceDesc (TNFRDS). Promo GCs carry the
-        // loaded value in OriginalUnitPrice while UnitPrice is $0, so OriginalUnitPrice is authoritative.
-        private decimal GetFirstGiftCardOriginalUnitPrice(RetailEvent retailEvent)
+        // Card token of a GC activation item. Promo GCs may carry no giftCard node at all
+        // (attribute-only activations), in which case the PC line's card number stays blank.
+        private string GetGiftCardToken(TransactionItem item) =>
+            item.GiftCard?.CardToken ?? "";
+
+        // Original unit price (the value loaded onto the card) of a GC activation item — used for
+        // the PC tender AuthNumber (TNFAUT) and ReferenceDesc (TNFRDS). Promo GCs carry the loaded
+        // value in OriginalUnitPrice while UnitPrice is $0, so OriginalUnitPrice is authoritative.
+        private decimal GetGiftCardOriginalUnitPrice(TransactionItem item)
         {
-            var gcItem = retailEvent.Transaction?.Items?
-                .FirstOrDefault(IsGiftCardActivation);
-            if (gcItem?.Pricing?.OriginalUnitPrice?.Value != null &&
-                decimal.TryParse(gcItem.Pricing.OriginalUnitPrice.Value, out decimal price))
+            if (item.Pricing?.OriginalUnitPrice?.Value != null &&
+                decimal.TryParse(item.Pricing.OriginalUnitPrice.Value, out decimal price))
             {
                 return price;
             }

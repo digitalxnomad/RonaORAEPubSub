@@ -372,7 +372,16 @@ Log entries include:
 
 ## Version History
 
-### v1.0.94 (07/14/26) ✨ Current
+### v1.0.95 (07/15/26) ✨ Current
+**One PC tender line per Gift Card activation:**
+- 🔧 **`PC` line is now emitted per activation, not per transaction** - A cart activating more than one gift card produced a single `PC` line describing only the **first** card; every subsequent activation was dropped. The order side was already correct (each activation got its own `SLFLNT=45` line), so a 2-card cart emitted two `45` lines but one `PC`. The tender block asked `HasGiftCardActivation()` ("is there *any* activation?") and then read `GetFirstGiftCardToken()` / `GetFirstGiftCardOriginalUnitPrice()`. It now iterates every activation item in item order.
+  - Each `PC` carries its own `TNFCCD` (card token), `TNFAUT` and `TNFRDS` (that card's `originalUnitPrice`), with `TNFAMT` zero and `TNFMSR="S"` as before.
+  - Covers all three combinations: multiple regular, multiple promo, and mixed regular + promo. `IsGiftCardActivation` already matched both forms (a `giftCard` node, or an attribute-only promo), so no detection change was needed.
+  - Promo activations carry no `giftCard` node, so their `PC` line's `TNFCCD` stays blank — unchanged behaviour, now applied per card.
+- ℹ️ **`PP` is unchanged** — still one line carrying the summed promo value across all promo activations. Only `PC` was reported as wrong. **Open question for Rona:** should multiple promo activations emit one `PP` per card instead of one aggregate?
+- ✨ Added `GC Activation/two_regular_activations.json` (real capture, 2 regular cards) plus synthetic multi-promo and mixed fixtures as regression cases. No existing baseline changed: every prior sample activates exactly one card.
+
+### v1.0.94 (07/14/26)
 **Transaction times no longer depend on the host timezone:**
 - 🔧 **`occurredAt` is now bound as `DateTimeOffset`** - It was a `DateTime`. System.Text.Json binds `"...Z"` to `Kind=Utc` and leaves the value alone, but binds an explicit numeric offset (`"...-04:00"`) to `Kind=Local`, **silently converting it to the host machine's timezone**. `ApplyTimezoneAdjustment` documents and relies on `occurredAt` being UTC, so for offset-bearing payloads it subtracted the store offset a second time.
   - Affected only payloads whose `occurredAt` carries a numeric offset rather than `Z`. Among the samples that is `transactionBurned.json` alone — burn events are emitted with a local offset.

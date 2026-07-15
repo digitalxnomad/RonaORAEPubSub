@@ -1,0 +1,168 @@
+﻿{
+    "schemaVersion":  "2.0.0",
+    "messageType":  "RetailEvent",
+    "eventType":  "ORIGINAL",
+    "eventId":  "synthetic-mixed-regular-and-promo",
+    "occurredAt":  "2026-06-29T17:24:31Z",
+    "ingestedAt":  "2026-06-29T17:24:32Z",
+    "businessContext":  {
+                            "businessDay":  "2026-06-29",
+                            "channel":  "STORE",
+                            "fulfillment":  "CARRYOUT",
+                            "store":  {
+                                          "currency":  "CAD",
+                                          "storeId":  "41100",
+                                          "taxArea":  "QC"
+                                      },
+                            "workstation":  {
+                                                "registerId":  "20",
+                                                "sequenceNumber":  22,
+                                                "type":  "POS"
+                                            }
+                        },
+    "eventCategory":  "TRANSACTION",
+    "eventSubType":  "transactionSale",
+    "transaction":  {
+                        "transactionType":  "SALE",
+                        "items":  [
+                                      {
+                                          "attributes":  {
+                                                             "x-epp-coverage-identifier":  "0",
+                                                             "x-giftcard-activation":  "A"
+                                                         },
+                                          "discounts":  [
+                                                            {
+                                                                "appliedAmount":  {
+                                                                                      "currency":  "CAD",
+                                                                                      "value":  "100.00"
+                                                                                  },
+                                                                "discountId":  "PromoGiftCard",
+                                                                "method":  "AMOUNT",
+                                                                "reason":  "ProductLevelPromoGiftCardPercentageD",
+                                                                "type":  "BNuy in bulk",
+                                                                "value":  "100.00"
+                                                            }
+                                                        ],
+                                          "item":  {
+                                                       "description":  "CARTE-CADEAU REG.",
+                                                       "sku":  "000124156"
+                                                   },
+                                          "lineId":  "17827538336343822788",
+                                          "pricing":  {
+                                                          "extendedPrice":  {
+                                                                                "currency":  "CAD",
+                                                                                "value":  "100.00"
+                                                                            },
+                                                          "originalUnitPrice":  {
+                                                                                    "currency":  "CAD",
+                                                                                    "value":  "100.00"
+                                                                                },
+                                                          "priceVehicle":  "REG:ORG",
+                                                          "unitPrice":  {
+                                                                            "currency":  "CAD",
+                                                                            "value":  "0.00"
+                                                                        }
+                                                      },
+                                          "quantity":  {
+                                                           "uom":  "CH",
+                                                           "value":  1
+                                                       }
+                                      },
+                                      {
+                                          "attributes":  {
+                                                             "x-epp-coverage-identifier":  "0",
+                                                             "x-giftcard-activation":  "S"
+                                                         },
+                                          "giftCard":  {
+                                                           "action":  "ISSUE",
+                                                           "amount":  {
+                                                                          "currency":  "CAD",
+                                                                          "value":  "212.00"
+                                                                      },
+                                                           "cardToken":  "600649*********7609"
+                                                       },
+                                          "item":  {
+                                                       "description":  "CARD GIFT REG.",
+                                                       "sku":  "000804904"
+                                                   },
+                                          "lineId":  "178353982015655229565",
+                                          "pricing":  {
+                                                          "extendedPrice":  {
+                                                                                "currency":  "CAD",
+                                                                                "value":  "22.00"
+                                                                            },
+                                                          "originalUnitPrice":  {
+                                                                                    "currency":  "CAD",
+                                                                                    "value":  "22.00"
+                                                                                },
+                                                          "priceVehicle":  "REG:ORG",
+                                                          "unitPrice":  {
+                                                                            "currency":  "CAD",
+                                                                            "value":  "22.00"
+                                                                        }
+                                                      },
+                                          "quantity":  {
+                                                           "uom":  "EA",
+                                                           "value":  1
+                                                       }
+                                      }
+                                  ],
+                        "tenders":  [
+                                        {
+                                            "amount":  {
+                                                           "currency":  "CAD",
+                                                           "value":  "22.00"
+                                                       },
+                                            "card":  {
+                                                         "responseCode":  "SETTLE"
+                                                     },
+                                            "method":  "CASH",
+                                            "tenderId":  "CA"
+                                        }
+                                    ],
+                        "totals":  {
+                                       "cashRounding":  {
+                                                            "currency":  "CAD",
+                                                            "value":  "0.00"
+                                                        },
+                                       "changeDue":  {
+                                                         "currency":  "CAD",
+                                                         "value":  "0.00"
+                                                     },
+                                       "discounts":  {
+                                                         "currency":  "CAD",
+                                                         "value":  "-100.00"
+                                                     },
+                                       "gross":  {
+                                                     "currency":  "CAD",
+                                                     "value":  "122.00"
+                                                 },
+                                       "net":  {
+                                                   "currency":  "CAD",
+                                                   "value":  "22.00"
+                                               },
+                                       "tax":  {
+                                                   "currency":  "CAD",
+                                                   "value":  "0.00"
+                                               }
+                                   }
+                    },
+    "promotions":  [
+                       {
+                           "code":  "",
+                           "description":  "100% Promotional gift card",
+                           "amount":  {
+                                          "currency":  "CAD",
+                                          "value":  "100.00"
+                                      }
+                       }
+                   ],
+    "actor":  {
+                  "cashier":  {
+                                  "loginId":  "6006523"
+                              },
+                  "customer":  {
+                                   "customerIdToken":  ""
+                               }
+              }
+}
