@@ -378,7 +378,7 @@ Log entries include:
   - Each `PC` carries its own `TNFCCD` (card token), `TNFAUT` and `TNFRDS` (that card's `originalUnitPrice`), with `TNFAMT` zero and `TNFMSR="S"` as before.
   - Covers all three combinations: multiple regular, multiple promo, and mixed regular + promo. `IsGiftCardActivation` already matched both forms (a `giftCard` node, or an attribute-only promo), so no detection change was needed.
   - Promo activations carry no `giftCard` node, so their `PC` line's `TNFCCD` stays blank — unchanged behaviour, now applied per card.
-- ℹ️ **`PP` is unchanged** — still one line carrying the summed promo value across all promo activations. Only `PC` was reported as wrong. **Open question for Rona:** should multiple promo activations emit one `PP` per card instead of one aggregate?
+- ℹ️ **`PP` is unchanged, and this is confirmed correct** — one `PP` line per transaction carrying the summed promo value across all promo activations, alongside one `PC` per card. Two promo activations of `$100.00` + `$50.00` produce a single `PP` of `$150.00` and two `PC` lines of `$100.00` and `$50.00`. Only `PC` was ever per-card.
 - ✨ Added `GC Activation/two_regular_activations.json` (real capture, 2 regular cards) plus synthetic multi-promo and mixed fixtures as regression cases. No existing baseline changed: every prior sample activates exactly one card.
 
 ### v1.0.94 (07/14/26)
