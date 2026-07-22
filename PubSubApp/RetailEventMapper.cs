@@ -74,6 +74,32 @@ class RetailEventMapper
             salesPersonId = PadNumeric(cashierLoginId, 5);
         }
 
+        // SLFOTS/SLFOTD/SLFOTR/SLFOTT — original-transaction reference, shared by every SKU and
+        // tax record. Sales print zeros. Returns identify the original sale via
+        // references.originalEvent (present only on RETURN_WITH_RECEIPT; RETURN_NO_RECEIPT prints
+        // zeros). VOIDs reference the current transaction itself.
+        string origTxStore = "00000", origTxDate = "000000", origTxRegister = "000", origTxNumber = "00000";
+        if (mappedTransactionTypeSLFTTP == "11") // RETURN
+        {
+            var origEvent = retailEvent.References?.OriginalEvent;
+            if (origEvent != null)
+            {
+                origTxStore = PadNumeric(origEvent.StoreId, 5) ?? "00000";
+                origTxDate = DateTime.TryParse(origEvent.BusinessDay, out DateTime origDay)
+                    ? origDay.ToString("yyMMdd")
+                    : "000000";
+                origTxRegister = PadNumeric(origEvent.RegisterId, 3) ?? "000";
+                origTxNumber = PadNumeric(origEvent.SequenceNumber?.ToString(), 5) ?? "00000";
+            }
+        }
+        else if (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88") // Current/Post VOID
+        {
+            origTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) ?? "00000";
+            origTxDate = transactionDateTime.ToString("yyMMdd");
+            origTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) ?? "000";
+            origTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) ?? "00000";
+        }
+
         var recordSet = new RecordSet
         {
             OrderRecords = new List<OrderRecord>(),
@@ -304,31 +330,11 @@ class RetailEventMapper
                 orderRecord.ReferenceCode = ""; // SLFRFC - Always empty string
                 orderRecord.ReferenceDesc = ""; // SLFRFD - Always empty string
 
-                // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
-                if (mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43") // SALE, Employee SALE, AR Payment
-                {
-                    orderRecord.OriginalTxStore = "00000"; // 5 zeros for sales
-                    orderRecord.OriginalTxDate = "000000"; // SLFOTD - 6 zeros for sales
-                    orderRecord.OriginalTxRegister = "000"; // SLFOTR - 3 zeros for sales
-                    orderRecord.OriginalTxNumber = "00000"; // SLFOTT - 5 zeros for sales
-                }
-                else if (mappedTransactionTypeSLFTTP == "11") // RETURN
-                {
-                    orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
-                    orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd");
-                    orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
-                    // Use sourceTransactionId if available for returns
-                    orderRecord.OriginalTxNumber = retailEvent.References?.SourceTransactionId != null
-                        ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5)
-                        : PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5);
-                }
-                else if (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88") // Current VOID or Post VOID
-                {
-                    orderRecord.OriginalTxStore = PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5);
-                    orderRecord.OriginalTxDate = transactionDateTime.ToString("yyMMdd");
-                    orderRecord.OriginalTxRegister = PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3);
-                    orderRecord.OriginalTxNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5);
-                }
+                // SLFOTS, SLFOTD, SLFOTR, SLFOTT - original-transaction reference (computed once above)
+                orderRecord.OriginalTxStore = origTxStore;
+                orderRecord.OriginalTxDate = origTxDate;
+                orderRecord.OriginalTxRegister = origTxRegister;
+                orderRecord.OriginalTxNumber = origTxNumber;
 
                 // === CSV-specified field mappings ===
 
@@ -371,7 +377,7 @@ class RetailEventMapper
                 string overrideReason = item.Pricing?.PriceOverride?.Reason ?? "";
 
                 if (transType == "RETURN")
-                    reasonCode = "RRT0";
+                    reasonCode = "RRT0" + (item.Return?.Reason ?? ""); // RRT0 + return.reason (e.g. "RRT00204"), same shape as POV0 below
                 else if (transType == "VOID")
                     reasonCode = "VOD0";
                 else if (priceVehicle == "OVD:OVR")
@@ -401,7 +407,12 @@ class RetailEventMapper
 
                 // Required fields with fixed values - per validation spec
                 orderRecord.OriginalSalesperson = "00000"; // SLFOSP - Required, must be "00000"
-                orderRecord.OriginalStore = "00000"; // SLFOST - Required, must be "00000"
+                // SLFOST - original store: on returns the store the original sale happened in
+                // (references.originalEvent.storeId, RETURN_WITH_RECEIPT only); zeros otherwise.
+                string? origEventStoreId = retailEvent.References?.OriginalEvent?.StoreId;
+                orderRecord.OriginalStore = mappedTransactionTypeSLFTTP == "11" && !string.IsNullOrEmpty(origEventStoreId)
+                    ? PadNumeric(origEventStoreId, 5)
+                    : "00000";
                 orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                 orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
                 orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
@@ -510,6 +521,22 @@ class RetailEventMapper
                     }
                 }
 
+                // Returns: the mapping doc pins these price fields regardless of what the payload
+                // carries — the return is signalled by SLFQTN/SLFEXN, not by negative prices or
+                // ad/override codes. Applied last so no earlier price path can overwrite it.
+                //   SLFADC "0000"; SLFADP/SLFOVR 9 zeros with blank signs;
+                //   SLFORN/SLFOPN blank (SLFORG/SLFORT stay positive absolute values).
+                if (retailEvent.Transaction?.TransactionType == "RETURN")
+                {
+                    orderRecord.AdCode = "0000";
+                    orderRecord.AdPrice = "000000000";
+                    orderRecord.AdPriceNegativeSign = "";
+                    orderRecord.OverridePrice = "000000000";
+                    orderRecord.OverridePriceNegativeSign = "";
+                    orderRecord.OriginalPriceNegativeSign = "";
+                    orderRecord.OriginalRetailNegativeSign = "";
+                }
+
                 // Add this OrderRecord to the item records list
                 itemRecords.Add(orderRecord);
 
@@ -539,9 +566,11 @@ class RetailEventMapper
 
                     foreach (var fee in item.Fees)
                     {
-                        if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars <= 0) continue;
+                        // Zero means no fee. Returns carry the fee as a negative amount and must
+                        // still print the 83 line (SLFTTP=11, positive amount, sign on SLFEXN).
+                        if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars == 0) continue;
 
-                        string feeAmountFormatted = feeAmountDollars.ToString("F2");
+                        string feeAmountFormatted = Math.Abs(feeAmountDollars).ToString("F2");
 
                         // SLFACD: use fee's own authority if available, otherwise fall back to item tax jurisdiction
                         string feeAuthority = !string.IsNullOrEmpty(fee.Authority) ? fee.Authority : fallbackFeeProvince;
@@ -574,7 +603,7 @@ class RetailEventMapper
                             ItemSellPrice = FormatCurrency(feeAmountFormatted, 9),
                             SellPriceNegativeSign = "",
                             ExtendedValue = FormatCurrency(feeAmountFormatted, 11),
-                            ExtendedValueNegativeSign = "",
+                            ExtendedValueNegativeSign = feeAmountDollars < 0 ? "-" : "",
                             ChargedTax1 = "N",
                             ChargedTax2 = "N",
                             ChargedTax3 = "N",
@@ -641,12 +670,14 @@ class RetailEventMapper
                     itemRangeStart.Add(recIdx);
                     var txItem = retailEvent.Transaction.Items[txIdx];
                     int count = 1; // the item record itself
-                    // Count eco fee records for this item
+                    // Count eco fee records for this item. MUST mirror the emission predicate in the
+                    // fee loop above (non-zero, negative allowed on returns) — if these disagree the
+                    // ranges shift and the reorder drops or duplicates records.
                     if (txItem.Fees != null)
                     {
                         foreach (var fee in txItem.Fees)
                         {
-                            if (fee.Amount != null && decimal.TryParse(fee.Amount.Value, out decimal amt) && amt > 0)
+                            if (fee.Amount != null && decimal.TryParse(fee.Amount.Value, out decimal amt) && amt != 0)
                                 count++;
                         }
                     }
@@ -837,10 +868,10 @@ class RetailEventMapper
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate("HON", 6),
                         TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(hstTaxRateCode) ? hstTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(hstTaxTotal.ToString("F2"), 11),
+                        ExtendedValue = FormatCurrency(Math.Abs(hstTaxTotal).ToString("F2"), 11),
                         ExtendedValueNegativeSign = hstTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(hstTaxTotal.ToString("F2"), 9),
-                        SellPriceNegativeSign = hstTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(Math.Abs(hstTaxTotal).ToString("F2"), 9),
+                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
                         SKUNumber = "000000000",
                         Quantity = "000000100",
                         QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
@@ -852,16 +883,12 @@ class RetailEventMapper
                         OriginalRetailNegativeSign = "",
                         ReferenceCode = "",
                         ReferenceDesc = "",
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
-                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
-                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                        // Tax lines carry no original-transaction reference on sales or returns
+                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
                         CustomerName = "",
                         CustomerNumber = "",
                         ZipCode = "         0",
@@ -922,10 +949,10 @@ class RetailEventMapper
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate("HON1", 6),
                         TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(nonHstTaxRateCode) ? nonHstTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(nonHstTaxTotal.ToString("F2"), 11),
+                        ExtendedValue = FormatCurrency(Math.Abs(nonHstTaxTotal).ToString("F2"), 11),
                         ExtendedValueNegativeSign = nonHstTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(nonHstTaxTotal.ToString("F2"), 9),
-                        SellPriceNegativeSign = nonHstTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(Math.Abs(nonHstTaxTotal).ToString("F2"), 9),
+                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
                         SKUNumber = "000000000",
                         Quantity = "000000100",
                         QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
@@ -937,16 +964,12 @@ class RetailEventMapper
                         OriginalRetailNegativeSign = "",
                         ReferenceCode = "",
                         ReferenceDesc = "",
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
-                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
-                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                        // Tax lines carry no original-transaction reference on sales or returns
+                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
                         CustomerName = "",
                         CustomerNumber = "",
                         ZipCode = "         0",
@@ -1074,10 +1097,10 @@ class RetailEventMapper
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate("FED", 6),
                         TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(federalTaxRateCode) ? federalTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(federalTaxTotal.ToString("F2"), 11),
+                        ExtendedValue = FormatCurrency(Math.Abs(federalTaxTotal).ToString("F2"), 11),
                         ExtendedValueNegativeSign = federalTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(federalTaxTotal.ToString("F2"), 9),
-                        SellPriceNegativeSign = federalTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(Math.Abs(federalTaxTotal).ToString("F2"), 9),
+                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
                         SKUNumber = "000000000",
                         Quantity = "000000100",
                         QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
@@ -1089,16 +1112,12 @@ class RetailEventMapper
                         OriginalRetailNegativeSign = "",
                         ReferenceCode = "",
                         ReferenceDesc = "",
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
-                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
-                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                        // Tax lines carry no original-transaction reference on sales or returns
+                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
                         CustomerName = "",
                         CustomerNumber = "",
                         ZipCode = "         0",
@@ -1159,10 +1178,10 @@ class RetailEventMapper
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate(provincialTaxAuth, 6),
                         TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(provincialTaxRateCode) ? provincialTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(provincialTaxTotal.ToString("F2"), 11),
+                        ExtendedValue = FormatCurrency(Math.Abs(provincialTaxTotal).ToString("F2"), 11),
                         ExtendedValueNegativeSign = provincialTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(provincialTaxTotal.ToString("F2"), 9),
-                        SellPriceNegativeSign = provincialTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(Math.Abs(provincialTaxTotal).ToString("F2"), 9),
+                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
                         SKUNumber = "000000000",
                         Quantity = "000000100",
                         QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
@@ -1174,16 +1193,12 @@ class RetailEventMapper
                         OriginalRetailNegativeSign = "",
                         ReferenceCode = "",
                         ReferenceDesc = "",
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
-                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
-                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                        // Tax lines carry no original-transaction reference on sales or returns
+                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
                         CustomerName = "",
                         CustomerNumber = "",
                         ZipCode = "         0",
@@ -1266,10 +1281,10 @@ class RetailEventMapper
                         ChargedTax4 = "N",
                         TaxAuthCode = PadOrTruncate("FED", 6),
                         TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(gstTaxRateCode) ? gstTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(gstTaxTotal.ToString("F2"), 11),
+                        ExtendedValue = FormatCurrency(Math.Abs(gstTaxTotal).ToString("F2"), 11),
                         ExtendedValueNegativeSign = gstTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(gstTaxTotal.ToString("F2"), 9),
-                        SellPriceNegativeSign = gstTaxTotal < 0 ? "-" : "",
+                        ItemSellPrice = FormatCurrency(Math.Abs(gstTaxTotal).ToString("F2"), 9),
+                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
                         SKUNumber = "000000000",
                         Quantity = "000000100",
                         QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
@@ -1281,16 +1296,12 @@ class RetailEventMapper
                         OriginalRetailNegativeSign = "",
                         ReferenceCode = "",
                         ReferenceDesc = "",
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                         (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
-                                        (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
-                                            (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                          (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                          (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
-                                          PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                        // Tax lines carry no original-transaction reference on sales or returns
+                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
                         CustomerName = "",
                         CustomerNumber = "",
                         ZipCode = "         0",
@@ -1390,10 +1401,10 @@ class RetailEventMapper
                                 TaxRateCode = lastComputedTaxRateCode, // SLFTCD - Use computed TaxRateCode from order record
 
                                 // Tax amount in ExtendedValue and ItemSellPrice
-                                ExtendedValue = FormatCurrency(itemTaxTotal.ToString("F2"), 11),
+                                ExtendedValue = FormatCurrency(Math.Abs(itemTaxTotal).ToString("F2"), 11),
                                 ExtendedValueNegativeSign = itemTaxTotal < 0 ? "-" : "",
-                                ItemSellPrice = FormatCurrency(itemTaxTotal.ToString("F2"), 9),
-                                SellPriceNegativeSign = itemTaxTotal < 0 ? "-" : "",
+                                ItemSellPrice = FormatCurrency(Math.Abs(itemTaxTotal).ToString("F2"), 9),
+                                SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
 
                                 // Blank fields for tax line
                                 SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
@@ -1409,16 +1420,12 @@ class RetailEventMapper
                                 ReferenceDesc = "", // SLFRFD - Always empty string
 
                                 // SLFOTS, SLFOTD, SLFOTR, SLFOTT - Set based on transaction type
-                                OriginalTxStore = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                                 (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Store?.StoreId, 5) : null),
-                                OriginalTxDate = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000000" :
-                                                (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? transactionDateTime.ToString("yyMMdd") : null),
-                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "000" :
-                                                    (mappedTransactionTypeSLFTTP == "11" || mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadOrTruncate(retailEvent.BusinessContext?.Workstation?.RegisterId, 3) : null),
-                                OriginalTxNumber = mappedTransactionTypeSLFTTP == "01" || mappedTransactionTypeSLFTTP == "04" || mappedTransactionTypeSLFTTP == "43" ? "00000" :
-                                                  (mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5) :
-                                                  (mappedTransactionTypeSLFTTP == "11" && retailEvent.References?.SourceTransactionId != null ? PadOrTruncate(retailEvent.References.SourceTransactionId, 5) :
-                                                  PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5))),
+                                // Tax lines carry no original-transaction reference on sales or returns
+                                // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                                OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                                OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                                OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                                OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
 
                                 CustomerName = "",
                                 CustomerNumber = "",
@@ -2074,7 +2081,10 @@ class RetailEventMapper
                         decimal.TryParse(tax.TaxAmount.Value, out taxAmount);
                     }
 
-                    if (taxAmount <= 0)
+                    // Zero means the tax wasn't charged. Returns carry negative tax amounts for
+                    // taxes that WERE charged on the original sale, so only skip on zero —
+                    // otherwise every SLFTX1-4 flag stays "N" on return lines.
+                    if (taxAmount == 0)
                         continue;
 
                     // Map tax type/category to ChargedTax1-4 flags

@@ -372,7 +372,20 @@ Log entries include:
 
 ## Version History
 
-### v1.0.95 (07/15/26) ✨ Current
+### v1.0.96 (07/22/26) ✨ Current
+**Return transactions (with & without receipt) per the returns mapping document:**
+- ✨ **New models** - `transaction.subType` (`RETURN_WITH_RECEIPT` / `RETURN_NO_RECEIPT`), `items[n].return` (`originalLineId`, `reason`), and `references.originalEvent` (`businessDay`, `registerId`, `sequenceNumber`, `storeId`).
+- 🔧 **`SLFRSN`** - Now `RRT0` + `items[n].return.reason` (e.g. `RRT00204`), same shape as the existing `POV0`+reason convention. Previously the reason was never appended.
+- 🔧 **`SLFOST` / `SLFOTS` / `SLFOTD` / `SLFOTR` / `SLFOTT`** - Now sourced from `references.originalEvent` (the original sale) on `RETURN_WITH_RECEIPT`; all zeros on `RETURN_NO_RECEIPT`. Previously they echoed the *current* event's store/date/register. Tax lines always carry zeros, matching the sales flow.
+- 🔧 **`SLFADC`** - Was `####` on every return: the ad-price check compared positive `unitPrice` against negative `originalUnitPrice`. Returns now always print `0000` (and `SLFADP`/`SLFOVR` stay 9 zeros with blank signs) per the mapping document.
+- 🔧 **`SLFORN` / `SLFOPN`** - Blank on returns; `SLFORG`/`SLFORT` stay positive. The return is signalled by `SLFQTN`/`SLFEXN`, not by price signs.
+- 🔧 **Tax lines (`XH`/`XI`...)** - Return tax amounts printed as embedded negatives (`0000-1297`). `SLFSEL`/`SLFEXT` are now positive absolute values with the sign on `SLFEXN`; `SLFSLN` is always blank.
+- 🔧 **`SLFTX1-4`** - Were stuck at `N` on returns: charged-tax detection skipped any tax with amount `<= 0`, and return taxes are negative. Now only zero (not-charged) taxes are skipped, so the flags match the original sale's.
+- 🔧 **Eco fees on returns** - A negative fee amount was skipped entirely, so the `83` line never printed; the range-counting used by record reordering had the same predicate, which could silently drop an unrelated SKU line once emission was fixed. Both now accept non-zero amounts: a returned SKU with an eco fee prints `11`/`11` followed by `11`/`83`, positive amounts, sign on `SLFEXN`.
+- ℹ️ `TNFTTP=11` and `TNFAMN="-"` on tenders already worked and are unchanged; the acceptance criteria's `TNFLNT` does not exist in the tender layout — `TNFTTP` carries the `11`. The cross-region `SLFACD`/`SLFTCD` bug noted in the mapping doc is not reproducible with same-region captures and remains open.
+- ✨ Regression cases: both real Jul 21 captures (`samples/Returns/return_with_receipt.json`, `return_no_receipt.json`) plus a synthetic eco-fee return derived from the with-receipt capture.
+
+### v1.0.95 (07/15/26)
 **One PC tender line per Gift Card activation:**
 - 🔧 **`PC` line is now emitted per activation, not per transaction** - A cart activating more than one gift card produced a single `PC` line describing only the **first** card; every subsequent activation was dropped. The order side was already correct (each activation got its own `SLFLNT=45` line), so a 2-card cart emitted two `45` lines but one `PC`. The tender block asked `HasGiftCardActivation()` ("is there *any* activation?") and then read `GetFirstGiftCardToken()` / `GetFirstGiftCardOriginalUnitPrice()`. It now iterates every activation item in item order.
   - Each `PC` carries its own `TNFCCD` (card token), `TNFAUT` and `TNFRDS` (that card's `originalUnitPrice`), with `TNFAMT` zero and `TNFMSR="S"` as before.

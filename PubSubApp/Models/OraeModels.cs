@@ -51,12 +51,36 @@ public class References
 {
     [JsonPropertyName("sourceTransactionId")]
     public string? SourceTransactionId { get; set; }
+
+    // Present on RETURN_WITH_RECEIPT: identifies the original sale transaction.
+    // Absent on RETURN_NO_RECEIPT, so every consumer must handle null.
+    [JsonPropertyName("originalEvent")]
+    public OriginalEventRef? OriginalEvent { get; set; }
+}
+
+public class OriginalEventRef
+{
+    [JsonPropertyName("businessDay")]
+    public string? BusinessDay { get; set; }
+
+    [JsonPropertyName("registerId")]
+    public string? RegisterId { get; set; }
+
+    [JsonPropertyName("sequenceNumber")]
+    public long? SequenceNumber { get; set; }
+
+    [JsonPropertyName("storeId")]
+    public string? StoreId { get; set; }
 }
 
 public class Transaction
 {
     [JsonPropertyName("transactionType")]
     public string? TransactionType { get; set; }
+
+    // RETURN transactions only: "RETURN_WITH_RECEIPT" or "RETURN_NO_RECEIPT"
+    [JsonPropertyName("subType")]
+    public string? SubType { get; set; }
 
     [JsonPropertyName("items")]
     public required List<TransactionItem> Items { get; set; }
@@ -202,6 +226,19 @@ public class TransactionItem
 
     [JsonPropertyName("discounts")]
     public List<ItemDiscount>? Discounts { get; set; }
+
+    // Present on RETURN items: links back to the original sale line and carries the reason code.
+    [JsonPropertyName("return")]
+    public ReturnInfo? Return { get; set; }
+}
+
+public class ReturnInfo
+{
+    [JsonPropertyName("originalLineId")]
+    public string? OriginalLineId { get; set; }
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
 }
 
 public class GiftCardInfo

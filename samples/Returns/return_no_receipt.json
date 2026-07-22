@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7485414137158637966",
+  "occurredAt": "2026-07-21T19:24:33Z",
+  "ingestedAt": "2026-07-21T19:24:35Z",
+  "businessContext": {
+    "businessDay": "2026-07-21",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "85",
+      "sequenceNumber": 4729,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "RETURN",
+    "subType": "RETURN_NO_RECEIPT",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "WALL CABINET SMALL 33\" 2D GREY",
+          "sku": "000479301"
+        },
+        "lineId": "17846618352772177232",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-242.99"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-242.99"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "-242.99"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": -1
+        },
+        "return": {
+          "reason": "0204"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-31.59"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "-274.60"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "-0.02"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "-242.99"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "-274.60"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "-31.59"
+      }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": {
+      "loginId": "2"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}
