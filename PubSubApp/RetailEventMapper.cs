@@ -106,6 +106,21 @@ class RetailEventMapper
             TenderRecords = new List<TenderRecord>()
         };
 
+        // ADJUSTMENT: the sale leg of a pair may not repeat the return reason; index the return
+        // legs' reasons by SKU so both lines of the pair carry the same POV0 code (AC1/AC2).
+        Dictionary<string, string> adjustmentReasonBySku = new Dictionary<string, string>();
+        if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && retailEvent.Transaction.Items != null)
+        {
+            foreach (var it in retailEvent.Transaction.Items)
+            {
+                if (!string.IsNullOrEmpty(it.Return?.Reason) && !string.IsNullOrEmpty(it.Item?.Sku) &&
+                    !adjustmentReasonBySku.ContainsKey(it.Item.Sku))
+                {
+                    adjustmentReasonBySku[it.Item.Sku] = it.Return.Reason;
+                }
+            }
+        }
+
         // Temporary lists to group records by type
         List<OrderRecord> itemRecords = new List<OrderRecord>();
         List<OrderRecord> taxRecords = new List<OrderRecord>();
@@ -157,6 +172,17 @@ class RetailEventMapper
                 // SKU Number - 9-digits with leading zeros
                 orderRecord.SKUNumber = PadNumeric(item.Item?.Sku, 9);
 
+                // Return semantics apply to every line of a RETURN, but only to the return leg of a
+                // price ADJUSTMENT (the sale leg prints as a sale, TTP 11 aside).
+                bool isReturnLine = IsReturnLine(retailEvent, item);
+
+                // Price adjustment sale leg: SLFLNT drops to the sale line type while SLFTTP stays 11.
+                if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && !isReturnLine &&
+                    orderRecord.LineType == mappedTransactionTypeSLFLNT)
+                {
+                    orderRecord.LineType = "01";
+                }
+
                 // Quantity - 9-digits without decimal (multiply by 100)
                 if (item.Quantity != null)
                 {
@@ -165,8 +191,8 @@ class RetailEventMapper
                     int qtyCents = (int)(Math.Abs(qtyValue) * 100);
 
                     orderRecord.Quantity = qtyCents.ToString().PadLeft(9, '0');
-                    // SLFQTN: "-" for Return, "" for all else
-                    orderRecord.QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "";
+                    // SLFQTN: "-" on return lines, "" for all else
+                    orderRecord.QuantityNegativeSign = isReturnLine ? "-" : "";
                 }
 
                 // Original Price - 9-digits without decimal
@@ -378,6 +404,14 @@ class RetailEventMapper
 
                 if (transType == "RETURN")
                     reasonCode = "RRT0" + (item.Return?.Reason ?? ""); // RRT0 + return.reason (e.g. "RRT00204"), same shape as POV0 below
+                else if (transType == "ADJUSTMENT")
+                {
+                    // Price adjustment: POV0 + return.reason on BOTH legs of the pair (AC1/AC2).
+                    // The sale leg falls back to the reason indexed from its SKU's return leg.
+                    string adjReason = item.Return?.Reason
+                        ?? (item.Item?.Sku != null && adjustmentReasonBySku.TryGetValue(item.Item.Sku, out string? paired) ? paired : "");
+                    reasonCode = "POV0" + adjReason;
+                }
                 else if (transType == "VOID")
                     reasonCode = "VOD0";
                 else if (priceVehicle == "OVD:OVR")
@@ -521,12 +555,13 @@ class RetailEventMapper
                     }
                 }
 
-                // Returns: the mapping doc pins these price fields regardless of what the payload
-                // carries — the return is signalled by SLFQTN/SLFEXN, not by negative prices or
-                // ad/override codes. Applied last so no earlier price path can overwrite it.
+                // Return lines: the mapping doc pins these price fields regardless of what the
+                // payload carries — the return is signalled by SLFQTN/SLFEXN, not by negative
+                // prices or ad/override codes. Applies to every line of a RETURN and to the return
+                // leg of an ADJUSTMENT. Applied last so no earlier price path can overwrite it.
                 //   SLFADC "0000"; SLFADP/SLFOVR 9 zeros with blank signs;
                 //   SLFORN/SLFOPN blank (SLFORG/SLFORT stay positive absolute values).
-                if (retailEvent.Transaction?.TransactionType == "RETURN")
+                if (isReturnLine)
                 {
                     orderRecord.AdCode = "0000";
                     orderRecord.AdPrice = "000000000";
@@ -1769,6 +1804,17 @@ class RetailEventMapper
             return false;
         }
 
+        // A line prints with return semantics when the whole transaction is a RETURN, or — on a
+        // price ADJUSTMENT — when this item is the return leg of a pair (it carries a return node
+        // or a negative quantity). The sale leg of an adjustment prints with sale semantics.
+        private bool IsReturnLine(RetailEvent retailEvent, TransactionItem item)
+        {
+            string transType = retailEvent.Transaction?.TransactionType ?? "";
+            if (transType == "RETURN") return true;
+            return transType == "ADJUSTMENT" &&
+                (item.Return != null || (item.Quantity?.Value ?? 0) < 0);
+        }
+
         // ── Gift Card Activation detection ──
 
         // Check if a transaction item is a GC activation (has giftCard object)
@@ -2535,6 +2581,7 @@ class RetailEventMapper
             {
                 "SALE" => "01",          // Regular sale (no employee discount)
                 "RETURN" => "11",        // Return transactions
+                "ADJUSTMENT" => "11",    // Price adjustment: return + re-sale in one transaction; TTP stays 11 on every line
                 "AR_PAYMENT" => "43",    // AR Payment
                 "VOID" => "87",          // Current transaction void
                 "POST_VOID" => "88",     // Post void transaction
@@ -2577,6 +2624,11 @@ class RetailEventMapper
                 // Regular return (no Customer ID) → SLFLNT = "11"
                 return "11";
             }
+
+            // Price adjustment (SLFTTP = 11): the transaction-level default is the return line's
+            // "11"; sale-shaped items are overridden to "01" per item in the mapping loop.
+            if (input == "ADJUSTMENT")
+                return "11";
 
             // Current transaction void (SLFTTP = 87) → SLFLNT = "87"
             if (input == "VOID")

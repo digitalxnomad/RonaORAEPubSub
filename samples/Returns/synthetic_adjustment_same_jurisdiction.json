@@ -1,0 +1,178 @@
+﻿{
+    "schemaVersion":  "2.0.0",
+    "messageType":  "RetailEvent",
+    "eventType":  "ORIGINAL",
+    "eventId":  "synthetic-adjustment-same-jurisdiction",
+    "occurredAt":  "2026-07-21T19:15:43Z",
+    "ingestedAt":  "2026-07-21T19:15:47Z",
+    "businessContext":  {
+                            "businessDay":  "2026-07-21",
+                            "channel":  "STORE",
+                            "fulfillment":  "CARRYOUT",
+                            "store":  {
+                                          "currency":  "CAD",
+                                          "storeId":  "55010",
+                                          "taxArea":  "ON"
+                                      },
+                            "workstation":  {
+                                                "registerId":  "85",
+                                                "sequenceNumber":  4723,
+                                                "type":  "POS"
+                                            }
+                        },
+    "eventCategory":  "TRANSACTION",
+    "eventSubType":  "transactionSale",
+    "transaction":  {
+                        "transactionType":  "ADJUSTMENT",
+                        "subType":  "RETURN_WITH_RECEIPT",
+                        "items":  [
+                                      {
+                                          "attributes":  {
+                                                             "x-epp-coverage-identifier":  "0"
+                                                         },
+                                          "item":  {
+                                                       "description":  "HAMMER 16OZ SOLID STEEL",
+                                                       "gtin":  "000000034139623618",
+                                                       "sku":  "000160789"
+                                                   },
+                                          "lineId":  "178466127634064162131",
+                                          "pricing":  {
+                                                          "extendedPrice":  {
+                                                                                "currency":  "CAD",
+                                                                                "value":  "-62.99"
+                                                                            },
+                                                          "originalUnitPrice":  {
+                                                                                    "currency":  "CAD",
+                                                                                    "value":  "-62.99"
+                                                                                },
+                                                          "priceVehicle":  "REG:ORG",
+                                                          "unitPrice":  {
+                                                                            "currency":  "CAD",
+                                                                            "value":  "62.99"
+                                                                        }
+                                                      },
+                                          "quantity":  {
+                                                           "uom":  "EA",
+                                                           "value":  -1
+                                                       },
+                                          "return":  {
+                                                         "originalLineId":  "2",
+                                                         "reason":  "0204"
+                                                     },
+                                          "taxes":  [
+                                                        {
+                                                            "amount":  {
+                                                                           "currency":  "CAD",
+                                                                           "value":  "-8.19"
+                                                                       },
+                                                            "jurisdiction":  {
+                                                                                 "region":  "HON"
+                                                                             },
+                                                            "taxCode":  "HST"
+                                                        }
+                                                    ]
+                                      },
+                                      {
+                                          "attributes":  {
+                                                             "x-epp-coverage-identifier":  "0"
+                                                         },
+                                          "item":  {
+                                                       "description":  "HAMMER 16OZ SOLID STEEL",
+                                                       "gtin":  "000000034139623618",
+                                                       "sku":  "000160789"
+                                                   },
+                                          "lineId":  "178466127634064162132",
+                                          "pricing":  {
+                                                          "extendedPrice":  {
+                                                                                "currency":  "CAD",
+                                                                                "value":  "49.99"
+                                                                            },
+                                                          "originalUnitPrice":  {
+                                                                                    "currency":  "CAD",
+                                                                                    "value":  "62.99"
+                                                                                },
+                                                          "priceVehicle":  "REG:ORG",
+                                                          "unitPrice":  {
+                                                                            "currency":  "CAD",
+                                                                            "value":  "49.99"
+                                                                        }
+                                                      },
+                                          "quantity":  {
+                                                           "uom":  "EA",
+                                                           "value":  1
+                                                       },
+                                          "taxes":  [
+                                                        {
+                                                            "amount":  {
+                                                                           "currency":  "CAD",
+                                                                           "value":  "6.50"
+                                                                       },
+                                                            "jurisdiction":  {
+                                                                                 "region":  "HON"
+                                                                             },
+                                                            "taxCode":  "HST"
+                                                        }
+                                                    ]
+                                      }
+                                  ],
+                        "tenders":  [
+                                        {
+                                            "amount":  {
+                                                           "currency":  "CAD",
+                                                           "value":  "-14.69"
+                                                       },
+                                            "card":  {
+                                                         "responseCode":  "SETTLE"
+                                                     },
+                                            "method":  "CASH",
+                                            "tenderId":  "CA"
+                                        }
+                                    ],
+                        "totals":  {
+                                       "cashRounding":  {
+                                                            "currency":  "CAD",
+                                                            "value":  "0.00"
+                                                        },
+                                       "changeDue":  {
+                                                         "currency":  "CAD",
+                                                         "value":  "0.00"
+                                                     },
+                                       "discounts":  {
+                                                         "currency":  "CAD",
+                                                         "value":  "0.00"
+                                                     },
+                                       "gross":  {
+                                                     "currency":  "CAD",
+                                                     "value":  "-13.00"
+                                                 },
+                                       "net":  {
+                                                   "currency":  "CAD",
+                                                   "value":  "-14.69"
+                                               },
+                                       "tax":  {
+                                                   "currency":  "CAD",
+                                                   "value":  "-1.69"
+                                               }
+                                   }
+                    },
+    "promotions":  [
+
+                   ],
+    "references":  {
+                       "originalEvent":  {
+                                             "businessDay":  "2026-07-17",
+                                             "registerId":  "10",
+                                             "sequenceNumber":  373,
+                                             "storeId":  "55010"
+                                         },
+                       "sourceTransactionId":  "4723"
+                   },
+    "actor":  {
+                  "cashier":  {
+                                  "loginId":  "2"
+                              },
+                  "customer":  {
+                                   "customerIdToken":  ""
+                               }
+              }
+}

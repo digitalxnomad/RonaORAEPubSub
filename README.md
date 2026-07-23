@@ -372,7 +372,19 @@ Log entries include:
 
 ## Version History
 
-### v1.0.96 (07/22/26) ✨ Current
+### v1.0.97 (07/23/26) ✨ Current
+**Price adjustment transactions (`transactionType = "ADJUSTMENT"`):**
+- ✨ **Two RIMSLF line pairs per adjusted SKU** - The return leg prints per the returns mapping (`SLFTTP=11`, `SLFLNT=11`, `SLFQTN`/`SLFEXN` `-`, positive amounts, ADC/ADP/OVR pinned to zeros); the re-sale leg prints per the sales mapping at the adjusted price with **`SLFTTP` staying `11`** and `SLFLNT=01`. Previously `ADJUSTMENT` fell through to the default and mapped as a plain `01` sale.
+- ✨ **`SLFRSN` = `POV0` + `items[n].return.reason` on both legs** - The sale leg copies the reason from its SKU-paired return leg when it carries no `return` node itself.
+- ✨ **Tax lines** - Same jurisdiction on both legs → one combined line with the net amount, `SLFEXN` `-` when the returned tax exceeds the re-sold tax. Different jurisdictions → separate lines (return jurisdiction with `-`, sale jurisdiction positive). Falls out of the existing per-jurisdiction aggregation plus the v1.0.96 sign handling — verified, not assumed.
+- ✨ **Eco fees** - An adjusted SKU with an eco fee prints two identical `11`/`83` lines, distinguished only by the sign fields.
+- ⚠️ **Built without a real ORAE capture — every fixture is synthetic** (derived from the Jul 21 return capture). Documented assumptions, each of which a real capture should confirm:
+  1. ORAE sends **two items per adjusted SKU**: a return-shaped leg (negative quantity, `return.reason`, original price) and a sale-shaped leg (positive quantity, adjusted price).
+  2. The return leg is recognised by its `return` node or negative quantity.
+  3. The sale leg may omit `return.reason`; it is copied from the SKU-paired return leg.
+  4. `references.originalEvent` semantics are identical to returns; tax-line `SLFQTN` stays blank (sign rides on `SLFEXN`).
+
+### v1.0.96 (07/22/26)
 **Return transactions (with & without receipt) per the returns mapping document:**
 - ✨ **New models** - `transaction.subType` (`RETURN_WITH_RECEIPT` / `RETURN_NO_RECEIPT`), `items[n].return` (`originalLineId`, `reason`), and `references.originalEvent` (`businessDay`, `registerId`, `sequenceNumber`, `storeId`).
 - 🔧 **`SLFRSN`** - Now `RRT0` + `items[n].return.reason` (e.g. `RRT00204`), same shape as the existing `POV0`+reason convention. Previously the reason was never appended.
