@@ -1,0 +1,273 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7485540179179128134",
+  "occurredAt": "2026-07-22T03:45:45Z",
+  "ingestedAt": "2026-07-22T03:45:49Z",
+  "businessContext": {
+    "businessDay": "2026-07-22",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "85",
+      "sequenceNumber": 4734,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "ADJUSTMENT",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "TREMCLAD BROWN 946ML",
+          "gtin": "000000063213000731",
+          "sku": "000012212"
+        },
+        "lineId": "17846918979121158873",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-147.16"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-36.79"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "36.79"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 4
+        },
+        "return": {
+          "originalLineId": "1",
+          "reason": "1502"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-19.13"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "TREMCLAD BROWN 946ML",
+          "gtin": "000000063213000731",
+          "sku": "000012212"
+        },
+        "lineId": "178469189791510255527",
+        "parentLineId": "17846918979121158873",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "132.44"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "33.11"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "33.11"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 4
+        },
+        "return": {
+          "reason": "1502"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "17.22"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "HAMMER 16OZ SOLID STEEL",
+          "gtin": "000000034139623618",
+          "sku": "000160789"
+        },
+        "lineId": "178469191824600321213",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-251.96"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-62.99"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "62.99"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 4
+        },
+        "return": {
+          "originalLineId": "2",
+          "reason": "1501"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-32.76"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "HAMMER 16OZ SOLID STEEL",
+          "gtin": "000000034139623618",
+          "sku": "000160789"
+        },
+        "lineId": "178469191832898753357",
+        "parentLineId": "178469191824600321213",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "226.76"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "56.69"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "56.69"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": 4
+        },
+        "return": {
+          "reason": "1501"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "29.48"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "45.10"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.01"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "-39.92"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "-45.10"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "-5.19"
+      }
+    }
+  },
+  "promotions": [],
+  "references": {
+    "originalEvent": {
+      "businessDay": "2026-07-17",
+      "registerId": "10",
+      "sequenceNumber": 373,
+      "storeId": "55010"
+    },
+    "sourceTransactionId": "4734"
+  },
+  "actor": {
+    "cashier": {
+      "loginId": "2"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}

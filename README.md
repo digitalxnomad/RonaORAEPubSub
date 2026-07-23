@@ -372,7 +372,15 @@ Log entries include:
 
 ## Version History
 
-### v1.0.97 (07/23/26) ✨ Current
+### v1.0.98 (07/23/26) ✨ Current
+**Price adjustments validated against real captures; cross-region tax fix:**
+- 🔧 **Adjustment leg detection corrected** - Real Jul 21 captures disproved two v1.0.97 assumptions: BOTH legs carry a `return` node, and the return leg's quantity is **positive**. The legs are distinguished by pricing sign (return leg has negative `extendedPrice`/`originalUnitPrice`). With the v1.0.97 heuristic every adjustment line would have printed as a return line.
+- 🔧 **`SLFEXN` forced `-` on return lines** - The computed extended value (qty × unit price) can come out positive on a return line (adjustment legs have positive quantity; ORAE sign conventions also vary — the no-receipt return capture carries a negative `unitPrice` where the with-receipt one is positive). The sign is now pinned per the mapping doc rather than inherited from arithmetic. **This also corrects the `return_no_receipt` baseline, which had frozen a blank `SLFEXN` in v1.0.96.**
+- 🔧 **Cross-region taxes print under their own jurisdiction (`SLFACD`/`SLFTCD` bug, long open)** - Tax records were bucketed by the *store's* province, so an ON-store adjustment refunding a QC purchase lumped the return's `FED`/`PQ` taxes into a single mislabelled `XI`/`HON1`/`GST` line. Every item tax is now bucketed by its **own** `jurisdiction.region` (`HON`→`XH`, `HON1`→`XI`, `FED`→`XG`, `PQ`→`XQ`, `BC`/`MB`/`SK`→`XR`/`XM`/`XS`, Atlantic HSTs likewise); region-less taxes keep the store province's historical heuristics. The five near-identical per-province tax blocks consolidated into one bucketing loop + emitter (~430 lines removed); all pre-existing same-region baselines byte-for-byte unchanged.
+- 🔧 **Eco-fee pair borrows `authority`/`code` across legs (AC3)** - The QC capture's return-leg fee omits `authority`/`code` that the sale leg carries; the fallback printed mismatched `SLFACD` (`FED` vs `22`). Both `83` lines now print identically apart from sign fields.
+- ✨ **Fixtures are now the three real Jul 21 captures** (`adjustment_two_skus`, `adjustment_cross_region`, `adjustment_qc_ecofee`), replacing the v1.0.97 synthetics which encoded the wrong payload shape.
+
+### v1.0.97 (07/23/26)
 **Price adjustment transactions (`transactionType = "ADJUSTMENT"`):**
 - ✨ **Two RIMSLF line pairs per adjusted SKU** - The return leg prints per the returns mapping (`SLFTTP=11`, `SLFLNT=11`, `SLFQTN`/`SLFEXN` `-`, positive amounts, ADC/ADP/OVR pinned to zeros); the re-sale leg prints per the sales mapping at the adjusted price with **`SLFTTP` staying `11`** and `SLFLNT=01`. Previously `ADJUSTMENT` fell through to the default and mapped as a plain `01` sale.
 - ✨ **`SLFRSN` = `POV0` + `items[n].return.reason` on both legs** - The sale leg copies the reason from its SKU-paired return leg when it carries no `return` node itself.

@@ -121,6 +121,23 @@ class RetailEventMapper
             }
         }
 
+        // ADJUSTMENT: the pair's eco-fee lines must be identical apart from sign fields (AC3), but
+        // real captures omit authority/code on one leg's fee. Index the populated values by SKU so
+        // both legs print the same SLFACD/SLFTCD.
+        Dictionary<string, (string Authority, string Code)> adjustmentFeeAuthBySku = new Dictionary<string, (string, string)>();
+        if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && retailEvent.Transaction.Items != null)
+        {
+            foreach (var it in retailEvent.Transaction.Items)
+            {
+                if (it.Fees == null || string.IsNullOrEmpty(it.Item?.Sku)) continue;
+                foreach (var f in it.Fees)
+                {
+                    if (!string.IsNullOrEmpty(f.Authority) && !adjustmentFeeAuthBySku.ContainsKey(it.Item.Sku))
+                        adjustmentFeeAuthBySku[it.Item.Sku] = (f.Authority, f.Code ?? "");
+                }
+            }
+        }
+
         // Temporary lists to group records by type
         List<OrderRecord> itemRecords = new List<OrderRecord>();
         List<OrderRecord> taxRecords = new List<OrderRecord>();
@@ -570,6 +587,11 @@ class RetailEventMapper
                     orderRecord.OverridePriceNegativeSign = "";
                     orderRecord.OriginalPriceNegativeSign = "";
                     orderRecord.OriginalRetailNegativeSign = "";
+                    // SLFEXN is "-" on every return line. On RETURN transactions it falls out of
+                    // the negative quantity; on ADJUSTMENT return legs the quantity is positive
+                    // (the negativity lives in extendedPrice, which SLFEXT does not use), so the
+                    // computed sign would be blank without this.
+                    orderRecord.ExtendedValueNegativeSign = "-";
                 }
 
                 // Add this OrderRecord to the item records list
@@ -609,6 +631,16 @@ class RetailEventMapper
 
                         // SLFACD: use fee's own authority if available, otherwise fall back to item tax jurisdiction
                         string feeAuthority = !string.IsNullOrEmpty(fee.Authority) ? fee.Authority : fallbackFeeProvince;
+                        string feeCode = fee.Code ?? "";
+
+                        // ADJUSTMENT: a leg's fee may omit authority/code that its paired leg carries;
+                        // borrow them so the two 83 lines are identical apart from sign fields (AC3).
+                        if (string.IsNullOrEmpty(fee.Authority) && item.Item?.Sku != null &&
+                            adjustmentFeeAuthBySku.TryGetValue(item.Item.Sku, out var pairedFee))
+                        {
+                            feeAuthority = pairedFee.Authority;
+                            feeCode = pairedFee.Code;
+                        }
 
                         var feeRecord = new OrderRecord
                         {
@@ -644,7 +676,7 @@ class RetailEventMapper
                             ChargedTax3 = "N",
                             ChargedTax4 = "N",
                             TaxAuthCode = PadOrTruncate(feeAuthority, 6),
-                            TaxRateCode = PadOrTruncate(fee.Code ?? "", 6),
+                            TaxRateCode = PadOrTruncate(feeCode, 6),
                             CustomerName = "",
                             CustomerNumber = "",
                             ZipCode = "         0",
@@ -825,551 +857,117 @@ class RetailEventMapper
             //   - Federal GST (FED -> XG) - accumulated sum of all taxes across all items
             //   - No tax line if tax total is zero
             // For other provinces: Create per-item tax records
-            if (isOntario)
+            if (isOntario || isGstPstProvince || isGstOnlyProvince)
             {
-                // Separate tax totals for HST (13%) and non-HST (5% GST)
-                decimal hstTaxTotal = 0;    // HON - 13% HST
-                decimal nonHstTaxTotal = 0; // HON1 - 5% GST/Partial HST
-                string hstTaxRateCode = "";
-                string nonHstTaxRateCode = "";
+                // Aggregate every item tax into a bucket keyed by the TAX'S OWN jurisdiction, not
+                // the store province. Cross-region transactions (e.g. an ON-store price adjustment
+                // refunding a QC purchase) carry taxes from more than one province, and each must
+                // print under its own authority and line type — the store-province bucketing
+                // previously mislabelled a QC return's FED/PQ taxes as HON1/XI at an ON store.
+                // Taxes with no usable region fall back to the store province's historical
+                // heuristics, so same-region behaviour is unchanged.
+                var bucketTotals = new Dictionary<string, decimal>();
+                var bucketTaxCodes = new Dictionary<string, string>();
 
                 foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
                 {
-                    if (item.Taxes != null)
+                    if (item.Taxes == null) continue;
+                    foreach (var tax in item.Taxes)
                     {
-                        foreach (var tax in item.Taxes)
-                        {
-                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
-                            {
-                                // Determine if this is HST (13%) or non-HST (5%) based on rate or jurisdiction
-                                bool isHst = false;
+                        if (tax.TaxAmount?.Value == null || !decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
+                            continue;
 
-                                // Check by rate percent
-                                if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal ratePercent))
-                                {
-                                    isHst = ratePercent >= 10; // 13% is HST, 5% is GST
-                                }
-                                // Check by tax rate (decimal form)
-                                else if (tax.TaxRate != null)
-                                {
-                                    isHst = tax.TaxRate.Value >= 0.10m; // 0.13 is HST, 0.05 is GST
-                                }
-                                // Check by jurisdiction region
-                                else if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
-                                {
-                                    string region = tax.Jurisdiction.Region.ToUpper();
-                                    isHst = region == "HON" || region.Contains("HST");
-                                }
-
-                                if (isHst)
-                                {
-                                    hstTaxTotal += taxAmount;
-                                    if (string.IsNullOrEmpty(hstTaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
-                                        hstTaxRateCode = tax.TaxCode;
-                                }
-                                else
-                                {
-                                    nonHstTaxTotal += taxAmount;
-                                    if (string.IsNullOrEmpty(nonHstTaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
-                                        nonHstTaxRateCode = tax.TaxCode;
-                                }
-                            }
-                        }
+                        string bucket = ClassifyTaxBucket(tax, province, isOntario, isGstOnlyProvince);
+                        bucketTotals[bucket] = bucketTotals.GetValueOrDefault(bucket) + taxAmount;
+                        if (!bucketTaxCodes.ContainsKey(bucket) && !string.IsNullOrEmpty(tax.TaxCode))
+                            bucketTaxCodes[bucket] = tax.TaxCode;
                     }
                 }
 
-                // Create HST tax record (HON - 13%) if there's HST tax
-                if (hstTaxTotal != 0)
+                // One aggregate record per authority; captures the surrounding mapping locals.
+                OrderRecord CreateAggregateTaxRecord(string authCode, decimal total, string taxCode) => new OrderRecord
                 {
-                    var hstTaxRecord = new OrderRecord
-                    {
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = "XH", // HON -> XH
-                        TransDate = transactionDateTime.ToString("yyMMdd"),
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000",
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate("HON", 6),
-                        TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(hstTaxRateCode) ? hstTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(Math.Abs(hstTaxTotal).ToString("F2"), 11),
-                        ExtendedValueNegativeSign = hstTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(Math.Abs(hstTaxTotal).ToString("F2"), 9),
-                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
-                        SKUNumber = "000000000",
-                        Quantity = "000000100",
-                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
-                        OriginalPrice = "000000000",
-                        OriginalPriceNegativeSign = "",
-                        OverridePrice = "000000000",
-                        OverridePriceNegativeSign = "",
-                        OriginalRetail = "000000000",
-                        OriginalRetailNegativeSign = "",
-                        ReferenceCode = "",
-                        ReferenceDesc = "",
-                        // Tax lines carry no original-transaction reference on sales or returns
-                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
-                        CustomerName = "",
-                        CustomerNumber = "",
-                        ZipCode = "         0",
-                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                        EmployeeCardNumber = 0,
-                        UPCCode = "0000000000000",
-                        EReceiptEmail = "",
-                        ReasonCode = "",
-                        TaxExemptId1 = "",
-                        TaxExemptId2 = "",
-                        TaxExemptionName = "",
-                        AdCode = "0000",
-                        AdPrice = "000000000",
-                        AdPriceNegativeSign = "",
-                        PriceVehicleCode = "",
-                        PriceVehicleReference = "",
-                        OriginalSalesperson = "00000",
-                        OriginalStore = "00000",
-                        GroupDiscAmount = "000000000",
-                        GroupDiscSign = "",
-                        SalesPerson = salesPersonId,
-                        DiscountAmount = "000000000",
-                        DiscountType = "",
-                        DiscountAmountNegativeSign = "",
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        ItemScanned = ""
-                    };
-                    taxRecords.Add(hstTaxRecord);
-                }
-
-                // Create non-HST tax record (HON1 - 5% GST) if there's non-HST tax
-                if (nonHstTaxTotal != 0)
-                {
-                    var nonHstTaxRecord = new OrderRecord
-                    {
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = "XI", // HON1 -> XI
-                        TransDate = transactionDateTime.ToString("yyMMdd"),
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000",
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate("HON1", 6),
-                        TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(nonHstTaxRateCode) ? nonHstTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(Math.Abs(nonHstTaxTotal).ToString("F2"), 11),
-                        ExtendedValueNegativeSign = nonHstTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(Math.Abs(nonHstTaxTotal).ToString("F2"), 9),
-                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
-                        SKUNumber = "000000000",
-                        Quantity = "000000100",
-                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
-                        OriginalPrice = "000000000",
-                        OriginalPriceNegativeSign = "",
-                        OverridePrice = "000000000",
-                        OverridePriceNegativeSign = "",
-                        OriginalRetail = "000000000",
-                        OriginalRetailNegativeSign = "",
-                        ReferenceCode = "",
-                        ReferenceDesc = "",
-                        // Tax lines carry no original-transaction reference on sales or returns
-                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
-                        CustomerName = "",
-                        CustomerNumber = "",
-                        ZipCode = "         0",
-                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                        EmployeeCardNumber = 0,
-                        UPCCode = "0000000000000",
-                        EReceiptEmail = "",
-                        ReasonCode = "",
-                        TaxExemptId1 = "",
-                        TaxExemptId2 = "",
-                        TaxExemptionName = "",
-                        AdCode = "0000",
-                        AdPrice = "000000000",
-                        AdPriceNegativeSign = "",
-                        PriceVehicleCode = "",
-                        PriceVehicleReference = "",
-                        OriginalSalesperson = "00000",
-                        OriginalStore = "00000",
-                        GroupDiscAmount = "000000000",
-                        GroupDiscSign = "",
-                        SalesPerson = salesPersonId,
-                        DiscountAmount = "000000000",
-                        DiscountType = "",
-                        DiscountAmountNegativeSign = "",
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        ItemScanned = ""
-                    };
-                    taxRecords.Add(nonHstTaxRecord);
-                }
-            }
-            else if (isGstPstProvince)
-            {
-                // GST+PST/QST provinces (BC, MB, SK, QC): Create up to TWO consolidated tax records
-                // 1. Federal GST (FED -> XG) - accumulated across all items
-                // 2. Provincial PST/QST (province-specific auth code) - accumulated across all items
-                decimal federalTaxTotal = 0;
-                decimal provincialTaxTotal = 0;
-                string federalTaxRateCode = "";
-                string provincialTaxRateCode = "";
-
-                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
-                {
-                    if (item.Taxes != null)
-                    {
-                        foreach (var tax in item.Taxes)
-                        {
-                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
-                            {
-                                string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper() ?? tax.TaxCode?.ToUpper();
-
-                                bool isFederal = taxType is "GST" or "FEDERAL" or "VAT" or "NATIONAL";
-                                bool isProvincial = taxType is "PST" or "QST" or "PROVINCIAL" or "STATE" or "QUEBEC";
-
-                                // Fallback: if taxType is not set, try to determine from rate
-                                if (!isFederal && !isProvincial)
-                                {
-                                    if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal ratePercent))
-                                    {
-                                        isFederal = ratePercent >= 4 && ratePercent <= 6; // ~5% GST
-                                        isProvincial = !isFederal;
-                                    }
-                                    else if (tax.TaxRate != null)
-                                    {
-                                        isFederal = tax.TaxRate.Value >= 0.04m && tax.TaxRate.Value <= 0.06m; // ~5% GST
-                                        isProvincial = !isFederal;
-                                    }
-                                    else
-                                    {
-                                        // Default: treat unknown as federal GST
-                                        isFederal = true;
-                                    }
-                                }
-
-                                if (isFederal)
-                                {
-                                    federalTaxTotal += taxAmount;
-                                    if (string.IsNullOrEmpty(federalTaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
-                                        federalTaxRateCode = tax.TaxCode;
-                                }
-                                else if (isProvincial)
-                                {
-                                    provincialTaxTotal += taxAmount;
-                                    if (string.IsNullOrEmpty(provincialTaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
-                                        provincialTaxRateCode = tax.TaxCode;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Map province to provincial tax authority code
-                string provincialTaxAuth = province!.ToUpper() switch
-                {
-                    "QC" => "PQ",
-                    _ => province.ToUpper() // BC, MB, SK map directly
+                    TransType = mappedTransactionTypeSLFTTP,
+                    LineType = MapTaxAuthToLineType(authCode),
+                    TransDate = transactionDateTime.ToString("yyMMdd"),
+                    TransTime = transactionDateTime.ToString("HHmmss"),
+                    TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
+                    TransSeq = "00000",
+                    RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
+                    PolledStore = polledStoreInt,
+                    PollCen = pollCen,
+                    PollDate = pollDate,
+                    CreateCen = createCen,
+                    CreateDate = createDate,
+                    CreateTime = createTime,
+                    Status = " ",
+                    ChargedTax1 = "N",
+                    ChargedTax2 = "N",
+                    ChargedTax3 = "N",
+                    ChargedTax4 = "N",
+                    TaxAuthCode = PadOrTruncate(authCode, 6),
+                    TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(taxCode) ? taxCode : lastComputedTaxRateCode, 6),
+                    ExtendedValue = FormatCurrency(Math.Abs(total).ToString("F2"), 11),
+                    ExtendedValueNegativeSign = total < 0 ? "-" : "",
+                    ItemSellPrice = FormatCurrency(Math.Abs(total).ToString("F2"), 9),
+                    SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
+                    SKUNumber = "000000000",
+                    Quantity = "000000100",
+                    QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
+                    OriginalPrice = "000000000",
+                    OriginalPriceNegativeSign = "",
+                    OverridePrice = "000000000",
+                    OverridePriceNegativeSign = "",
+                    OriginalRetail = "000000000",
+                    OriginalRetailNegativeSign = "",
+                    ReferenceCode = "",
+                    ReferenceDesc = "",
+                    // Tax lines carry no original-transaction reference on sales or returns
+                    // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
+                    OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
+                    OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
+                    OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
+                    OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
+                    CustomerName = "",
+                    CustomerNumber = "",
+                    ZipCode = "         0",
+                    Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
+                    EmployeeCardNumber = 0,
+                    UPCCode = "0000000000000",
+                    EReceiptEmail = "",
+                    ReasonCode = "",
+                    TaxExemptId1 = "",
+                    TaxExemptId2 = "",
+                    TaxExemptionName = "",
+                    AdCode = "0000",
+                    AdPrice = "000000000",
+                    AdPriceNegativeSign = "",
+                    PriceVehicleCode = "",
+                    PriceVehicleReference = "",
+                    OriginalSalesperson = "00000",
+                    OriginalStore = "00000",
+                    GroupDiscAmount = "000000000",
+                    GroupDiscSign = "",
+                    SalesPerson = salesPersonId,
+                    DiscountAmount = "000000000",
+                    DiscountType = "",
+                    DiscountAmountNegativeSign = "",
+                    GroupDiscReason = "00",
+                    RegDiscReason = "00",
+                    OrderNumber = "",
+                    ProjectNumber = "",
+                    SalesStore = 0,
+                    InvStore = 0,
+                    ItemScanned = ""
                 };
 
-                // Create Federal GST tax record if there's federal tax
-                if (federalTaxTotal != 0)
+                // Canonical emission order keeps existing outputs stable: ON emits XH then XI,
+                // GST+PST provinces emit the federal line before the provincial one.
+                string[] bucketOrder = { "HON", "HON1", "FED", "PQ", "BC", "MB", "SK", "HNB", "HNF", "HNS", "HPE" };
+                foreach (string bucket in bucketOrder)
                 {
-                    var federalTaxRecord = new OrderRecord
-                    {
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = MapTaxAuthToLineType("FED"), // XG
-                        TransDate = transactionDateTime.ToString("yyMMdd"),
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000",
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate("FED", 6),
-                        TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(federalTaxRateCode) ? federalTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(Math.Abs(federalTaxTotal).ToString("F2"), 11),
-                        ExtendedValueNegativeSign = federalTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(Math.Abs(federalTaxTotal).ToString("F2"), 9),
-                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
-                        SKUNumber = "000000000",
-                        Quantity = "000000100",
-                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
-                        OriginalPrice = "000000000",
-                        OriginalPriceNegativeSign = "",
-                        OverridePrice = "000000000",
-                        OverridePriceNegativeSign = "",
-                        OriginalRetail = "000000000",
-                        OriginalRetailNegativeSign = "",
-                        ReferenceCode = "",
-                        ReferenceDesc = "",
-                        // Tax lines carry no original-transaction reference on sales or returns
-                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
-                        CustomerName = "",
-                        CustomerNumber = "",
-                        ZipCode = "         0",
-                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                        EmployeeCardNumber = 0,
-                        UPCCode = "0000000000000",
-                        EReceiptEmail = "",
-                        ReasonCode = "",
-                        TaxExemptId1 = "",
-                        TaxExemptId2 = "",
-                        TaxExemptionName = "",
-                        AdCode = "0000",
-                        AdPrice = "000000000",
-                        AdPriceNegativeSign = "",
-                        PriceVehicleCode = "",
-                        PriceVehicleReference = "",
-                        OriginalSalesperson = "00000",
-                        OriginalStore = "00000",
-                        GroupDiscAmount = "000000000",
-                        GroupDiscSign = "",
-                        SalesPerson = salesPersonId,
-                        DiscountAmount = "000000000",
-                        DiscountType = "",
-                        DiscountAmountNegativeSign = "",
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        ItemScanned = ""
-                    };
-                    taxRecords.Add(federalTaxRecord);
-                }
-
-                // Create Provincial PST/QST tax record if there's provincial tax
-                if (provincialTaxTotal != 0)
-                {
-                    var provincialTaxRecord = new OrderRecord
-                    {
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = MapTaxAuthToLineType(provincialTaxAuth), // XR/XM/XS/XQ
-                        TransDate = transactionDateTime.ToString("yyMMdd"),
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000",
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate(provincialTaxAuth, 6),
-                        TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(provincialTaxRateCode) ? provincialTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(Math.Abs(provincialTaxTotal).ToString("F2"), 11),
-                        ExtendedValueNegativeSign = provincialTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(Math.Abs(provincialTaxTotal).ToString("F2"), 9),
-                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
-                        SKUNumber = "000000000",
-                        Quantity = "000000100",
-                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
-                        OriginalPrice = "000000000",
-                        OriginalPriceNegativeSign = "",
-                        OverridePrice = "000000000",
-                        OverridePriceNegativeSign = "",
-                        OriginalRetail = "000000000",
-                        OriginalRetailNegativeSign = "",
-                        ReferenceCode = "",
-                        ReferenceDesc = "",
-                        // Tax lines carry no original-transaction reference on sales or returns
-                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
-                        CustomerName = "",
-                        CustomerNumber = "",
-                        ZipCode = "         0",
-                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                        EmployeeCardNumber = 0,
-                        UPCCode = "0000000000000",
-                        EReceiptEmail = "",
-                        ReasonCode = "",
-                        TaxExemptId1 = "",
-                        TaxExemptId2 = "",
-                        TaxExemptionName = "",
-                        AdCode = "0000",
-                        AdPrice = "000000000",
-                        AdPriceNegativeSign = "",
-                        PriceVehicleCode = "",
-                        PriceVehicleReference = "",
-                        OriginalSalesperson = "00000",
-                        OriginalStore = "00000",
-                        GroupDiscAmount = "000000000",
-                        GroupDiscSign = "",
-                        SalesPerson = salesPersonId,
-                        DiscountAmount = "000000000",
-                        DiscountType = "",
-                        DiscountAmountNegativeSign = "",
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        ItemScanned = ""
-                    };
-                    taxRecords.Add(provincialTaxRecord);
-                }
-            }
-            else if (isGstOnlyProvince)
-            {
-                // GST-only province (AB): Create ONE consolidated tax record (FED -> XG)
-                decimal gstTaxTotal = 0;
-                string gstTaxRateCode = "";
-
-                foreach (var item in retailEvent.Transaction?.Items ?? new List<TransactionItem>())
-                {
-                    if (item.Taxes != null)
-                    {
-                        foreach (var tax in item.Taxes)
-                        {
-                            if (tax.TaxAmount?.Value != null && decimal.TryParse(tax.TaxAmount.Value, out decimal taxAmount))
-                            {
-                                gstTaxTotal += taxAmount;
-                                if (string.IsNullOrEmpty(gstTaxRateCode) && !string.IsNullOrEmpty(tax.TaxCode))
-                                    gstTaxRateCode = tax.TaxCode;
-                            }
-                        }
-                    }
-                }
-
-                // Only create tax line if there's a non-zero tax amount
-                if (gstTaxTotal != 0)
-                {
-                    var gstTaxRecord = new OrderRecord
-                    {
-                        TransType = mappedTransactionTypeSLFTTP,
-                        LineType = MapTaxAuthToLineType("FED"), // XG
-                        TransDate = transactionDateTime.ToString("yyMMdd"),
-                        TransTime = transactionDateTime.ToString("HHmmss"),
-                        TransNumber = PadNumeric(retailEvent.BusinessContext?.Workstation?.SequenceNumber?.ToString(), 5),
-                        TransSeq = "00000",
-                        RegisterID = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 3),
-                        PolledStore = polledStoreInt,
-                        PollCen = pollCen,
-                        PollDate = pollDate,
-                        CreateCen = createCen,
-                        CreateDate = createDate,
-                        CreateTime = createTime,
-                        Status = " ",
-                        ChargedTax1 = "N",
-                        ChargedTax2 = "N",
-                        ChargedTax3 = "N",
-                        ChargedTax4 = "N",
-                        TaxAuthCode = PadOrTruncate("FED", 6),
-                        TaxRateCode = PadOrTruncate(!string.IsNullOrEmpty(gstTaxRateCode) ? gstTaxRateCode : lastComputedTaxRateCode, 6),
-                        ExtendedValue = FormatCurrency(Math.Abs(gstTaxTotal).ToString("F2"), 11),
-                        ExtendedValueNegativeSign = gstTaxTotal < 0 ? "-" : "",
-                        ItemSellPrice = FormatCurrency(Math.Abs(gstTaxTotal).ToString("F2"), 9),
-                        SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
-                        SKUNumber = "000000000",
-                        Quantity = "000000100",
-                        QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
-                        OriginalPrice = "000000000",
-                        OriginalPriceNegativeSign = "",
-                        OverridePrice = "000000000",
-                        OverridePriceNegativeSign = "",
-                        OriginalRetail = "000000000",
-                        OriginalRetailNegativeSign = "",
-                        ReferenceCode = "",
-                        ReferenceDesc = "",
-                        // Tax lines carry no original-transaction reference on sales or returns
-                        // (mapping doc: always zeros on tax lines); VOIDs keep the current-event values.
-                        OriginalTxStore = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxStore : "00000",
-                        OriginalTxDate = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxDate : "000000",
-                        OriginalTxRegister = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxRegister : "000",
-                        OriginalTxNumber = mappedTransactionTypeSLFTTP == "87" || mappedTransactionTypeSLFTTP == "88" ? origTxNumber : "00000",
-                        CustomerName = "",
-                        CustomerNumber = "",
-                        ZipCode = "         0",
-                        Clerk = PadNumeric(retailEvent.BusinessContext?.Workstation?.RegisterId, 5),
-                        EmployeeCardNumber = 0,
-                        UPCCode = "0000000000000",
-                        EReceiptEmail = "",
-                        ReasonCode = "",
-                        TaxExemptId1 = "",
-                        TaxExemptId2 = "",
-                        TaxExemptionName = "",
-                        AdCode = "0000",
-                        AdPrice = "000000000",
-                        AdPriceNegativeSign = "",
-                        PriceVehicleCode = "",
-                        PriceVehicleReference = "",
-                        OriginalSalesperson = "00000",
-                        OriginalStore = "00000",
-                        GroupDiscAmount = "000000000",
-                        GroupDiscSign = "",
-                        SalesPerson = salesPersonId,
-                        DiscountAmount = "000000000",
-                        DiscountType = "",
-                        DiscountAmountNegativeSign = "",
-                        GroupDiscReason = "00",
-                        RegDiscReason = "00",
-                        OrderNumber = "",
-                        ProjectNumber = "",
-                        SalesStore = 0,
-                        InvStore = 0,
-                        ItemScanned = ""
-                    };
-                    taxRecords.Add(gstTaxRecord);
+                    if (bucketTotals.TryGetValue(bucket, out decimal total) && total != 0)
+                        taxRecords.Add(CreateAggregateTaxRecord(bucket, total, bucketTaxCodes.GetValueOrDefault(bucket, "")));
                 }
             }
             else
@@ -1805,14 +1403,21 @@ class RetailEventMapper
         }
 
         // A line prints with return semantics when the whole transaction is a RETURN, or — on a
-        // price ADJUSTMENT — when this item is the return leg of a pair (it carries a return node
-        // or a negative quantity). The sale leg of an adjustment prints with sale semantics.
+        // price ADJUSTMENT — when this item is the return leg of a pair. In real ADJUSTMENT
+        // payloads (Jul 21 captures) BOTH legs carry a return node and the return leg's quantity
+        // is positive, so neither distinguishes the legs: the discriminator is negative pricing.
+        // The return leg carries negative extendedPrice/originalUnitPrice; the sale leg positive.
         private bool IsReturnLine(RetailEvent retailEvent, TransactionItem item)
         {
             string transType = retailEvent.Transaction?.TransactionType ?? "";
             if (transType == "RETURN") return true;
-            return transType == "ADJUSTMENT" &&
-                (item.Return != null || (item.Quantity?.Value ?? 0) < 0);
+            if (transType != "ADJUSTMENT") return false;
+
+            if (decimal.TryParse(item.Pricing?.ExtendedPrice?.Value, out decimal ext) && ext != 0)
+                return ext < 0;
+            if (decimal.TryParse(item.Pricing?.OriginalUnitPrice?.Value, out decimal orig) && orig != 0)
+                return orig < 0;
+            return (item.Quantity?.Value ?? 0) < 0;
         }
 
         // ── Gift Card Activation detection ──
@@ -2551,6 +2156,42 @@ class RetailEventMapper
 
         // Map Tax Authority Code to Sales Transaction Line Type (SLFLNT) for tax records
         // Based on TBLFLD TAXTXC mapping table
+        // Buckets an item tax by its own jurisdiction region so cross-region transactions print
+        // each tax under its own authority. Region-less taxes fall back to the store province's
+        // historical heuristics (rate split in ON, type/rate split in GST+PST provinces, single
+        // GST line in AB), preserving pre-existing same-region behaviour.
+        private string ClassifyTaxBucket(TaxDetail tax, string? province, bool isOntario, bool isGstOnlyProvince)
+        {
+            string region = tax.Jurisdiction?.Region?.Trim().ToUpper() ?? "";
+            if (region is "HON" or "HON1" or "FED" or "PQ" or "BC" or "MB" or "SK" or "HNB" or "HNF" or "HNS" or "HPE")
+                return region;
+
+            if (isGstOnlyProvince)
+                return "FED"; // AB: everything consolidates into the single GST line
+
+            if (isOntario)
+            {
+                if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal ratePercent))
+                    return ratePercent >= 10 ? "HON" : "HON1"; // 13% full HST vs 5% partial/GST
+                if (tax.TaxRate != null)
+                    return tax.TaxRate.Value >= 0.10m ? "HON" : "HON1";
+                if (region.Contains("HST"))
+                    return "HON";
+                return "HON1";
+            }
+
+            // GST+PST provinces (BC, MB, SK, QC)
+            string provincialAuth = province?.ToUpper() == "QC" ? "PQ" : (province?.ToUpper() ?? "");
+            string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper() ?? tax.TaxCode?.ToUpper();
+            if (taxType is "GST" or "FEDERAL" or "VAT" or "NATIONAL") return "FED";
+            if (taxType is "PST" or "QST" or "PROVINCIAL" or "STATE" or "QUEBEC") return provincialAuth;
+            if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal rp))
+                return rp >= 4 && rp <= 6 ? "FED" : provincialAuth;
+            if (tax.TaxRate != null)
+                return tax.TaxRate.Value >= 0.04m && tax.TaxRate.Value <= 0.06m ? "FED" : provincialAuth;
+            return "FED";
+        }
+
         private string MapTaxAuthToLineType(string taxAuthCode)
         {
             string code = taxAuthCode.Trim().ToUpper();

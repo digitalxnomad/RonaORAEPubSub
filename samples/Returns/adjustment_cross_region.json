@@ -1,0 +1,298 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7485550445436803472",
+  "occurredAt": "2026-07-22T04:25:41Z",
+  "ingestedAt": "2026-07-22T04:25:44Z",
+  "businessContext": {
+    "businessDay": "2026-07-22",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "85",
+      "sequenceNumber": 4735,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "ADJUSTMENT",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "ENS.ACCESSOIRE ASPI.STD NR 30'",
+          "sku": "000119208"
+        },
+        "lineId": "1784694313773235969181",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-222.98"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-111.49"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "111.49"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 2
+        },
+        "return": {
+          "originalLineId": "2",
+          "reason": "1501"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-11.15"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-22.24"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "taxCode": "PST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "ENS.ACCESSOIRE ASPI.STD NR 30'",
+          "sku": "000119208"
+        },
+        "lineId": "1784694313773012818466",
+        "parentLineId": "1784694313773235969181",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "111.48"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "55.74"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "55.74"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 2
+        },
+        "return": {
+          "reason": "1501"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "14.49"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "fees": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-9.00"
+            },
+            "type": "ECO"
+          }
+        ],
+        "item": {
+          "description": "PNEU DE RECHANGE 12\" NOIR AC",
+          "sku": "000241097"
+        },
+        "lineId": "178469432277032933682",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-284.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-142.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "142.00"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 2
+        },
+        "return": {
+          "originalLineId": "4",
+          "reason": "1502"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-14.65"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-29.23"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "taxCode": "PST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "PNEU DE RECHANGE 12\" NOIR AC",
+          "sku": "000241097"
+        },
+        "lineId": "1784694322770827596886",
+        "parentLineId": "178469432277032933682",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "142.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "71.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "71.00"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 2
+        },
+        "return": {
+          "reason": "1502"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "18.46"
+            },
+            "jurisdiction": {
+              "region": "HON"
+            },
+            "ratePercent": "13",
+            "taxCode": "HST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "306.80"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.02"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "-253.50"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "-306.80"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "-44.32"
+      }
+    }
+  },
+  "promotions": [],
+  "references": {
+    "originalEvent": {
+      "businessDay": "2026-07-17",
+      "registerId": "10",
+      "sequenceNumber": 11,
+      "storeId": "41100"
+    },
+    "sourceTransactionId": "4735"
+  },
+  "actor": {
+    "cashier": {
+      "loginId": "2"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}

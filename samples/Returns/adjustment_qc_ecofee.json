@@ -1,0 +1,331 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7485553187297857904",
+  "occurredAt": "2026-07-22T04:37:30Z",
+  "ingestedAt": "2026-07-22T04:37:32Z",
+  "businessContext": {
+    "businessDay": "2026-07-22",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "41100",
+      "taxArea": "QC"
+    },
+    "workstation": {
+      "registerId": "10",
+      "sequenceNumber": 15,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "ADJUSTMENT",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "fees": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-9.00"
+            },
+            "type": "ECO"
+          }
+        ],
+        "item": {
+          "description": "PNEU DE RECHANGE 12\" NOIR AC",
+          "sku": "000241097"
+        },
+        "lineId": "178469499342162165406",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-284.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-142.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "142.00"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 2
+        },
+        "return": {
+          "originalLineId": "14",
+          "reason": "1501"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-14.65"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-29.23"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "taxCode": "PST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "fees": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "9.00"
+            },
+            "authority": "22",
+            "code": "PQ",
+            "type": "ECO"
+          }
+        ],
+        "item": {
+          "description": "PNEU DE RECHANGE 12\" NOIR AC",
+          "sku": "000241097"
+        },
+        "lineId": "1784694993421749639203",
+        "parentLineId": "178469499342162165406",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "142.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "71.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "71.00"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 2
+        },
+        "return": {
+          "reason": "1501"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "7.55"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "ratePercent": "5",
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "15.06"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "ratePercent": "9.98",
+            "taxCode": "PST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "PEINTURE TABLEAU NR MAT 946ML",
+          "sku": "000311936"
+        },
+        "lineId": "178469503546206269556",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-202.93"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-28.99"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "28.99"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 7
+        },
+        "return": {
+          "originalLineId": "1",
+          "reason": "1502"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-10.15"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-20.24"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "taxCode": "PST"
+          }
+        ]
+      },
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "description": "PEINTURE TABLEAU NR MAT 946ML",
+          "sku": "000311936"
+        },
+        "lineId": "178469503546265948112",
+        "parentLineId": "178469503546206269556",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "101.43"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "14.49"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "14.49"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": 7
+        },
+        "return": {
+          "reason": "1502"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "5.07"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "ratePercent": "5",
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "10.12"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "ratePercent": "9.98",
+            "taxCode": "PST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "279.95"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.02"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "-243.50"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "-279.95"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "-36.47"
+      }
+    }
+  },
+  "promotions": [],
+  "references": {
+    "originalEvent": {
+      "businessDay": "2026-07-14",
+      "registerId": "88",
+      "sequenceNumber": 33,
+      "storeId": "41100"
+    },
+    "sourceTransactionId": "0015"
+  },
+  "actor": {
+    "cashier": {
+      "loginId": "2"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}
