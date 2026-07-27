@@ -372,7 +372,19 @@ Log entries include:
 
 ## Version History
 
-### v1.0.99 (07/27/26) ✨ Current
+### v1.0.100 (07/27/26) ✨ Current
+**Price adjustment legs are paired on `parentLineId` instead of inferred:**
+
+v1.0.97–98 identified the two halves of a price-adjustment pair by SKU (for the reason code) and by pricing sign (for return-vs-sale). The payload states the relationship outright — the sale leg's `parentLineId` is its return leg's `lineId` — and using it closes three defects at once. A link only counts as a pair when both ends carry the same SKU, which distinguishes it from `parentLineId`'s other meaning (an EPP coverage item pointing at the SKU it covers).
+
+- 🔧 **Duplicate SKU no longer cross-contaminates reason codes** - One SKU adjusted twice in a transaction put the *first* pair's reason on all four lines, so a pair's two legs disagreed — the exact AC1/AC2 invariant the lookup existed to guarantee. Each leg now takes its own partner's reason.
+- 🔧 **A `$0` adjustment leg is no longer mistaken for a sale** - All three sign discriminators (`extendedPrice`, `originalUnitPrice`, `quantity`) skip zero, so a leg repriced to or from `$0` fell through and **both** halves printed as sale lines (`SLFLNT 01`, blank `SLFQTN`/`SLFEXN`, `SLFADC ####`) — the refund side vanished from the ledger. Pairing is now explicit, so the sign test is only a fallback for an unpaired item.
+- 🔧 **EPP-coverage adjustments emit lines in the right order** - `parentLineId` is overloaded, so an adjustment whose item is EPP coverage put the sale leg into the EPP child map and emitted `item, item, fee, fee` instead of the `item, fee, item, fee` every other adjustment produces. Adjustment sale legs are now excluded from that map. ℹ️ Both legs still print `SLFLNT 21` — consistent with how EPP lines behave on returns, where the sign fields do the differentiating.
+- 🔧 **An eco fee keeps its own `code`** - The cross-leg borrow overwrote both `authority` *and* `code` whenever `authority` was missing, discarding a code the fee itself stated. Only missing values are filled now; the Jul 21 QC capture (return leg omits both) is unchanged.
+- 🧹 Removed dead `lineIdToIndex`, `HasStandardGiftCardActivation`, `HasRegularItems`.
+- ✨ Four regression cases under `samples/Adjustment Pairing/` (synthetic — none of these shapes appears in a real capture yet); all four fail against the pre-fix mapper. All 39 pre-existing baselines byte-for-byte unchanged.
+
+### v1.0.99 (07/27/26)
 **Fixed-width overflow guards on two payload-driven fields:**
 - 🔧 **`SLFRSN` is now truncated, not just padded** - `RRT0`/`POV0`/`IDS0` append a reason string taken straight from the payload, but the field is a fixed 16 and the code only called `PadRight(16)`. A `return.reason` longer than 12 characters produced an over-long field, which fails `RecordSetValidator` — and the production subscriber **ACKs and drops** a failing message, so the entire transaction would be silently lost rather than retried. Reproduced with an 18-character reason (`SLFRSN length is 22, but maximum is 16`); now truncates to 16 and publishes.
 - 🔧 **`TNFAUT` overflow on large gift card activations** - The activation value in cents is zero-padded to 6 digits, so an activation of **$10,000.00 or more** produced 7 digits and dropped the transaction the same way. The value is now clamped to `999999` with an **Error**-level log naming the true amount. ⚠️ The clamped value is deliberately wrong — `TNFRDS` on the same line still carries the true amount (e.g. `00000012500.00 A`), so nothing is lost, but **how a ≥$9,999.99 activation should be represented in `TNFAUT` needs a decision from Rona.**

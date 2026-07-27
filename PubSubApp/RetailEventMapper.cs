@@ -106,43 +106,12 @@ class RetailEventMapper
             TenderRecords = new List<TenderRecord>()
         };
 
-        // ADJUSTMENT: the sale leg of a pair may not repeat the return reason; index the return
-        // legs' reasons by SKU so both lines of the pair carry the same POV0 code (AC1/AC2).
-        Dictionary<string, string> adjustmentReasonBySku = new Dictionary<string, string>();
-        if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && retailEvent.Transaction.Items != null)
-        {
-            foreach (var it in retailEvent.Transaction.Items)
-            {
-                if (!string.IsNullOrEmpty(it.Return?.Reason) && !string.IsNullOrEmpty(it.Item?.Sku) &&
-                    !adjustmentReasonBySku.ContainsKey(it.Item.Sku))
-                {
-                    adjustmentReasonBySku[it.Item.Sku] = it.Return.Reason;
-                }
-            }
-        }
-
-        // ADJUSTMENT: the pair's eco-fee lines must be identical apart from sign fields (AC3), but
-        // real captures omit authority/code on one leg's fee. Index the populated values by SKU so
-        // both legs print the same SLFACD/SLFTCD.
-        Dictionary<string, (string Authority, string Code)> adjustmentFeeAuthBySku = new Dictionary<string, (string, string)>();
-        if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && retailEvent.Transaction.Items != null)
-        {
-            foreach (var it in retailEvent.Transaction.Items)
-            {
-                if (it.Fees == null || string.IsNullOrEmpty(it.Item?.Sku)) continue;
-                foreach (var f in it.Fees)
-                {
-                    if (!string.IsNullOrEmpty(f.Authority) && !adjustmentFeeAuthBySku.ContainsKey(it.Item.Sku))
-                        adjustmentFeeAuthBySku[it.Item.Sku] = (f.Authority, f.Code ?? "");
-                }
-            }
-        }
+        // ADJUSTMENT leg pairing, derived from the payload's own explicit link.
+        AdjustmentPairing adjustmentPairing = AdjustmentPairing.Build(retailEvent);
 
         // Temporary lists to group records by type
         List<OrderRecord> itemRecords = new List<OrderRecord>();
         List<OrderRecord> taxRecords = new List<OrderRecord>();
-        // Track lineId to index mapping for EPP parent lookup
-        Dictionary<string, int> lineIdToIndex = new Dictionary<string, int>();
         // Store computed TaxRateCode per item (for use by tax records)
         string lastComputedTaxRateCode = "";
 
@@ -191,7 +160,7 @@ class RetailEventMapper
 
                 // Return semantics apply to every line of a RETURN, but only to the return leg of a
                 // price ADJUSTMENT (the sale leg prints as a sale, TTP 11 aside).
-                bool isReturnLine = IsReturnLine(retailEvent, item);
+                bool isReturnLine = IsReturnLine(retailEvent, item, adjustmentPairing);
 
                 // Price adjustment sale leg: SLFLNT drops to the sale line type while SLFTTP stays 11.
                 if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && !isReturnLine &&
@@ -424,9 +393,11 @@ class RetailEventMapper
                 else if (transType == "ADJUSTMENT")
                 {
                     // Price adjustment: POV0 + return.reason on BOTH legs of the pair (AC1/AC2).
-                    // The sale leg falls back to the reason indexed from its SKU's return leg.
+                    // A leg that carries no reason of its own takes its partner's, so the two
+                    // halves always agree.
                     string adjReason = item.Return?.Reason
-                        ?? (item.Item?.Sku != null && adjustmentReasonBySku.TryGetValue(item.Item.Sku, out string? paired) ? paired : "");
+                        ?? adjustmentPairing.PairOf(item)?.Return?.Reason
+                        ?? "";
                     reasonCode = "POV0" + adjReason;
                 }
                 else if (transType == "VOID")
@@ -601,11 +572,6 @@ class RetailEventMapper
                 // Add this OrderRecord to the item records list
                 itemRecords.Add(orderRecord);
 
-                // Track lineId to record index for EPP parent lookup
-                if (!string.IsNullOrEmpty(item.LineId))
-                {
-                    lineIdToIndex[item.LineId] = itemRecords.Count - 1;
-                }
 
 
                 // Generate eco fee records for this item
@@ -633,18 +599,27 @@ class RetailEventMapper
 
                         string feeAmountFormatted = Math.Abs(feeAmountDollars).ToString("F2");
 
-                        // SLFACD: use fee's own authority if available, otherwise fall back to item tax jurisdiction
-                        string feeAuthority = !string.IsNullOrEmpty(fee.Authority) ? fee.Authority : fallbackFeeProvince;
+                        string feeAuthority = fee.Authority ?? "";
                         string feeCode = fee.Code ?? "";
 
-                        // ADJUSTMENT: a leg's fee may omit authority/code that its paired leg carries;
-                        // borrow them so the two 83 lines are identical apart from sign fields (AC3).
-                        if (string.IsNullOrEmpty(fee.Authority) && item.Item?.Sku != null &&
-                            adjustmentFeeAuthBySku.TryGetValue(item.Item.Sku, out var pairedFee))
+                        // ADJUSTMENT: a leg's fee may omit authority/code that its partner carries
+                        // (the Jul 21 QC capture omits both on the return leg), and AC3 requires the
+                        // two 83 lines to be identical apart from sign fields. Fill in only what is
+                        // missing — a fee that states its own value keeps it.
+                        if (string.IsNullOrEmpty(feeAuthority) || string.IsNullOrEmpty(feeCode))
                         {
-                            feeAuthority = pairedFee.Authority;
-                            feeCode = pairedFee.Code;
+                            List<Fee>? partnerFees = adjustmentPairing.PairOf(item)?.Fees;
+                            Fee? partnerFee = partnerFees?.FirstOrDefault(pf => pf.Type == fee.Type)
+                                           ?? partnerFees?.FirstOrDefault();
+                            if (partnerFee != null)
+                            {
+                                if (string.IsNullOrEmpty(feeAuthority)) feeAuthority = partnerFee.Authority ?? "";
+                                if (string.IsNullOrEmpty(feeCode)) feeCode = partnerFee.Code ?? "";
+                            }
                         }
+
+                        // SLFACD falls back to the item's tax jurisdiction when no authority is known.
+                        if (string.IsNullOrEmpty(feeAuthority)) feeAuthority = fallbackFeeProvince;
 
                         var feeRecord = new OrderRecord
                         {
@@ -765,7 +740,11 @@ class RetailEventMapper
                 {
                     var txItem = retailEvent.Transaction.Items[txIdx];
                     string? covId = GetEPPCoverageIdentifier(txItem);
-                    if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId))
+                    // An adjustment sale leg's parentLineId points at its own return leg, not at a
+                    // covered SKU. Treating it as an EPP child would nest the pair inside itself and
+                    // emit item/item/fee/fee instead of item/fee/item/fee.
+                    if (covId == "9" && !string.IsNullOrEmpty(txItem.ParentLineId) &&
+                        !adjustmentPairing.IsSaleLeg(txItem))
                     {
                         if (!eppChildMap.ContainsKey(txItem.ParentLineId))
                             eppChildMap[txItem.ParentLineId] = new List<int>();
@@ -1416,16 +1395,73 @@ class RetailEventMapper
             return false;
         }
 
+        // Explicit ADJUSTMENT leg pairing. A price adjustment carries each SKU twice: a return leg
+        // at the original price and a re-sale leg at the adjusted price. The payload links them —
+        // the sale leg's parentLineId is the return leg's lineId — so pair on that rather than on
+        // SKU (collides when one SKU is adjusted twice) or on pricing signs (a $0 leg has none).
+        //
+        // parentLineId is overloaded: on an EPP coverage item it points at the covered SKU's line.
+        // A link therefore only counts as an adjustment pair when both ends carry the same SKU,
+        // which an EPP plan and the item it covers never do.
+        private sealed class AdjustmentPairing
+        {
+            private static readonly AdjustmentPairing Empty = new();
+            private readonly Dictionary<string, TransactionItem> _pairOf = new();
+            private readonly HashSet<string> _saleLegs = new();
+
+            public static AdjustmentPairing Build(RetailEvent retailEvent)
+            {
+                var items = retailEvent.Transaction?.Items;
+                if (retailEvent.Transaction?.TransactionType != "ADJUSTMENT" || items == null)
+                    return Empty;
+
+                var byLineId = new Dictionary<string, TransactionItem>();
+                foreach (var item in items)
+                    if (!string.IsNullOrEmpty(item.LineId))
+                        byLineId[item.LineId] = item;
+
+                var pairing = new AdjustmentPairing();
+                foreach (var saleLeg in items)
+                {
+                    if (string.IsNullOrEmpty(saleLeg.LineId) || string.IsNullOrEmpty(saleLeg.ParentLineId))
+                        continue;
+                    if (!byLineId.TryGetValue(saleLeg.ParentLineId, out TransactionItem? returnLeg))
+                        continue;
+                    if (string.IsNullOrEmpty(saleLeg.Item?.Sku) || saleLeg.Item.Sku != returnLeg.Item?.Sku)
+                        continue;
+
+                    pairing._saleLegs.Add(saleLeg.LineId);
+                    pairing._pairOf[saleLeg.LineId] = returnLeg;
+                    if (!string.IsNullOrEmpty(returnLeg.LineId))
+                        pairing._pairOf[returnLeg.LineId] = saleLeg;
+                }
+                return pairing;
+            }
+
+            /// The re-sale half of a pair (the one carrying parentLineId).
+            public bool IsSaleLeg(TransactionItem item) =>
+                item.LineId != null && _saleLegs.Contains(item.LineId);
+
+            /// Either half of a pair — false for an item that was never paired.
+            public bool IsPaired(TransactionItem item) =>
+                item.LineId != null && _pairOf.ContainsKey(item.LineId);
+
+            /// The opposite half, or null when unpaired.
+            public TransactionItem? PairOf(TransactionItem item) =>
+                item.LineId != null && _pairOf.TryGetValue(item.LineId, out TransactionItem? pair) ? pair : null;
+        }
+
         // A line prints with return semantics when the whole transaction is a RETURN, or — on a
-        // price ADJUSTMENT — when this item is the return leg of a pair. In real ADJUSTMENT
-        // payloads (Jul 21 captures) BOTH legs carry a return node and the return leg's quantity
-        // is positive, so neither distinguishes the legs: the discriminator is negative pricing.
-        // The return leg carries negative extendedPrice/originalUnitPrice; the sale leg positive.
-        private bool IsReturnLine(RetailEvent retailEvent, TransactionItem item)
+        // price ADJUSTMENT — when this item is the return half of a pair. Pairing is explicit
+        // (see AdjustmentPairing); the pricing-sign test is only a fallback for an adjustment item
+        // that carries no usable parentLineId link.
+        private bool IsReturnLine(RetailEvent retailEvent, TransactionItem item, AdjustmentPairing pairing)
         {
             string transType = retailEvent.Transaction?.TransactionType ?? "";
             if (transType == "RETURN") return true;
             if (transType != "ADJUSTMENT") return false;
+
+            if (pairing.IsPaired(item)) return !pairing.IsSaleLeg(item);
 
             if (decimal.TryParse(item.Pricing?.ExtendedPrice?.Value, out decimal ext) && ext != 0)
                 return ext < 0;
@@ -1467,18 +1503,6 @@ class RetailEventMapper
         private bool HasPromoGiftCardActivation(RetailEvent retailEvent)
         {
             return retailEvent.Transaction?.Items?.Any(i => IsGiftCardActivation(i) && IsPromoGiftCard(i)) ?? false;
-        }
-
-        // Check if transaction contains any Standard GC activations
-        private bool HasStandardGiftCardActivation(RetailEvent retailEvent)
-        {
-            return retailEvent.Transaction?.Items?.Any(i => IsGiftCardActivation(i) && !IsPromoGiftCard(i)) ?? false;
-        }
-
-        // Check if transaction contains any regular (non-GC) items
-        private bool HasRegularItems(RetailEvent retailEvent)
-        {
-            return retailEvent.Transaction?.Items?.Any(i => !IsGiftCardActivation(i)) ?? false;
         }
 
         // Sum of an item's PromoGiftCard discount applied amounts — the promotional value booked for that GC.
