@@ -2,7 +2,7 @@
   "profiles": {
     "PubSubApp": {
       "commandName": "Project",
-      "commandLineArgs": "--test \"C:\\TransactionTree\\TTCustomers\\Rona\\Tax Exemptions\\July 13\\ORAE\""
+      "commandLineArgs": "--test  \"C:\\TransactionTree\\TTCustomers\\Rona\\2 reg GC Activations\\2 reg GC Activations\\ORAE\""
     }
   }
 }
