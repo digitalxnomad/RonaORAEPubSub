@@ -10,6 +10,8 @@ public class SampleRegressionTests
 {
     /// Set to 1 to rewrite every baseline from current mapper output instead of asserting.
     /// Review the resulting diff before committing — this makes any behavior change look intentional.
+    /// A run in this mode always fails: regenerating expectations is not verifying them, and a
+    /// green suite here would mean the regression net had silently rewritten itself.
     private static bool UpdateBaselines =>
         Environment.GetEnvironmentVariable("PUBSUB_UPDATE_BASELINES") == "1";
 
@@ -31,7 +33,9 @@ public class SampleRegressionTests
         if (UpdateBaselines)
         {
             File.WriteAllText(sample.BaselinePath, actual);
-            return;
+            Assert.Fail(
+                $"Baseline regenerated for {sample.Name} — this run verified nothing. " +
+                "Review the diff, unset PUBSUB_UPDATE_BASELINES, and re-run to verify.");
         }
 
         string expected = File.ReadAllText(sample.BaselinePath);
