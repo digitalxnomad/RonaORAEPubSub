@@ -435,7 +435,11 @@ class RetailEventMapper
                     reasonCode = "POV0" + overrideReason; // POV0 + priceOverride.reason (e.g. "POV01504")
                 else if (pvCodeForRsn == "MAN")
                     reasonCode = "IDS0" + overrideReason;
-                orderRecord.ReasonCode = reasonCode.PadRight(16);
+                // PadOrTruncate, not PadRight: RRT0/POV0/IDS0 now append a payload-supplied reason
+                // of unbounded length, and SLFRSN is a fixed 16. An over-long value fails
+                // RecordSetValidator, and the production subscriber ACKs and DROPS a failing
+                // message — so an unusual reason code would silently lose the whole transaction.
+                orderRecord.ReasonCode = PadOrTruncate(reasonCode, 16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN
                 // Populated on every SKU line when the transaction is a tax-exemption transaction
@@ -1273,6 +1277,16 @@ class RetailEventMapper
 
                     // AuthNumber (TNFAUT) = original unit price (loaded value) in cents, zero-padded to 6 digits
                     long authCents = (long)Math.Round(Math.Abs(activationOriginalUnitPrice) * 100, MidpointRounding.AwayFromZero);
+                    if (authCents > 999999)
+                    {
+                        // TNFAUT is a fixed 6 digits, so it cannot represent an activation of
+                        // $10,000.00 or more. Clamping keeps the rest of the transaction publishable
+                        // (an over-long value fails validation and the subscriber ACKs and DROPS the
+                        // message), but the emitted value is deliberately wrong — hence Error level.
+                        SimpleLogger.LogError(
+                            $"✗ TNFAUT overflow: gift card activation {activationOriginalUnitPrice:F2} exceeds the 6-digit field; clamping to 9999.99");
+                        authCents = 999999;
+                    }
                     pcRecord.AuthNumber = authCents.ToString().PadLeft(6, '0');
 
                     // ReferenceDesc (TNFRDS) = dollar amount zero-padded to 14 chars + " A" (16 chars total).

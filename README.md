@@ -372,7 +372,13 @@ Log entries include:
 
 ## Version History
 
-### v1.0.98 (07/23/26) ✨ Current
+### v1.0.99 (07/27/26) ✨ Current
+**Fixed-width overflow guards on two payload-driven fields:**
+- 🔧 **`SLFRSN` is now truncated, not just padded** - `RRT0`/`POV0`/`IDS0` append a reason string taken straight from the payload, but the field is a fixed 16 and the code only called `PadRight(16)`. A `return.reason` longer than 12 characters produced an over-long field, which fails `RecordSetValidator` — and the production subscriber **ACKs and drops** a failing message, so the entire transaction would be silently lost rather than retried. Reproduced with an 18-character reason (`SLFRSN length is 22, but maximum is 16`); now truncates to 16 and publishes.
+- 🔧 **`TNFAUT` overflow on large gift card activations** - The activation value in cents is zero-padded to 6 digits, so an activation of **$10,000.00 or more** produced 7 digits and dropped the transaction the same way. The value is now clamped to `999999` with an **Error**-level log naming the true amount. ⚠️ The clamped value is deliberately wrong — `TNFRDS` on the same line still carries the true amount (e.g. `00000012500.00 A`), so nothing is lost, but **how a ≥$9,999.99 activation should be represented in `TNFAUT` needs a decision from Rona.**
+- ✨ Both guards locked in as regression cases under `samples/Field Limits/` (synthetic — no real capture has exercised either limit).
+
+### v1.0.98 (07/23/26)
 **Price adjustments validated against real captures; cross-region tax fix:**
 - 🔧 **Adjustment leg detection corrected** - Real Jul 21 captures disproved two v1.0.97 assumptions: BOTH legs carry a `return` node, and the return leg's quantity is **positive**. The legs are distinguished by pricing sign (return leg has negative `extendedPrice`/`originalUnitPrice`). With the v1.0.97 heuristic every adjustment line would have printed as a return line.
 - 🔧 **`SLFEXN` forced `-` on return lines** - The computed extended value (qty × unit price) can come out positive on a return line (adjustment legs have positive quantity; ORAE sign conventions also vary — the no-receipt return capture carries a negative `unitPrice` where the with-receipt one is positive). The sign is now pinned per the mapping doc rather than inherited from arithmetic. **This also corrects the `return_no_receipt` baseline, which had frozen a blank `SLFEXN` in v1.0.96.**
