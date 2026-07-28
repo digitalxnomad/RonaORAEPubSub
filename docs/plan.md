@@ -1,5 +1,11 @@
 # Plan: Consolidated Tax Lines for GST+PST/QST Provinces
 
+> ⚠️ **Historical — implemented, then superseded.** This plan was carried out, but v1.0.98
+> replaced the province-keyed bucketing it describes: taxes are now bucketed by each tax's own
+> `jurisdiction.region` so cross-region transactions print under the correct authority. The code
+> snippets below no longer match `RetailEventMapper`. Kept for the reasoning; see
+> [TransactionType_Mapping.md](TransactionType_Mapping.md) for current behaviour.
+
 ## Problem
 Currently, non-Ontario provinces (BC, MB, QC, SK) create **per-item** tax records — one tax line per item, lumping all of that item's taxes into a single amount. The new requirement says these provinces should create **two consolidated** tax lines across all SKUs: one for Federal (GST) and one for Provincial (PST/QST), matching the Ontario consolidation pattern.
 

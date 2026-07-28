@@ -96,6 +96,19 @@ If the entire `businessContext` object is null, a single error is returned and n
 | Field | Type | Rule | Example Error |
 |-------|------|------|---------------|
 | `transactionType` | `string` | Required. Must be one of: `SALE`, `RETURN`, `EXCHANGE`, `VOID`, `CANCEL`, `ADJUSTMENT`, `NONMERCH`, `SERVICE` | `Invalid transaction.transactionType: REFUND. Must be one of: SALE, RETURN, EXCHANGE, VOID, CANCEL, ADJUSTMENT, NONMERCH, SERVICE` |
+| `subType` | `string` | **Not validated.** Read on `RETURN` to distinguish `RETURN_WITH_RECEIPT` from `RETURN_NO_RECEIPT` — the two produce different `SLFOTS`/`SLFOTD`/`SLFOTR`/`SLFOTT`/`SLFOST` output | — |
+
+#### 4.1a Fields read but not validated
+
+These are consumed by the mapper and have no validation rule; a malformed or missing value
+degrades the output rather than rejecting the message.
+
+| Field | Read for |
+|-------|----------|
+| `transaction.subType` | With-receipt vs no-receipt returns (see above) |
+| `transaction.items[n].return.reason` | `SLFRSN` — `RRT0`+reason on returns, `POV0`+reason on adjustments. Truncated to the 16-char field |
+| `transaction.items[n].parentLineId` | Two meanings: the covered SKU's line on an EPP coverage item, **and** the paired return leg on an `ADJUSTMENT` re-sale leg |
+| `references.originalEvent` | `storeId` / `businessDay` / `registerId` / `sequenceNumber` → the original-transaction fields on a with-receipt return |
 
 #### 4.2 transaction.totals (Required Object)
 

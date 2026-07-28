@@ -1,19 +1,25 @@
 # Example Test Files
 
-This directory contains sample JSON files for testing the RetailEvent processing functionality.
+This directory contains sample ORAE payloads and their expected output, used as the automated
+regression suite.
 
-## Test File
+## Layout
 
-### `test_retailevent.json`
-Sample JSON file with RetailEvent v2.0.0 structure.
+Samples sit either at the top level or in a scenario folder. Most are **real captures**; anything
+named `synthetic_*` was constructed to exercise a code path no capture covers yet, and should be
+replaced when a real payload of that shape arrives.
 
-**Format:**
-```json
-{
-  "businessContext": {...},
-  "transaction": {...}
-}
-```
+| Folder | Covers |
+|--------|--------|
+| *(top level)* | Basic sales, cash tender/rounding, SK PST, `transactionBurned` |
+| `GC Activation/`, `Standard GC Activation/`, `Promo GC No GiftCard Node/` | Gift card activations — standard, promo, mixed, multi-card |
+| `Returns/` | Returns (with and without receipt) and price adjustments, including the real cross-region and eco-fee captures |
+| `Adjustment Pairing/` | Adjustment leg-pairing edge cases (duplicate SKU, `$0` leg, EPP coverage, fee-code conflict) — all synthetic |
+| `Field Limits/` | Fixed-width overflow guards on `SLFRSN` and `TNFAUT` — synthetic |
+| `SODA Mixed Cart/`, `Mother Baby SKU & UOM/`, `Manual Override (1)/`, … | Scenario captures from specific tickets |
+
+Files named `tactill order.json` are **not** ORAE payloads — they are a different format kept for
+reference, carry no baseline, and are deliberately excluded from the suite.
 
 ## How to Test
 
@@ -35,12 +41,24 @@ new pair anywhere under `samples/` and all three tests pick it up with no code c
 Samples without an `output_*.json` are ignored.
 
 When a mapping change is *intended*, regenerate the baselines and review the diff before
-committing — this rewrites expectations, so an unreviewed run will happily bless a bug:
+committing:
 
 ```bash
 PUBSUB_UPDATE_BASELINES=1 dotnet test    # PowerShell: $env:PUBSUB_UPDATE_BASELINES=1; dotnet test
 git diff samples/
 ```
+
+**A regeneration run always reports FAILED, by design.** It rewrites the expectations rather than
+checking them, so it must never be mistaken for a passing suite — a green run with that variable
+set would mean the regression net had silently replaced itself with whatever the mapper currently
+emits. Review the diff, unset the variable, and re-run to actually verify.
+
+### Adding a case
+
+Drop the input and its `output_<name>.json` next to each other and the suite picks it up — no code
+change. To generate the baseline for a new input, run it through test mode and copy the result
+from the configured `OutputSavePath`, then **read the output before committing it**: a generated
+baseline records what the mapper does today, which is only correct if today's behaviour is.
 
 ### Test a single JSON RetailEvent by hand
 ```bash

@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.50 | RonaORAEPubSub | February 2026**
+**PubSubApp v1.0.100 | RonaORAEPubSub | July 2026**
 
 ---
 
@@ -34,10 +34,11 @@ The incoming `transaction.transactionType` drives two key output fields (**SLFTT
 | SALE | **04** | Any item priceVehicle contains "EMP" (employee discount) |
 | SALE | **01** | Default (no employee discount) |
 | RETURN | **11** | |
+| ADJUSTMENT | **11** | Price adjustment — stays 11 on *both* the return and the re-sale line |
 | AR_PAYMENT | **43** | |
 | VOID | **87** | |
 | POST_VOID | **88** | |
-| EXCHANGE, ADJUSTMENT, NONMERCH, SERVICE, CANCEL | **01** | Default fallback |
+| EXCHANGE, NONMERCH, SERVICE, CANCEL | **01** | Default fallback (logs a warning) |
 
 ---
 
@@ -62,6 +63,21 @@ The incoming `transaction.transactionType` drives two key output fields (**SLFTT
 | 2 | Customer ID exists | **12** |
 | 3 | Default | **11** |
 
+### For ADJUSTMENT Transactions (price adjustment)
+
+A price adjustment returns an already-purchased item at its original price and re-sells it at
+the adjusted price in the same transaction, so each adjusted SKU produces **two** order lines.
+`SLFTTP` is `11` on both; only `SLFLNT` differs.
+
+| Line | SLFLNT | Notes |
+|------|--------|-------|
+| Return leg (original price) | **11** | Prints per the returns mapping — `SLFQTN`/`SLFEXN` `-`, `SLFADC`/`SLFADP`/`SLFOVR` pinned to zeros |
+| Re-sale leg (adjusted price) | **01** | Prints per the sales mapping |
+| Either leg, EPP coverage item | **21** | The EPP override wins; the sign fields differentiate the two legs |
+
+The legs are paired on `parentLineId` — the re-sale leg's `parentLineId` is the return leg's
+`lineId`, and both carry the same SKU. See *Adjustment Leg Pairing* below.
+
 ### Other Transaction Types
 
 | transactionType | SLFLNT | Notes |
@@ -75,6 +91,29 @@ The incoming `transaction.transactionType` drives two key output fields (**SLFTT
 ## EPP Coverage Override (Item-Level)
 
 If an item has attribute `x-epp-coverage-identifier = "9"`, **both SLFTTP and SLFLNT are overridden to "21"** for that specific item record only. Other items in the same transaction are unaffected.
+
+---
+
+## Adjustment Leg Pairing
+
+On an ADJUSTMENT the two halves of each adjusted SKU are linked by the payload itself: the
+**re-sale leg's `parentLineId` is the return leg's `lineId`**, and both ends carry the same SKU.
+
+`parentLineId` is overloaded — on an EPP coverage item it points at the SKU being covered — so a
+link only counts as an adjustment pair when **both ends share a SKU**, which an EPP plan and the
+item it covers never do. Adjustment re-sale legs are excluded from the EPP parent/child reorder
+for the same reason.
+
+Do **not** infer the pairing from SKU alone or from pricing signs:
+
+| Inference | Fails when |
+|-----------|------------|
+| Match on SKU | One SKU is adjusted twice in a transaction — the pairs cross-contaminate and a pair's two legs end up disagreeing |
+| Return leg = negative price | A leg repriced to or from `$0` has no sign, so **both** halves print as sale lines and the refund disappears |
+| Return leg = negative quantity | Real captures carry a **positive** quantity on the return leg |
+
+The pricing-sign test survives only as a fallback for an adjustment item that carries no usable
+`parentLineId` link.
 
 ---
 
@@ -104,34 +143,67 @@ Set to the **same value as SLFTTP** — passed directly from `mappedTransactionT
 
 ### SLFQTN — Quantity Negative Sign
 
-| transactionType | SLFQTN | Rule |
-|-----------------|--------|------|
-| RETURN | `-` | Negative quantity for returns |
+Evaluated **per line**, not per transaction (an ADJUSTMENT carries return and sale lines together).
+
+| Line | SLFQTN | Rule |
+|------|--------|------|
+| Any line of a RETURN | `-` | Negative quantity for returns |
+| ADJUSTMENT return leg | `-` | The return half of a pair |
+| ADJUSTMENT re-sale leg | *(blank)* | The sale half of a pair |
 | All others | *(blank)* | Positive quantity |
+
+Amount fields themselves stay **positive** on every line; the return is signalled by the sign
+columns (`SLFQTN`, `SLFEXN`, `TNFAMN`), never by embedding a `-` in the value.
+
+Tax lines follow the transaction type, so an ADJUSTMENT tax line leaves `SLFQTN` blank and
+carries its sign on `SLFEXN`.
 
 ### SLFRSN — Reason Code (16 chars, right-padded)
 
 | Condition | SLFRSN | Notes |
 |-----------|--------|-------|
-| transactionType = RETURN | `RRT0` | Return reason |
+| transactionType = RETURN | `RRT0` + `items[n].return.reason` | e.g. `RRT00204` |
+| transactionType = ADJUSTMENT | `POV0` + `items[n].return.reason` | e.g. `POV01502` — on **both** legs of the pair; a leg with no reason of its own takes its partner's |
 | transactionType = VOID | `VOD0` | Void reason |
 | priceVehicle = "OVD:OVR" | `POV0` + override reason | e.g. `POV01504` |
-| priceVehicleCode = "MAN" | `IDS0` | Manual discount |
+| priceVehicleCode = "MAN" | `IDS0` + override reason | Manual discount |
 | None of above | 16 spaces | Default blank |
 
+⚠️ The field is a fixed 16 and the reason is payload-supplied, so the result is **truncated**, not
+just padded. An over-long value would fail `RecordSetValidator`, and the production subscriber
+ACKs and drops a failing message — the whole transaction would be lost rather than retried.
+
 ### SLFOTS/SLFOTD/SLFOTR/SLFOTT — Original Transaction Fields
+
+These identify the **original sale** being returned against, sourced from
+`references.originalEvent` — not from the current event.
 
 | SLFTTP | SLFOTS | SLFOTD | SLFOTR | SLFOTT |
 |--------|--------|--------|--------|--------|
 | 01, 04, 43 (Sale/Employee/AR) | `00000` | `000000` | `000` | `00000` |
-| 11 (Return) | Store ID | Transaction date | Register ID | Source transaction ID |
+| 11, `RETURN_WITH_RECEIPT` | `originalEvent.storeId` | `originalEvent.businessDay` | `originalEvent.registerId` | `originalEvent.sequenceNumber` |
+| 11, `RETURN_NO_RECEIPT` | `00000` | `000000` | `000` | `00000` |
 | 87, 88 (Void/Post-Void) | Store ID | Transaction date | Register ID | Sequence number |
+
+`SLFOST` (Original Store) follows the same rule: `originalEvent.storeId` on a with-receipt
+return, `00000` otherwise. **Tax lines always print zeros** for all five fields except on
+VOID/POST-VOID, which keep the current-event values.
 
 ---
 
 ## Tax Line Type Mapping (SLFLNT for Tax Records)
 
-**Method:** `MapTaxAuthToLineType()`
+**Methods:** `ClassifyTaxBucket()` then `MapTaxAuthToLineType()`
+
+Each item tax is bucketed by **its own `jurisdiction.region`**, not by the store's province, and
+one aggregate line is emitted per bucket. This matters for cross-region transactions — an Ontario
+store refunding a Quebec purchase carries `FED`/`PQ` taxes that must print as `XG`/`XQ` under
+their own authorities, not collapse into the store province's `XI`/`HON1`.
+
+A tax with no recognised region falls back to the store province's historical heuristics (rate
+split in ON, type/rate split in GST+PST provinces, single GST line in AB), so same-region
+behaviour is unchanged. Note the precedence: **region wins over rate**, the reverse of the
+pre-v1.0.98 logic, which matters only for a payload whose region and rate disagree.
 
 | Tax Authority Code | SLFLNT | Description |
 |--------------------|--------|-------------|
@@ -158,6 +230,8 @@ Set to the **same value as SLFTTP** — passed directly from `mappedTransactionT
 | `HasGiftCardTender()` | Any tender method = "GIFT_CARD" | SLFLNT → 45 |
 | `GetCustomerId()` | Customer ID token exists | SLFLNT → 02 (sale) or 12 (return) |
 | `GetEPPCoverageIdentifier()` | Item attribute `x-epp-coverage-identifier` = "9" | Both SLFTTP & SLFLNT → 21 per item |
+| `AdjustmentPairing.Build()` | ADJUSTMENT items linked by `parentLineId` sharing a SKU | Identifies each pair's return vs re-sale leg |
+| `IsReturnLine()` | Whole transaction is a RETURN, or this item is an adjustment return leg | Per-line return treatment (signs, pinned price fields) |
 
 ---
 
@@ -170,18 +244,25 @@ Input: transaction.transactionType
   ├─ HasGiftCardTender()   ──► bool
   ├─ GetCustomerId()       ──► bool
   |
+  ├─► AdjustmentPairing.Build()  (ADJUSTMENT only)
+  |     └─► return leg / re-sale leg per adjusted SKU
+  |
   ├─► MapTransTypeSLFTTP(type, empDiscount)
-  |     └─► SLFTTP (01, 04, 11, 43, 87, 88)
+  |     └─► SLFTTP (01, 04, 11, 43, 87, 88)   [ADJUSTMENT → 11 on every line]
   |           └─► TNFTTP (same value)
   |                 └─► TNFESI ("#####" if 04)
   |
   ├─► MapTransTypeSLFLNT(type, empDiscount, giftCard, customerId)
   |     └─► SLFLNT (01, 02, 04, 11, 12, 45, 87)
+  |           └─► ADJUSTMENT re-sale leg overridden to 01
   |
   ├─► Per item: EPP override check
   |     └─► If EPP="9": SLFTTP=21, SLFLNT=21
   |
-  ├─► SLFRSN (based on type + priceVehicle)
-  ├─► SLFQTN ("-" for RETURN)
-  └─► SLFOTS/OTD/OTR/OTT (zeros for sale, populated for return/void)
+  ├─► Per line: IsReturnLine()
+  |     └─► SLFQTN/SLFEXN "-", SLFADC/SLFADP/SLFOVR pinned to zeros
+  |
+  ├─► SLFRSN (type + priceVehicle + return.reason, truncated to 16)
+  └─► SLFOTS/OTD/OTR/OTT (zeros for sale; references.originalEvent for a
+        with-receipt return; zeros for no-receipt; zeros on tax lines)
 ```
