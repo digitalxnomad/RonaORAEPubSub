@@ -372,7 +372,16 @@ Log entries include:
 
 ## Version History
 
-### v1.0.100 (07/27/26) ✨ Current
+### v1.0.101 (07/29/26) ✨ Current
+**`SLFTX1-4` charged-tax flags on cross-region returns:**
+- 🔧 **A tax that names its own jurisdiction now sets the flag from that jurisdiction, not the store's province** - Returning a Quebec purchase at an Ontario store (store 41100 → 55010, receipts 2136 → 4839) put the item's `FED`/`PQ` taxes through the *Ontario* rate split, producing `SLFTX1=N SLFTX2=N SLFTX4=Y` on the SKU line. It now produces `SLFTX1=Y SLFTX2=Y SLFTX3=N SLFTX4=N` — identical to the flags on the original QC sale, which is the point.
+  - `TX1` = provincial sales tax (PST/QST) · `TX2` = federal GST · `TX3` = Ontario full HST (13%) · `TX4` = Ontario partial HST (5%) · Atlantic HST sets `TX1`+`TX2`.
+  - This is the SKU-line half of the same defect v1.0.98 fixed for the aggregate **tax lines**; that change corrected `SLFACD`/`SLFTCD`/`SLFLNT` but left the per-item flags keyed to the store.
+  - ⚠️ Scoped deliberately: only taxes carrying a **recognised** `jurisdiction.region` are routed this way. A region-less tax keeps the historical store-province heuristics, because the two old code paths disagreed on the ambiguous case — the aggregate line defaulted to `HON1`, the flag defaulted to full HST — and unifying them silently flipped `SLFTX3`→`SLFTX4` on three unrelated Ontario baselines.
+- ✨ Both real captures added under `samples/Cross Region/` (QC sale 2136 and the ON return 4839); the `Returns/adjustment_cross_region` baseline is corrected by the same fix.
+- ℹ️ The ticket asks for `SLFTX4 = <BLANK>`; the field emits `N`, matching every other transaction including the original QC sale. Flag if a literal blank is genuinely required — that would change all four flags everywhere, not just this scenario.
+
+### v1.0.100 (07/27/26)
 **Price adjustment legs are paired on `parentLineId` instead of inferred:**
 
 v1.0.97–98 identified the two halves of a price-adjustment pair by SKU (for the reason code) and by pricing sign (for return-vs-sale). The payload states the relationship outright — the sale leg's `parentLineId` is its return leg's `lineId` — and using it closes three defects at once. A link only counts as a pair when both ends carry the same SKU, which distinguishes it from `parentLineId`'s other meaning (an EPP coverage item pointing at the SKU it covers).

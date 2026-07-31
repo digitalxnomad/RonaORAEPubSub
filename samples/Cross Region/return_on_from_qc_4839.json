@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7488333076563581797",
+  "occurredAt": "2026-07-29T20:42:49Z",
+  "ingestedAt": "2026-07-29T20:42:52Z",
+  "businessContext": {
+    "businessDay": "2026-07-29",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "85",
+      "sequenceNumber": 4839,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "RETURN",
+    "subType": "RETURN_WITH_RECEIPT",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "fees": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-4.50"
+            },
+            "type": "ECO"
+          }
+        ],
+        "item": {
+          "description": "PNEU DE RECHANGE 12\" NOIR AC",
+          "sku": "000241097"
+        },
+        "lineId": "178535774656722437690",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-142.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-142.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "142.00"
+          }
+        },
+        "quantity": {
+          "uom": "CH",
+          "value": -1
+        },
+        "return": {
+          "originalLineId": "1",
+          "reason": "0204"
+        },
+        "taxes": [
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-7.33"
+            },
+            "jurisdiction": {
+              "region": "FED"
+            },
+            "taxCode": "GST"
+          },
+          {
+            "amount": {
+              "currency": "CAD",
+              "value": "-14.61"
+            },
+            "jurisdiction": {
+              "region": "PQ"
+            },
+            "taxCode": "PST"
+          }
+        ]
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "-168.44"
+        },
+        "card": {
+          "authCode": "035440",
+          "emv": {
+            "tags": {
+              "magStrip": "t"
+            }
+          },
+          "entryMode": "TAP_ICC",
+          "last4": "1475",
+          "responseCode": "1[49]",
+          "scheme": "MASTERCARD"
+        },
+        "entryMethod": "TAP_ICC",
+        "method": "CREDIT",
+        "tenderId": "MA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "-142.00"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "-168.44"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "-21.94"
+      }
+    }
+  },
+  "promotions": [],
+  "references": {
+    "originalEvent": {
+      "businessDay": "2026-07-29",
+      "registerId": "85",
+      "sequenceNumber": 2136,
+      "storeId": "41100"
+    },
+    "sourceTransactionId": "4839"
+  },
+  "actor": {
+    "cashier": {
+      "loginId": "6008615"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}

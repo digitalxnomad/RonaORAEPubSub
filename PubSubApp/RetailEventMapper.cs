@@ -1776,106 +1776,139 @@ class RetailEventMapper
                     if (taxAmount == 0)
                         continue;
 
-                    // Map tax type/category to ChargedTax1-4 flags
-                    string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper() ?? tax.TaxCode?.ToUpper();
-
-                    // Alberta: GST-only province, all taxes are federal GST -> SLFTX2 = Y
-                    if (isGstOnlyProvince)
+                    // A tax that names its own jurisdiction is classified by it. Keying off the
+                    // STORE's province instead sent a QC purchase returned at an ON store through
+                    // the Ontario rate split, setting SLFTX4 instead of SLFTX1/SLFTX2.
+                    //   TX1 = provincial sales tax (PST/QST)   TX3 = Ontario full HST (13%)
+                    //   TX2 = federal GST                      TX4 = Ontario partial HST (5%)
+                    // A tax with no recognised region keeps the historical store-province
+                    // heuristics below, which default an ambiguous Ontario tax to full HST.
+                    string flagRegion = tax.Jurisdiction?.Region?.Trim().ToUpper() ?? "";
+                    if (flagRegion is "HON" or "HON1" or "FED" or "PQ" or "BC" or "MB" or "SK"
+                                   or "HNB" or "HNF" or "HNS" or "HPE")
                     {
-                        orderRecord.ChargedTax2 = "Y";
-                    }
-                    // Fallback: if taxType is not set, determine from rate
-                    if (string.IsNullOrEmpty(taxType))
-                    {
-                        if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal fallbackRate))
+                        switch (flagRegion)
                         {
-                            taxType = (fallbackRate >= 4 && fallbackRate <= 6) ? "GST" : "PST";
-                        }
-                        else if (tax.TaxRate != null)
-                        {
-                            taxType = (tax.TaxRate.Value >= 0.04m && tax.TaxRate.Value <= 0.06m) ? "GST" : "PST";
-                        }
-                        else
-                        {
-                            taxType = "GST"; // Default unknown to federal GST
-                        }
-                    }
-
-                    // Ontario-specific logic:
-                    // SLFTX3 = Y for HST (13%)
-                    // SLFTX4 = Y for Partial HST / GST (5%)
-                    else if (isOntario)
-                    {
-                        // Determine if this is full HST (13%) or Partial HST (5%) based on rate
-                        bool isFullHst = true; // Default to full HST
-
-                        // Check by ratePercent
-                        if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal ratePercent))
-                        {
-                            isFullHst = ratePercent >= 10; // 13% is HST, 5% is Partial HST
-                        }
-                        // Check by taxRate (decimal form)
-                        else if (tax.TaxRate != null)
-                        {
-                            isFullHst = tax.TaxRate.Value >= 0.10m; // 0.13 is HST, 0.05 is Partial HST
-                        }
-                        // Check by jurisdiction region
-                        else if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
-                        {
-                            string region = tax.Jurisdiction.Region.ToUpper();
-                            isFullHst = region == "HON" || region.Contains("HST");
-                            // HON1 indicates Partial HST
-                            if (region == "HON1") isFullHst = false;
-                        }
-
-                        if (isFullHst)
-                        {
-                            // Full HST (13%) -> SLFTX3 = Y
-                            orderRecord.ChargedTax3 = "Y";
-                            orderRecord.ChargedTax4 = "N";
-                        }
-                        else
-                        {
-                            // Partial HST / GST (5%) -> SLFTX4 = Y
-                            orderRecord.ChargedTax3 = "N";
-                            orderRecord.ChargedTax4 = "Y";
+                            case "HON":  orderRecord.ChargedTax3 = "Y"; break;
+                            case "HON1": orderRecord.ChargedTax4 = "Y"; break;
+                            case "FED":  orderRecord.ChargedTax2 = "Y"; break;
+                            case "HNB":
+                            case "HNF":
+                            case "HNS":
+                            case "HPE":
+                                // Atlantic HST is harmonized provincial + federal
+                                orderRecord.ChargedTax1 = "Y";
+                                orderRecord.ChargedTax2 = "Y";
+                                break;
+                            default:
+                                // PQ, BC, MB, SK — provincial sales tax
+                                orderRecord.ChargedTax1 = "Y";
+                                break;
                         }
                     }
                     else
                     {
-                        // Non-Ontario provinces: use original logic
-                        switch (taxType)
+                        // Map tax type/category to ChargedTax1-4 flags
+                        string? taxType = tax.TaxType?.ToUpper() ?? tax.TaxCategory?.ToUpper() ?? tax.TaxCode?.ToUpper();
+    
+                        // Alberta: GST-only province, all taxes are federal GST -> SLFTX2 = Y
+                        if (isGstOnlyProvince)
                         {
-                            case "PST":
-                            case "PROVINCIAL":
-                            case "STATE":
-                                orderRecord.ChargedTax1 = "Y";
-                                break;
-                            case "GST":
-                            case "FEDERAL":
-                            case "VAT":
-                            case "NATIONAL":
-                                orderRecord.ChargedTax2 = "Y";
-                                break;
-                            case "HST":
-                            case "HARMONIZED":
-                                // HST is combined PST+GST for non-Ontario
-                                orderRecord.ChargedTax1 = "Y";
-                                orderRecord.ChargedTax2 = "Y";
-                                break;
-                            case "QST":
-                            case "QUEBEC":
-                                orderRecord.ChargedTax1 = "Y";
+                            orderRecord.ChargedTax2 = "Y";
+                        }
+                        // Fallback: if taxType is not set, determine from rate
+                        if (string.IsNullOrEmpty(taxType))
+                        {
+                            if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal fallbackRate))
+                            {
+                                taxType = (fallbackRate >= 4 && fallbackRate <= 6) ? "GST" : "PST";
+                            }
+                            else if (tax.TaxRate != null)
+                            {
+                                taxType = (tax.TaxRate.Value >= 0.04m && tax.TaxRate.Value <= 0.06m) ? "GST" : "PST";
+                            }
+                            else
+                            {
+                                taxType = "GST"; // Default unknown to federal GST
+                            }
+                        }
+    
+                        // Ontario-specific logic:
+                        // SLFTX3 = Y for HST (13%)
+                        // SLFTX4 = Y for Partial HST / GST (5%)
+                        else if (isOntario)
+                        {
+                            // Determine if this is full HST (13%) or Partial HST (5%) based on rate
+                            bool isFullHst = true; // Default to full HST
+    
+                            // Check by ratePercent
+                            if (!string.IsNullOrEmpty(tax.RatePercent) && decimal.TryParse(tax.RatePercent, out decimal ratePercent))
+                            {
+                                isFullHst = ratePercent >= 10; // 13% is HST, 5% is Partial HST
+                            }
+                            // Check by taxRate (decimal form)
+                            else if (tax.TaxRate != null)
+                            {
+                                isFullHst = tax.TaxRate.Value >= 0.10m; // 0.13 is HST, 0.05 is Partial HST
+                            }
+                            // Check by jurisdiction region
+                            else if (!string.IsNullOrEmpty(tax.Jurisdiction?.Region))
+                            {
+                                string region = tax.Jurisdiction.Region.ToUpper();
+                                isFullHst = region == "HON" || region.Contains("HST");
+                                // HON1 indicates Partial HST
+                                if (region == "HON1") isFullHst = false;
+                            }
+    
+                            if (isFullHst)
+                            {
+                                // Full HST (13%) -> SLFTX3 = Y
                                 orderRecord.ChargedTax3 = "Y";
-                                break;
-                            case "MUNICIPAL":
-                            case "LOCAL":
-                            case "CITY":
+                                orderRecord.ChargedTax4 = "N";
+                            }
+                            else
+                            {
+                                // Partial HST / GST (5%) -> SLFTX4 = Y
+                                orderRecord.ChargedTax3 = "N";
                                 orderRecord.ChargedTax4 = "Y";
-                                break;
-                            default:
-                                // Unrecognized tax types - do not set any flag
-                                break;
+                            }
+                        }
+                        else
+                        {
+                            // Non-Ontario provinces: use original logic
+                            switch (taxType)
+                            {
+                                case "PST":
+                                case "PROVINCIAL":
+                                case "STATE":
+                                    orderRecord.ChargedTax1 = "Y";
+                                    break;
+                                case "GST":
+                                case "FEDERAL":
+                                case "VAT":
+                                case "NATIONAL":
+                                    orderRecord.ChargedTax2 = "Y";
+                                    break;
+                                case "HST":
+                                case "HARMONIZED":
+                                    // HST is combined PST+GST for non-Ontario
+                                    orderRecord.ChargedTax1 = "Y";
+                                    orderRecord.ChargedTax2 = "Y";
+                                    break;
+                                case "QST":
+                                case "QUEBEC":
+                                    orderRecord.ChargedTax1 = "Y";
+                                    orderRecord.ChargedTax3 = "Y";
+                                    break;
+                                case "MUNICIPAL":
+                                case "LOCAL":
+                                case "CITY":
+                                    orderRecord.ChargedTax4 = "Y";
+                                    break;
+                                default:
+                                    // Unrecognized tax types - do not set any flag
+                                    break;
+                            }
                         }
                     }
 
