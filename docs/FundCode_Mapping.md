@@ -4,6 +4,9 @@
 
 ---
 
+> Open specification questions affecting these codes — including the `TNFAUT` 6-digit limit on
+> large gift card activations — are tracked in [Open_Questions.md](Open_Questions.md).
+
 ## How It Works
 
 The fund code is set **directly from `tender.TenderId`** in the incoming ORAE data:

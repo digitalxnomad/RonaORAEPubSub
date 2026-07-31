@@ -4,6 +4,9 @@
 
 ---
 
+> Behaviour documented here that is still awaiting a specification decision from Rona is tracked
+> in [Open_Questions.md](Open_Questions.md).
+
 ## Overview
 
 The incoming `transaction.transactionType` drives two key output fields (**SLFTTP** and **SLFLNT**) plus several conditional behaviors across order, tax, and tender records.
