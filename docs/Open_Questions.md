@@ -1,6 +1,6 @@
 # Open Questions for Rona
 
-**PubSubApp v1.0.101 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.102 | RonaORAEPubSub | July 2026**
 
 Behaviour that is **shipped and test-covered**, but where the *specification* is ambiguous or the
 source data is inconsistent. Each entry states what TTree does today, why, and what a decision
@@ -11,51 +11,7 @@ When one is resolved, change the code, regenerate the affected baseline, and del
 
 ---
 
-## 1. `SLFTX4` on a cross-region return — `N` or literal blank?
-
-**Raised by:** *Tactill | ACO | ECO Fee — cross-region return* (receipts 2136 → 4839)
-
-The ticket's expectation reads:
-
-> for Seq-1-SKU the `SLFTX1 = Y`, `SLFTX2 = Y` & `SLFTX4 = <BLANK>`
-
-`SLFTX1` and `SLFTX2` were genuinely wrong and are fixed in v1.0.101. The `SLFTX4` half is the
-open question: the field emits **`N`**, not a blank.
-
-**Status — re-verified 07/31/26 against a live v1.0.101 run of receipt 4839.** Two of the three
-expectations match exactly; the third is awaiting the decision below:
-
-| Field | Ticket expects | v1.0.101 emits | |
-|-------|----------------|----------------|---|
-| `SLFTX1` | `Y` | `Y` | ✅ |
-| `SLFTX2` | `Y` | `Y` | ✅ |
-| `SLFTX4` | `<BLANK>` | `N` | ⏳ awaiting decision |
-
-**Why `N` was delivered:**
-
-| Evidence | Value |
-|----------|-------|
-| Return 4839 (after fix) | `SLFTX1=Y SLFTX2=Y SLFTX3=N SLFTX4=N` |
-| Original QC sale 2136 — the transaction being reversed | `SLFTX1=Y SLFTX2=Y SLFTX3=N SLFTX4=N` |
-| Every other transaction in `samples/` | Unset flags print `N` |
-
-An unset charged-tax flag has printed `N` everywhere since the field existed; no code path emits a
-blank. The return now matches its own original sale exactly, which is the outcome the ticket was
-driving at.
-
-**The question:** is `<BLANK>` in the ticket shorthand for "not `Y`" (satisfied — this is closed),
-or is a literal space genuinely required in the RIM record?
-
-**If a literal blank is required**, it is not a cross-region fix — it changes the meaning of "not
-charged" for **all four flags on every transaction type**, and every baseline in `samples/` would
-move. That is a spec change, not a bug fix, and needs confirming before anyone relies on it.
-
-> The only non-`Y`/`N` value the field takes today is `SLFTX3 = "O"`, the First Nation partial
-> exemption marker (v1.0.90).
-
----
-
-## 2. Eco-fee `SLFACD` / `SLFTCD` — the payload's `authority` and `code` disagree between regions
+## 1. Eco-fee `SLFACD` / `SLFTCD` — the payload's `authority` and `code` disagree between regions
 
 **Raised by:** review of the `83` eco-fee line
 
@@ -103,7 +59,7 @@ missing values are filled — a fee stating its own code keeps it.
 
 ---
 
-## 3. `TNFAUT` for a gift card activation of $10,000.00 or more
+## 2. `TNFAUT` for a gift card activation of $10,000.00 or more
 
 **Raised by:** code review, v1.0.99
 
@@ -126,3 +82,4 @@ because it is less bad than discarding the transaction. No real capture has appr
 |----------|--------|---------|
 | Should multiple promo GC activations emit one `PP` per card? | No — one aggregate `PP` per transaction carrying the summed promo value, alongside one `PC` per card | v1.0.95 |
 | Cross-region `SLFACD`/`SLFTCD` on **tax** lines (flagged in the returns mapping document) | Bucket each tax by its own `jurisdiction.region` | v1.0.98 |
+| `SLFTX4` on a cross-region return — `N` or a literal blank? (*Tactill \| ACO \| ECO Fee*, receipts 2136 → 4839) | **`N`** — confirmed 07/31/26. `<BLANK>` in the ticket meant "not `Y`". No code change: unset charged-tax flags have always printed `N`, and the return already matched its original QC sale exactly. That ticket is fully satisfied by v1.0.101 | v1.0.101 (no change needed) |

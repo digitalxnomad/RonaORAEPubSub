@@ -396,7 +396,7 @@ Log entries include:
   - This is the SKU-line half of the same defect v1.0.98 fixed for the aggregate **tax lines**; that change corrected `SLFACD`/`SLFTCD`/`SLFLNT` but left the per-item flags keyed to the store.
   - ⚠️ Scoped deliberately: only taxes carrying a **recognised** `jurisdiction.region` are routed this way. A region-less tax keeps the historical store-province heuristics, because the two old code paths disagreed on the ambiguous case — the aggregate line defaulted to `HON1`, the flag defaulted to full HST — and unifying them silently flipped `SLFTX3`→`SLFTX4` on three unrelated Ontario baselines.
 - ✨ Both real captures added under `samples/Cross Region/` (QC sale 2136 and the ON return 4839); the `Returns/adjustment_cross_region` baseline is corrected by the same fix.
-- ℹ️ The ticket asks for `SLFTX4 = <BLANK>`; the field emits `N`, matching every other transaction including the original QC sale. Flag if a literal blank is genuinely required — that would change all four flags everywhere, not just this scenario.
+- ✅ The ticket asks for `SLFTX4 = <BLANK>`; the field emits `N`, matching every other transaction including the original QC sale. **Confirmed 07/31/26 that `N` is correct** — `<BLANK>` meant "not `Y`". No code change; the ticket is fully satisfied by this version.
 
 ### v1.0.100 (07/27/26)
 **Price adjustment legs are paired on `parentLineId` instead of inferred:**
