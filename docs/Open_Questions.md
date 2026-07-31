@@ -22,6 +22,15 @@ The ticket's expectation reads:
 `SLFTX1` and `SLFTX2` were genuinely wrong and are fixed in v1.0.101. The `SLFTX4` half is the
 open question: the field emits **`N`**, not a blank.
 
+**Status — re-verified 07/31/26 against a live v1.0.101 run of receipt 4839.** Two of the three
+expectations match exactly; the third is awaiting the decision below:
+
+| Field | Ticket expects | v1.0.101 emits | |
+|-------|----------------|----------------|---|
+| `SLFTX1` | `Y` | `Y` | ✅ |
+| `SLFTX2` | `Y` | `Y` | ✅ |
+| `SLFTX4` | `<BLANK>` | `N` | ⏳ awaiting decision |
+
 **Why `N` was delivered:**
 
 | Evidence | Value |
