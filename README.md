@@ -382,7 +382,14 @@ Log entries include:
 
 ## Version History
 
-### v1.0.101 (07/29/26) ✨ Current
+### v1.0.102 (07/31/26) ✨ Current
+**Clear `SLFSLN` and `SLFQTN` on return output:**
+- 🔧 **Tax lines no longer sign `SLFQTN`** - Every `X*` tax line on a `RETURN` printed `SLFQTN="-"`. A tax line has no quantity to sign — `SLFQTY` is the constant `000000100` — so the direction belongs on `SLFEXN` alone. Now blank, which is what `SALE` and `ADJUSTMENT` tax lines already did; this brings `RETURN` into line with them rather than introducing a new rule.
+- 🔧 **`SLFSLN` blank on return SKU lines** - The field is computed from the payload's `unitPrice` sign, and ORAE's conventions differ between captures: the no-receipt return sends a **negative** `unitPrice` where the with-receipt one sends positive. So the `-` leaked into `SLFSLN` on some returns and not others. Now pinned blank on every return line, matching the tax-line rule from v1.0.96.
+- ℹ️ The eco-fee `83` line is deliberately **unchanged** — it carries a real SKU rather than `000000000`, so it follows the SKU-line rule and keeps `SLFQTN="-"`.
+- ⚠️ Scope covers `transactionType = RETURN` and the return leg of an `ADJUSTMENT`. Five return baselines moved, by exactly these two fields and nothing else; no sale, adjustment or gift-card baseline shifted. **No fixture exists for a SODA return or a tax-exemption return** — the fix is transaction-wide so it applies to them, but neither shape has been captured.
+
+### v1.0.101 (07/29/26)
 **`SLFTX1-4` charged-tax flags on cross-region returns:**
 - 🔧 **A tax that names its own jurisdiction now sets the flag from that jurisdiction, not the store's province** - Returning a Quebec purchase at an Ontario store (store 41100 → 55010, receipts 2136 → 4839) put the item's `FED`/`PQ` taxes through the *Ontario* rate split, producing `SLFTX1=N SLFTX2=N SLFTX4=Y` on the SKU line. It now produces `SLFTX1=Y SLFTX2=Y SLFTX3=N SLFTX4=N` — identical to the flags on the original QC sale, which is the point.
   - `TX1` = provincial sales tax (PST/QST) · `TX2` = federal GST · `TX3` = Ontario full HST (13%) · `TX4` = Ontario partial HST (5%) · Atlantic HST sets `TX1`+`TX2`.

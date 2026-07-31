@@ -158,8 +158,17 @@ Evaluated **per line**, not per transaction (an ADJUSTMENT carries return and sa
 Amount fields themselves stay **positive** on every line; the return is signalled by the sign
 columns (`SLFQTN`, `SLFEXN`, `TNFAMN`), never by embedding a `-` in the value.
 
-Tax lines follow the transaction type, so an ADJUSTMENT tax line leaves `SLFQTN` blank and
-carries its sign on `SLFEXN`.
+**Tax lines always leave `SLFQTN` blank**, returns included — a tax line has no quantity to sign
+(`SLFQTY` is the constant `000000100`), so the direction rides on `SLFEXN` alone. The eco-fee
+`83` line is *not* a tax line for this purpose: it carries a real SKU and follows the SKU-line
+rule above.
+
+### SLFSLN — Sell Price Negative Sign
+
+**Always blank.** Not on tax lines (v1.0.96) and not on SKU lines either (v1.0.102). ORAE sign
+conventions vary between captures — the no-receipt return capture sends a negative `unitPrice`
+where the with-receipt one sends positive — so a computed sign leaked a `-` into this field on
+some returns and not others. `SLFQTN` and `SLFEXN` carry the direction.
 
 ### SLFRSN — Reason Code (16 chars, right-padded)
 

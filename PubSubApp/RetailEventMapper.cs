@@ -562,6 +562,11 @@ class RetailEventMapper
                     orderRecord.OverridePriceNegativeSign = "";
                     orderRecord.OriginalPriceNegativeSign = "";
                     orderRecord.OriginalRetailNegativeSign = "";
+                    // SLFSLN blank on the SKU line. ORAE sign conventions differ between captures
+                    // — the no-receipt return sends a negative unitPrice where the with-receipt one
+                    // sends positive — so the computed sign leaked a "-" into this field on some
+                    // returns and not others. The direction rides on SLFQTN/SLFEXN.
+                    orderRecord.SellPriceNegativeSign = "";
                     // SLFEXN is "-" on every return line. On RETURN transactions it falls out of
                     // the negative quantity; on ADJUSTMENT return legs the quantity is positive
                     // (the negativity lives in extendedPrice, which SLFEXT does not use), so the
@@ -896,7 +901,10 @@ class RetailEventMapper
                     SellPriceNegativeSign = "", // SLFSLN always blank on tax lines; the sign rides on SLFEXN
                     SKUNumber = "000000000",
                     Quantity = "000000100",
-                    QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "",
+                    // SLFQTN is blank on every tax line, returns included: a tax line has no
+                    // quantity to sign (SLFQTY is the constant 000000100). The direction rides on
+                    // SLFEXN. ADJUSTMENT and SALE already printed blank here; RETURN did not.
+                    QuantityNegativeSign = "",
                     OriginalPrice = "000000000",
                     OriginalPriceNegativeSign = "",
                     OverridePrice = "000000000",
@@ -1025,7 +1033,10 @@ class RetailEventMapper
                                 // Blank fields for tax line
                                 SKUNumber = "000000000", // Placeholder SKU for tax line (9 zeros per validation)
                                 Quantity = "000000100", // Tax quantity = 1.00 (1 * 100 in cents format)
-                                QuantityNegativeSign = retailEvent.Transaction?.TransactionType == "RETURN" ? "-" : "", // SLFQTN: "-" for Return, "" for all else
+                                // SLFQTN is blank on every tax line, returns included: a tax line has no
+                    // quantity to sign (SLFQTY is the constant 000000100). The direction rides on
+                    // SLFEXN. ADJUSTMENT and SALE already printed blank here; RETURN did not.
+                    QuantityNegativeSign = "",
                                 OriginalPrice = "000000000", // SLFORG - 9 zeros for tax record
                                 OriginalPriceNegativeSign = "",
                                 OverridePrice = "000000000", // SLFOVR - 9 zeros when no override
