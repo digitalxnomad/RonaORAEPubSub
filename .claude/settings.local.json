@@ -23,5 +23,11 @@
       "Bash(PUBSUB_UPDATE_BASELINES=1 dotnet test PubSubApp.Tests/PubSubApp.Tests.csproj --filter \"DisplayName~transactionBurned.json\")",
       "Bash(xargs -I{} echo \"version fields: {}\")"
     ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Pushing already-reviewed local commits to the tracked remote branch with `git push origin master` (fast-forward, no --force, no history rewriting) in this repository. The user reviews each change and authorizes the push explicitly."
+    ]
   }
 }
