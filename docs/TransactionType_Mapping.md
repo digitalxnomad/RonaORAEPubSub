@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.100 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.101 | RonaORAEPubSub | July 2026**
 
 ---
 
@@ -188,6 +188,38 @@ These identify the **original sale** being returned against, sourced from
 `SLFOST` (Original Store) follows the same rule: `originalEvent.storeId` on a with-receipt
 return, `00000` otherwise. **Tax lines always print zeros** for all five fields except on
 VOID/POST-VOID, which keep the current-event values.
+
+---
+
+## SLFTX1–SLFTX4 — Charged-Tax Flags (SKU Lines)
+
+**Method:** `ParseItemTaxes()`
+
+Set from each tax's **own** `jurisdiction.region`, not the store's province — the same principle as
+the tax-line bucketing below. Keying off the store sent a Quebec purchase returned at an Ontario
+store through the Ontario rate split, setting `SLFTX4` where `SLFTX1`/`SLFTX2` belonged.
+
+| Tax jurisdiction | Flag | Meaning |
+|------------------|------|---------|
+| `PQ`, `BC`, `MB`, `SK` | `SLFTX1` | Provincial sales tax (PST/QST) |
+| `FED` | `SLFTX2` | Federal GST |
+| `HON` | `SLFTX3` | Ontario full HST (13%) |
+| `HON1` | `SLFTX4` | Ontario partial HST (5%) |
+| `HNB`, `HNF`, `HNS`, `HPE` | `SLFTX1` + `SLFTX2` | Atlantic HST (harmonized) |
+
+Unset flags print `N`, never blank. Notes:
+
+- **Region-less taxes keep the historical heuristics** (rate split in ON, tax-type switch
+  elsewhere). This is deliberate: the flag path and the tax-line path disagreed on the ambiguous
+  case — the line defaulted to `HON1`, the flag to full HST — so routing everything through one
+  classifier would silently flip `SLFTX3`→`SLFTX4` on existing Ontario output.
+- **A zero tax amount is skipped; a negative one is not.** Return taxes are negative but *were*
+  charged on the original sale, so they must still set their flag.
+- **`taxExempt = true` entries are skipped** entirely.
+- **First Nation partial exemption** overrides `SLFTX3` to `"O"` when
+  `transaction.qualifiers.isTaxExemptTransaction` is set and a tax entry carries `status="A"`.
+  Applied after the loop, so it wins over the jurisdiction routing.
+- **Tax lines themselves always carry `SLFTX1-4 = N`** — the flags describe the SKU.
 
 ---
 

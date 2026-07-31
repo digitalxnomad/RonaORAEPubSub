@@ -155,44 +155,54 @@ The application now supports comprehensive item-level tax parsing from ORAE v2.0
   - `taxExempt` (boolean flag)
   - `exemptReason` (exemption description)
 
-### Province-Aware Tax Logic
+### Jurisdiction-Aware Tax Logic
 
-**Ontario-Specific Rules:**
-- **Actual Items**: `SLFTX2=N`, `SLFTX3=Y` (HST)
-- **Tax Authority**: Automatically determined based on rate
-  - 13% → "HON" (Ontario HST)
-  - 5% → "HON1" (Federal GST)
-- **Tax Consolidation**: All item taxes combined into ONE tax record per transaction ✨
-  - `ExtendedValue` and `ItemSellPrice` contain transaction-level tax total
-  - Single tax line item representing HST or Partial HST across all SKUs
+Each item tax is classified by **its own `jurisdiction.region`**, not by the store's province.
+That matters for cross-region transactions — returning a Quebec purchase at an Ontario store must
+still report Quebec's taxes as Quebec's.
 
-**Other Provinces:**
-- **PST**: `SLFTX1=Y`
-- **GST**: `SLFTX2=Y`
-- **HST**: `SLFTX1=Y`, `SLFTX2=Y` (combined)
-- **QST**: `SLFTX1=Y`, `SLFTX3=Y` (Quebec)
-- **Municipal**: `SLFTX4=Y`
-- **Tax Records**: Per-item tax records (one tax line per item)
+**Charged-tax flags on SKU lines (`SLFTX1`–`SLFTX4`):**
 
-### Tax Line Items
+| Tax jurisdiction | Flag set | Meaning |
+|------------------|----------|---------|
+| `PQ`, `BC`, `MB`, `SK` | `SLFTX1=Y` | Provincial sales tax (PST/QST) |
+| `FED` | `SLFTX2=Y` | Federal GST |
+| `HON` | `SLFTX3=Y` | Ontario full HST (13%) |
+| `HON1` | `SLFTX4=Y` | Ontario partial HST (5%) |
+| `HNB`, `HNF`, `HNS`, `HPE` | `SLFTX1=Y`, `SLFTX2=Y` | Atlantic HST (harmonized) |
 
-**Ontario Transactions:**
-One consolidated tax line item per transaction:
-- **LineType**: From TBLFLD TAXTXC mapping (e.g., "XH" for HON, "XI" for HON1)
-- **Tax Flags**: All set to "N" (`SLFTX1-4=N`)
-- **Tax Authority (SLFACD)**: From `taxes.jurisdiction.region`
-- **Tax Rate Code (SLFTCD)**: From `taxes.taxCode` (first with jurisdiction)
-- **ExtendedValue**: Sum of all item taxes in transaction
-- **Sequence**: Gets its own sequence number after all item lines
+A tax carrying no recognised region falls back to the store province's historical heuristics
+(rate split in Ontario, tax-type switch elsewhere). A First Nation partial exemption overrides
+`SLFTX3` to `"O"` — see the v1.0.90 entry.
 
-**Non-Ontario Transactions:**
-Per-item tax line items:
-- **LineType**: From TBLFLD TAXTXC mapping (province-specific)
-- **Tax Flags**: Province-specific flags
-- **Tax Authority (SLFACD)**: From `taxes.jurisdiction.region`
-- **Tax Rate Code (SLFTCD)**: From `taxes.taxCode` (first with jurisdiction)
-- **ExtendedValue**: Individual item tax amount
-- **Sequence**: One per item with taxes
+**Tax line items** carry `SLFTX1-4 = N`; the flags describe the SKU, not the tax record.
+
+### Tax Line Consolidation
+
+One aggregate tax line is emitted **per jurisdiction present in the transaction**, each under its
+own authority and line type:
+
+| Store province | Typical lines |
+|----------------|---------------|
+| Ontario | `XH` (HON) and/or `XI` (HON1) |
+| Quebec | `XG` (FED) + `XQ` (PQ) |
+| BC / MB / SK | `XG` (FED) + `XR` / `XM` / `XS` |
+| Alberta | `XG` (FED) only |
+| Cross-region | Whatever jurisdictions appear — e.g. `XH` + `XG` + `XQ` |
+
+`ExtendedValue` / `ItemSellPrice` hold that jurisdiction's total across all SKUs. Provinces
+outside the sets above (Atlantic HST) still emit per-item tax records.
+
+### Tax Line Item Fields
+
+Every aggregate tax line carries:
+
+- **LineType (`SLFLNT`)**: From the jurisdiction, via TBLFLD TAXTXC mapping — `XH` (HON), `XI` (HON1), `XG` (FED), `XQ` (PQ), `XR`/`XM`/`XS` (BC/MB/SK)
+- **Tax Authority (`SLFACD`)**: The jurisdiction the line aggregates
+- **Tax Rate Code (`SLFTCD`)**: From `taxes.taxCode` for that jurisdiction (e.g. `HST`, `GST`, `PST`)
+- **Tax Flags**: Always `SLFTX1-4 = N` — the flags belong on the SKU line
+- **ExtendedValue (`SLFEXT`)**: That jurisdiction's total across all SKUs, as a **positive** value; a negative net (a return, or an adjustment refunding more than it re-sells) is signalled by `SLFEXN = "-"`
+- **Sequence**: Its own sequence number, after all item lines
 
 **Example Ontario Transaction Structure:**
 ```

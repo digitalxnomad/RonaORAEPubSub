@@ -14,9 +14,10 @@ replaced when a real payload of that shape arrives.
 | *(top level)* | Basic sales, cash tender/rounding, SK PST, `transactionBurned` |
 | `GC Activation/`, `Standard GC Activation/`, `Promo GC No GiftCard Node/` | Gift card activations — standard, promo, mixed, multi-card |
 | `Returns/` | Returns (with and without receipt) and price adjustments, including the real cross-region and eco-fee captures |
+| `Cross Region/` | An item bought in QC (store 41100, receipt 2136) and returned in ON (store 55010, receipt 4839) — the pair proves the return reports the *purchase's* jurisdiction, not the returning store's |
 | `Adjustment Pairing/` | Adjustment leg-pairing edge cases (duplicate SKU, `$0` leg, EPP coverage, fee-code conflict) — all synthetic |
 | `Field Limits/` | Fixed-width overflow guards on `SLFRSN` and `TNFAUT` — synthetic |
-| `SODA Mixed Cart/`, `Mother Baby SKU & UOM/`, `Manual Override (1)/`, … | Scenario captures from specific tickets |
+| All other folders | Scenario captures from specific tickets — `SODA Mixed Cart/`, `Mother Baby SKU & UOM/`, `Manual Override (1)/`, `Cash+Visa/`, `CashRoundingUp/`, `Cash Rounding Down/`, `062326_Bugs/`, and so on. This table is not exhaustive; the suite discovers cases by convention, not from this list |
 
 Files named `tactill order.json` are **not** ORAE payloads — they are a different format kept for
 reference, carry no baseline, and are deliberately excluded from the suite.
