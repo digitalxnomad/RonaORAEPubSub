@@ -14,6 +14,7 @@ replaced when a real payload of that shape arrives.
 | *(top level)* | Basic sales, cash tender/rounding, SK PST, `transactionBurned` |
 | `GC Activation/`, `Standard GC Activation/`, `Promo GC No GiftCard Node/` | Gift card activations — standard, promo, mixed, multi-card |
 | `Returns/` | Returns (with and without receipt) and price adjustments, including the real cross-region and eco-fee captures |
+| `Endless Aisle/` | Real in-store Endless Aisle payment (Aug 11) and refund (Aug 14) captures — line type `42` |
 | `Cross Region/` | An item bought in QC (store 41100, receipt 2136) and returned in ON (store 55010, receipt 4839) — the pair proves the return reports the *purchase's* jurisdiction, not the returning store's |
 | `Adjustment Pairing/` | Adjustment leg-pairing edge cases (duplicate SKU, `$0` leg, EPP coverage, fee-code conflict) — all synthetic |
 | `Field Limits/` | Fixed-width overflow guards on `SLFRSN` and `TNFAUT` — synthetic |

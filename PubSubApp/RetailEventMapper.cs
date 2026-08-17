@@ -120,8 +120,10 @@ class RetailEventMapper
         {
             foreach (var item in retailEvent.Transaction.Items)
             {
-                // Per-item SODA detection via item.altIds
+                // Per-item SODA / Endless Aisle detection via item.altIds. Mutually exclusive:
+                // both read altIds sodaType, which is either "SODA" or "ENDLESS_AISLE".
                 bool isSodaItem = IsItemSoda(item);
+                bool isEndlessAisleItem = IsItemEndlessAisle(item);
                 bool isSodaDeposit = isSodaItem && IsItemSodaDeposit(item);
                 string sodaRefId = isSodaItem ? (GetItemSodaRefId(item) ?? "") : "";
 
@@ -477,10 +479,47 @@ class RetailEventMapper
                     }
                 }
 
+                // Endless Aisle item override (CR RONA TSP Mapping Changes, MIM-7509 / MIM-8070).
+                // An in-store EA payment or refund must present as a single line 42 carrying the web
+                // order total, so MMS/SODA see it as an Endless Aisle order rather than merchandise.
+                // The refund direction (SLFTTP/SLFQTN/SLFEXN/SLFRSN, TNFTTP/TNFAMN) needs nothing
+                // here — the standard return handling already produces it.
+                if (isEndlessAisleItem)
+                {
+                    decimal eaTotal = GetEndlessAisleTotal(item);
+
+                    orderRecord.LineType = "42";                      // SLFLNT
+                    orderRecord.SKUNumber = "000000000";              // SLFSKU - forced zeros; the
+                                                                      // refund payload sends 999999999
+                    orderRecord.Quantity = "000000100";               // SLFQTY - always absolute qty 1
+
+                    // SLFORG / SLFSEL / SLFEXT all carry the same absolute web order total. The
+                    // signs stay blank here; on a refund the return block below pins SLFEXN to "-".
+                    orderRecord.OriginalPrice = FormatCurrency(eaTotal.ToString("F2"), 9);
+                    orderRecord.OriginalPriceNegativeSign = "";
+                    orderRecord.ItemSellPrice = FormatCurrency(eaTotal.ToString("F2"), 9);
+                    orderRecord.SellPriceNegativeSign = "";
+                    orderRecord.ExtendedValue = FormatCurrency(eaTotal.ToString("F2"), 11);
+                    orderRecord.ExtendedValueNegativeSign = "";
+
+                    orderRecord.ChargedTax1 = "N";                    // SLFTX1-4 - EA line is untaxed
+                    orderRecord.ChargedTax2 = "N";
+                    orderRecord.ChargedTax3 = "N";
+                    orderRecord.ChargedTax4 = "N";
+
+                    // SLFRFD = 5-digit store + rightmost 10 digits of sodaRef. That is 15 characters
+                    // in a 16-character field, so it is right-padded with one space — confirmed with
+                    // Rona 08/12/26 (the CR's length column was the error, not the formula).
+                    string eaRef = GetItemSodaRefId(item) ?? "";
+                    string eaWebNumber = eaRef.Length > 10 ? eaRef.Substring(eaRef.Length - 10) : eaRef;
+                    string eaStore = PadNumeric(retailEvent.BusinessContext?.Store?.StoreId, 5) ?? "";
+                    orderRecord.ReferenceDesc = PadOrTruncate(eaStore + eaWebNumber, 16);
+                }
+
                 // SODA item override — apply highlighted deviations from SODA mapping spec.
                 // Only items with altIds sodaType=SODA get these overrides; other items in
                 // the same transaction keep their normal mapping.
-                if (isSodaItem)
+                else if (isSodaItem)
                 {
                     orderRecord.LineType = "30";                  // SLFLNT
                     orderRecord.SKUNumber = "000000000";          // SLFSKU - 9 zeros
@@ -1372,6 +1411,30 @@ class RetailEventMapper
             return item.Item?.AltIds?.Any(a =>
                 string.Equals(a.Type, "sodaType", StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(a.Value, "SODA", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // Endless Aisle detection: item.altIds[] contains type="sodaType" with value="ENDLESS_AISLE".
+        // Deliberately keyed off sodaType rather than lineBusiness.detailType, which the payload also
+        // carries: sodaType keeps detection identical in shape to every other flow, whereas
+        // detailType was introduced for Endless Aisle alone (confirmed with Rona 08/12/26). An EA
+        // line therefore prints SLFLNT=42 regardless of what detailType says.
+        private bool IsItemEndlessAisle(TransactionItem item)
+        {
+            return item.Item?.AltIds?.Any(a =>
+                string.Equals(a.Type, "sodaType", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.Value, "ENDLESS_AISLE", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // The web order total on an Endless Aisle line, always positive. extendedPrice is the
+        // authoritative "web order total"; unitPrice is the fallback. originalUnitPrice is NOT
+        // usable — the sale capture carries 0.00 there while the real value sits in the other two.
+        private decimal GetEndlessAisleTotal(TransactionItem item)
+        {
+            if (decimal.TryParse(item.Pricing?.ExtendedPrice?.Value, out decimal ext) && ext != 0)
+                return Math.Abs(ext);
+            if (decimal.TryParse(item.Pricing?.UnitPrice?.Value, out decimal unit) && unit != 0)
+                return Math.Abs(unit);
+            return 0;
         }
 
         // SODA reference id from item.altIds[] entry with type="sodaRef".

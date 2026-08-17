@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.102 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.103 | RonaORAEPubSub | July 2026**
 
 ---
 
@@ -88,6 +88,39 @@ The legs are paired on `parentLineId` — the re-sale leg's `parentLineId` is th
 | VOID | **87** | Same as SLFTTP |
 | POST_VOID | **01** | Note: SLFTTP is 88, but SLFLNT is 01 |
 | Everything else | **01** | Default |
+
+---
+
+## SODA and Endless Aisle Override (Item-Level)
+
+Both are detected from `item.altIds` — an entry with `type = "sodaType"` whose `value` is either
+`SODA` or `ENDLESS_AISLE`. They are mutually exclusive, and only the matching item is affected;
+other items in the same transaction keep their normal mapping.
+
+| `sodaType` | SLFLNT | Notes |
+|------------|--------|-------|
+| `SODA` | **30** | `SLFRFD` = the raw `sodaRef`, padded to 16 |
+| `ENDLESS_AISLE` | **42** | See below |
+
+**Endless Aisle** (CR *RONA TSP Mapping Changes*, MIM-7509 / MIM-8070) presents an in-store web
+order as a single line carrying the web order total:
+
+| Field | Value |
+|-------|-------|
+| `SLFLNT` | `42` |
+| `SLFSKU` | `000000000` — forced; the refund payload sends `999999999` |
+| `SLFQTY` | `000000100` — always absolute quantity 1 |
+| `SLFORG` / `SLFSEL` / `SLFEXT` | The absolute web order total, from `extendedPrice` (falling back to `unitPrice`). **Not** `originalUnitPrice`, which the sale capture sends as `0.00` |
+| `SLFTX1`–`SLFTX4` | `N` — an EA line is untaxed |
+| `SLFRFD` | 5-digit `storeId` + rightmost 10 digits of `sodaRef`. That is 15 characters in a 16-char field, so it is right-padded with one space |
+
+`SLFTTP` follows the transaction as usual (`01` sale, `11` refund), and the refund direction —
+`SLFQTN`, `SLFEXN`, `SLFRSN`, `TNFTTP`, `TNFAMN` — needs no Endless-Aisle-specific handling; the
+standard return mapping already produces it.
+
+> The payload also carries `lineBusiness.detailType = "42"` on EA items. It is **deliberately
+> ignored**: keying off `sodaType` keeps detection identical in shape to every other flow, whereas
+> `detailType` was introduced for Endless Aisle alone (confirmed with Rona 08/12/26).
 
 ---
 

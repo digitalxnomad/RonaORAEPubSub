@@ -1,6 +1,6 @@
 # Open Questions for Rona
 
-**PubSubApp v1.0.102 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.103 | RonaORAEPubSub | July 2026**
 
 Decisions only Rona can make. Each entry states the evidence and what the answer would change, so
 it can be actioned without re-deriving any of it. Two kinds:
@@ -97,5 +97,5 @@ because it is less bad than discarding the transaction. No real capture has appr
 | Should multiple promo GC activations emit one `PP` per card? | No — one aggregate `PP` per transaction carrying the summed promo value, alongside one `PC` per card | v1.0.95 |
 | Cross-region `SLFACD`/`SLFTCD` on **tax** lines (flagged in the returns mapping document) | Bucket each tax by its own `jurisdiction.region` | v1.0.98 |
 | `SLFTX4` on a cross-region return — `N` or a literal blank? (*Tactill \| ACO \| ECO Fee*, receipts 2136 → 4839) | **`N`** — confirmed 07/31/26. `<BLANK>` in the ticket meant "not `Y`". No code change: unset charged-tax flags have always printed `N`, and the return already matched its original QC sale exactly. That ticket is fully satisfied by v1.0.101 | v1.0.101 (no change needed) |
-| Endless Aisle `SLFRFD` — 15-character value against a 16-character field (CR *RONA TSP Mapping Changes*, MIM-7509 / MIM-8070) | **15 digits + one trailing space**, i.e. `PadOrTruncate(storeId + rightmost-10 sodaRef, 16)`. Confirmed by Grace 08/12/26; the CR's length column was the error. Matches how the SODA branch already fills this field | pending implementation |
-| Endless Aisle line type — `altIds sodaType` or `lineBusiness.detailType`? | **`altIds` `sodaType == "ENDLESS_AISLE"`**, per the CR. Confirmed by Grace 08/12/26: keeps detection consistent with every other flow, and avoids depending on `detailType`, which was introduced for Endless Aisle only. `lineBusiness.detailType` is **deliberately ignored** — a `sodaType=ENDLESS_AISLE` line emits `SLFLNT=42` regardless of what `detailType` says | pending implementation |
+| Endless Aisle `SLFRFD` — 15-character value against a 16-character field (CR *RONA TSP Mapping Changes*, MIM-7509 / MIM-8070) | **15 digits + one trailing space**, i.e. `PadOrTruncate(storeId + rightmost-10 sodaRef, 16)`. Confirmed by Grace 08/12/26; the CR's length column was the error. Matches how the SODA branch already fills this field | v1.0.103 |
+| Endless Aisle line type — `altIds sodaType` or `lineBusiness.detailType`? | **`altIds` `sodaType == "ENDLESS_AISLE"`**, per the CR. Confirmed by Grace 08/12/26: keeps detection consistent with every other flow, and avoids depending on `detailType`, which was introduced for Endless Aisle only. `lineBusiness.detailType` is **deliberately ignored** — a `sodaType=ENDLESS_AISLE` line emits `SLFLNT=42` regardless of what `detailType` says | v1.0.103 |

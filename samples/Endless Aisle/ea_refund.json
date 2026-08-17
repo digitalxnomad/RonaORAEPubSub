@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "2.0.0",
+  "messageType": "RetailEvent",
+  "eventType": "ORIGINAL",
+  "eventId": "7494080471067065415",
+  "occurredAt": "2026-08-14T17:21:29Z",
+  "ingestedAt": "2026-08-14T17:21:32Z",
+  "businessContext": {
+    "businessDay": "2026-08-14",
+    "channel": "STORE",
+    "fulfillment": "CARRYOUT",
+    "store": {
+      "currency": "CAD",
+      "storeId": "55010",
+      "taxArea": "ON"
+    },
+    "workstation": {
+      "registerId": "85",
+      "sequenceNumber": 4979,
+      "type": "POS"
+    }
+  },
+  "eventCategory": "TRANSACTION",
+  "eventSubType": "transactionSale",
+  "transaction": {
+    "transactionType": "RETURN",
+    "subType": "RETURN_NO_RECEIPT",
+    "items": [
+      {
+        "attributes": {
+          "x-epp-coverage-identifier": "0"
+        },
+        "item": {
+          "altIds": [
+            {
+              "type": "sodaType",
+              "value": "ENDLESS_AISLE"
+            },
+            {
+              "type": "sodaRef",
+              "value": "005012225556668"
+            }
+          ],
+          "description": "SODA Item",
+          "sku": "999999999"
+        },
+        "lineId": "17867280275463635045",
+        "pricing": {
+          "extendedPrice": {
+            "currency": "CAD",
+            "value": "-500.00"
+          },
+          "originalUnitPrice": {
+            "currency": "CAD",
+            "value": "-500.00"
+          },
+          "priceVehicle": "REG:ORG",
+          "unitPrice": {
+            "currency": "CAD",
+            "value": "-500.00"
+          }
+        },
+        "quantity": {
+          "uom": "EA",
+          "value": -1
+        },
+        "return": {
+          "reason": "0206"
+        }
+      }
+    ],
+    "tenders": [
+      {
+        "amount": {
+          "currency": "CAD",
+          "value": "-500.00"
+        },
+        "card": {
+          "responseCode": "SETTLE"
+        },
+        "method": "CASH",
+        "tenderId": "CA"
+      }
+    ],
+    "totals": {
+      "cashRounding": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "changeDue": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "discounts": {
+        "currency": "CAD",
+        "value": "0.00"
+      },
+      "gross": {
+        "currency": "CAD",
+        "value": "-500.00"
+      },
+      "net": {
+        "currency": "CAD",
+        "value": "-500.00"
+      },
+      "tax": {
+        "currency": "CAD",
+        "value": "0.00"
+      }
+    }
+  },
+  "promotions": [],
+  "actor": {
+    "cashier": {
+      "loginId": "2"
+    },
+    "customer": {
+      "customerIdToken": ""
+    }
+  }
+}

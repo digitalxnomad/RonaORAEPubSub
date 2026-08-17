@@ -382,7 +382,16 @@ Log entries include:
 
 ## Version History
 
-### v1.0.102 (07/31/26) ✨ Current
+### v1.0.103 (08/12/26) ✨ Current
+**Endless Aisle in-store payment and refund (`SLFLNT = 42`):**
+- ✨ **New `ENDLESS_AISLE` line type** - An in-store Endless Aisle payment or refund now presents as a single line `42` carrying the web order total, so MMS/SODA see an EA order rather than merchandise. Detected from `item.altIds` `type="sodaType"`, `value="ENDLESS_AISLE"` — a sibling of the existing `SODA`→`30` branch, mutually exclusive with it.
+- ✨ **Field mapping** - `SLFSKU=000000000` (forced; the refund payload sends `999999999`), `SLFQTY=000000100`, `SLFTX1–4=N`, and `SLFORG`/`SLFSEL`/`SLFEXT` all carrying the absolute web order total from `extendedPrice`. `originalUnitPrice` is unusable here — the sale capture sends `0.00` in it while the real value sits in the other two fields.
+- ✨ **`SLFRFD`** - 5-digit `storeId` + rightmost 10 digits of `sodaRef`, right-padded with one space to fill the 16-character field. The CR specified a 15-character value against a 16-character field; confirmed with Rona that the length column was the error, not the formula. Left as specified it would have failed `RecordSetValidator` and the subscriber would have ACKed and dropped the transaction.
+- ℹ️ **The refund direction needed no new code** - `SLFTTP=11`, `SLFQTN`/`SLFEXN` `-`, `SLFRSN=RRT0`+reason, `TNFTTP=11` and `TNFAMN="-"` are all produced by the existing return mapping. Only `SLFLNT` and `SLFSKU` differed.
+- ℹ️ **`lineBusiness.detailType` is deliberately ignored** - EA payloads also carry the line type there, but detection keys off `sodaType` to stay consistent with every other flow and avoid depending on a field introduced for Endless Aisle alone.
+- ✨ Both real captures added as regression cases under `samples/Endless Aisle/`; all 33 pre-existing baselines unchanged.
+
+### v1.0.102 (07/31/26)
 **Clear `SLFSLN` and `SLFQTN` on return output:**
 - 🔧 **Tax lines no longer sign `SLFQTN`** - Every `X*` tax line on a `RETURN` printed `SLFQTN="-"`. A tax line has no quantity to sign — `SLFQTY` is the constant `000000100` — so the direction belongs on `SLFEXN` alone. Now blank, which is what `SALE` and `ADJUSTMENT` tax lines already did; this brings `RETURN` into line with them rather than introducing a new rule.
 - 🔧 **`SLFSLN` blank on return SKU lines** - The field is computed from the payload's `unitPrice` sign, and ORAE's conventions differ between captures: the no-receipt return sends a **negative** `unitPrice` where the with-receipt one sends positive. So the `-` leaked into `SLFSLN` on some returns and not others. Now pinned blank on every return line, matching the tax-line rule from v1.0.96.
