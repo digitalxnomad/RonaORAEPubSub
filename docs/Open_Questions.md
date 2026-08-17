@@ -86,51 +86,7 @@ because it is less bad than discarding the transaction. No real capture has appr
 
 # Part B — Blocking unstarted work
 
----
-
-## 3. Endless Aisle: `SLFRFD` is specified one character short 🔴
-
-**Raised by:** CR *RONA TSP Mapping Changes* — Endless Aisle (MIM-7509 / MIM-8070)
-
-The CR defines `SLFRFD` on an EA line as **storeId (5) + rightmost 10 digits of `sodaRef`**, and
-its own table gives the field length as **16**. Those disagree — the value is 15:
-
-| Input (from the supplied `Returns Aug 14` capture) | Value |
-|---|---|
-| `businessContext.store.storeId` | `55010` (5) |
-| `altIds` `sodaRef` | `005012225556668` (15) → rightmost 10 = `2225556668` |
-| Concatenated `SLFRFD` | `550102225556668` — **15 characters** |
-
-`OrderRecord.ReferenceDesc` is `[StringLength(16, MinimumLength = 16)]`. A 15-character value
-**fails `RecordSetValidator`**, and the production subscriber logs the error then returns
-`Reply.Ack` — the message is acknowledged and never published, so **the whole transaction is
-lost rather than retried**.
-
-**The question:** is the 16th character a trailing space, or is a digit missing from the formula
-(6-digit store? 11 digits of `sodaRef`)?
-
-The existing SODA branch pads to 16 with a trailing space (`PadOrTruncate(sodaRefId, 16)`), which
-is almost certainly the intent — but padding a financial reference field is not something to
-assume. **Not implemented pending this answer.**
-
----
-
-## 4. Endless Aisle: two competing sources for the line type
-
-**Raised by:** review of the supplied EA captures
-
-The CR specifies EA detection via `item.altIds` entry `type="sodaType"`, `value="ENDLESS_AISLE"`
-→ `SLFLNT = 42`. But both supplied captures *also* carry the line type directly on the item:
-
-```json
-"lineBusiness": { "detailType": "42" }
-```
-
-The CR never mentions `lineBusiness.detailType`. Implementing to the CR means keying off
-`sodaType` and ignoring a field that states the answer outright.
-
-**The question:** which source is authoritative, and what should happen if they ever disagree —
-for example a `sodaType=ENDLESS_AISLE` item whose `detailType` is not `42`?
+*(none open — the Endless Aisle blockers were answered 08/12/26; see Resolved)*
 
 ---
 
@@ -141,3 +97,5 @@ for example a `sodaType=ENDLESS_AISLE` item whose `detailType` is not `42`?
 | Should multiple promo GC activations emit one `PP` per card? | No — one aggregate `PP` per transaction carrying the summed promo value, alongside one `PC` per card | v1.0.95 |
 | Cross-region `SLFACD`/`SLFTCD` on **tax** lines (flagged in the returns mapping document) | Bucket each tax by its own `jurisdiction.region` | v1.0.98 |
 | `SLFTX4` on a cross-region return — `N` or a literal blank? (*Tactill \| ACO \| ECO Fee*, receipts 2136 → 4839) | **`N`** — confirmed 07/31/26. `<BLANK>` in the ticket meant "not `Y`". No code change: unset charged-tax flags have always printed `N`, and the return already matched its original QC sale exactly. That ticket is fully satisfied by v1.0.101 | v1.0.101 (no change needed) |
+| Endless Aisle `SLFRFD` — 15-character value against a 16-character field (CR *RONA TSP Mapping Changes*, MIM-7509 / MIM-8070) | **15 digits + one trailing space**, i.e. `PadOrTruncate(storeId + rightmost-10 sodaRef, 16)`. Confirmed by Grace 08/12/26; the CR's length column was the error. Matches how the SODA branch already fills this field | pending implementation |
+| Endless Aisle line type — `altIds sodaType` or `lineBusiness.detailType`? | **`altIds` `sodaType == "ENDLESS_AISLE"`**, per the CR. Confirmed by Grace 08/12/26: keeps detection consistent with every other flow, and avoids depending on `detailType`, which was introduced for Endless Aisle only. `lineBusiness.detailType` is **deliberately ignored** — a `sodaType=ENDLESS_AISLE` line emits `SLFLNT=42` regardless of what `detailType` says | pending implementation |
