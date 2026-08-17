@@ -2,12 +2,20 @@
 
 **PubSubApp v1.0.102 | RonaORAEPubSub | July 2026**
 
-Behaviour that is **shipped and test-covered**, but where the *specification* is ambiguous or the
-source data is inconsistent. Each entry states what TTree does today, why, and what a decision
-would change. None of these is a known defect — they are places where the current behaviour is a
-judgement call that only Rona can confirm.
+Decisions only Rona can make. Each entry states the evidence and what the answer would change, so
+it can be actioned without re-deriving any of it. Two kinds:
 
-When one is resolved, change the code, regenerate the affected baseline, and delete the entry.
+- **Part A — shipped behaviour, ambiguous spec.** Already live and test-covered; the current
+  behaviour is a judgement call. None of these is a known defect.
+- **Part B — blocking unstarted work.** A specification conflict that must be settled *before*
+  the work can be built correctly.
+
+When one is resolved, change the code, regenerate the affected baseline, and move the entry to
+**Resolved** with the answer recorded.
+
+---
+
+# Part A — Shipped behaviour, ambiguous spec
 
 ---
 
@@ -73,6 +81,56 @@ but the emitted `TNFAUT` is deliberately wrong.
 
 **The question:** what *should* a ≥ $9,999.99 activation put in `TNFAUT`? Clamping was chosen only
 because it is less bad than discarding the transaction. No real capture has approached the limit.
+
+---
+
+# Part B — Blocking unstarted work
+
+---
+
+## 3. Endless Aisle: `SLFRFD` is specified one character short 🔴
+
+**Raised by:** CR *RONA TSP Mapping Changes* — Endless Aisle (MIM-7509 / MIM-8070)
+
+The CR defines `SLFRFD` on an EA line as **storeId (5) + rightmost 10 digits of `sodaRef`**, and
+its own table gives the field length as **16**. Those disagree — the value is 15:
+
+| Input (from the supplied `Returns Aug 14` capture) | Value |
+|---|---|
+| `businessContext.store.storeId` | `55010` (5) |
+| `altIds` `sodaRef` | `005012225556668` (15) → rightmost 10 = `2225556668` |
+| Concatenated `SLFRFD` | `550102225556668` — **15 characters** |
+
+`OrderRecord.ReferenceDesc` is `[StringLength(16, MinimumLength = 16)]`. A 15-character value
+**fails `RecordSetValidator`**, and the production subscriber logs the error then returns
+`Reply.Ack` — the message is acknowledged and never published, so **the whole transaction is
+lost rather than retried**.
+
+**The question:** is the 16th character a trailing space, or is a digit missing from the formula
+(6-digit store? 11 digits of `sodaRef`)?
+
+The existing SODA branch pads to 16 with a trailing space (`PadOrTruncate(sodaRefId, 16)`), which
+is almost certainly the intent — but padding a financial reference field is not something to
+assume. **Not implemented pending this answer.**
+
+---
+
+## 4. Endless Aisle: two competing sources for the line type
+
+**Raised by:** review of the supplied EA captures
+
+The CR specifies EA detection via `item.altIds` entry `type="sodaType"`, `value="ENDLESS_AISLE"`
+→ `SLFLNT = 42`. But both supplied captures *also* carry the line type directly on the item:
+
+```json
+"lineBusiness": { "detailType": "42" }
+```
+
+The CR never mentions `lineBusiness.detailType`. Implementing to the CR means keying off
+`sodaType` and ignoring a field that states the answer outright.
+
+**The question:** which source is authoritative, and what should happen if they ever disagree —
+for example a `sodaType=ENDLESS_AISLE` item whose `detailType` is not `42`?
 
 ---
 
