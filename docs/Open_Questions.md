@@ -1,6 +1,6 @@
 # Open Questions for Rona
 
-**PubSubApp v1.0.103 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.104 | RonaORAEPubSub | July 2026**
 
 Decisions only Rona can make. Each entry states the evidence and what the answer would change, so
 it can be actioned without re-deriving any of it. Two kinds:

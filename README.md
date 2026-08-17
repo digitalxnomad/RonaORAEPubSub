@@ -382,7 +382,12 @@ Log entries include:
 
 ## Version History
 
-### v1.0.103 (08/12/26) ✨ Current
+### v1.0.104 (08/12/26) ✨ Current
+**Version marker — no mapping changes.**
+- ℹ️ **No behaviour change.** Output is byte-for-byte identical to v1.0.103 for every sample; all 141 regression tests pass unchanged. This bump marks a build, it does not carry a fix.
+- 📄 Version strings aligned across `PubSubApp.csproj` and every `docs/` header stamp.
+
+### v1.0.103 (08/12/26)
 **Endless Aisle in-store payment and refund (`SLFLNT = 42`):**
 - ✨ **New `ENDLESS_AISLE` line type** - An in-store Endless Aisle payment or refund now presents as a single line `42` carrying the web order total, so MMS/SODA see an EA order rather than merchandise. Detected from `item.altIds` `type="sodaType"`, `value="ENDLESS_AISLE"` — a sibling of the existing `SODA`→`30` branch, mutually exclusive with it.
 - ✨ **Field mapping** - `SLFSKU=000000000` (forced; the refund payload sends `999999999`), `SLFQTY=000000100`, `SLFTX1–4=N`, and `SLFORG`/`SLFSEL`/`SLFEXT` all carrying the absolute web order total from `extendedPrice`. `originalUnitPrice` is unusable here — the sale capture sends `0.00` in it while the real value sits in the other two fields.
