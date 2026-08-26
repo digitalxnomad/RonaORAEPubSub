@@ -382,7 +382,14 @@ Log entries include:
 
 ## Version History
 
-### v1.0.104 (08/12/26) ✨ Current
+### v1.0.105 (08/18/26) ✨ Current
+**Endless Aisle orders are always `REG:ORG`:**
+- 🔧 **Price vehicle forced** - An Endless Aisle line now prints `SLFPVC=REG` / `SLFREF=ORG` regardless of what OREA sends. The Aug 11 sale capture carries `priceVehicle: "OVD:OVR"` with a price override, which previously produced `SLFPVC=OVD` / `SLFREF=OVR`.
+- 🔧 **Dependent fields follow** - Everything keyed off the price vehicle now derives from the forced value rather than the payload: `SLFRSN` no longer picks up `POV0`+override reason (the sale printed `POV01406`; now blank), `SLFADP` zeroes under the existing "zeros when PVCode is REG" rule, and `SLFADC`/`SLFOVR` are pinned to `0000`/zeros since the line is a regular-price sale.
+- ℹ️ **Refund `SLFRSN` is unaffected** - `RRT0`+reason still prints on an EA refund; the reason chain tests `transactionType == RETURN` before it reaches the price-vehicle branch, so only the sale's override reason was removed.
+- ℹ️ Implemented as a single `effectivePriceVehicle` value that every dependent rule reads, rather than patching each field — reading the raw payload in those places is what let an `OVD:OVR` EA sale keep a reason the line no longer represents. Only the `ea_sale` baseline moved; no non-EA sample changed.
+
+### v1.0.104 (08/12/26)
 **Version marker — no mapping changes.**
 - ℹ️ **No behaviour change.** Output is byte-for-byte identical to v1.0.103 for every sample; all 141 regression tests pass unchanged. This bump marks a build, it does not carry a fix.
 - 📄 Version strings aligned across `PubSubApp.csproj` and every `docs/` header stamp.

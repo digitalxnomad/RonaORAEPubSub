@@ -124,6 +124,15 @@ class RetailEventMapper
                 // both read altIds sodaType, which is either "SODA" or "ENDLESS_AISLE".
                 bool isSodaItem = IsItemSoda(item);
                 bool isEndlessAisleItem = IsItemEndlessAisle(item);
+
+                // An Endless Aisle order is always a regular-price sale: the price vehicle is forced
+                // to REG:ORG and whatever OREA passes is ignored. Everything keyed off the price
+                // vehicle follows from this one value -- SLFPVC/SLFREF, the SLFADP zeroing rule, and
+                // the POV0/IDS0 reason codes. Reading the raw payload in those places instead would
+                // let an OVD:OVR EA sale keep an override reason the line no longer represents.
+                string effectivePriceVehicle = isEndlessAisleItem
+                    ? "REG:ORG"
+                    : (item.Pricing?.PriceVehicle ?? "");
                 bool isSodaDeposit = isSodaItem && IsItemSodaDeposit(item);
                 string sodaRefId = isSodaItem ? (GetItemSodaRefId(item) ?? "") : "";
 
@@ -281,9 +290,9 @@ class RetailEventMapper
 
                 // Price Vehicle Code (SLFPVC) and Reference (SLFREF) - parse from pricing.priceVehicle
                 // Format: "LEFT:RIGHT" where LEFT goes to SLFPVC (4 chars) and RIGHT goes to SLFREF (12 chars)
-                if (!string.IsNullOrEmpty(item.Pricing?.PriceVehicle))
+                if (!string.IsNullOrEmpty(effectivePriceVehicle))
                 {
-                    string[] parts = item.Pricing.PriceVehicle.Split(':');
+                    string[] parts = effectivePriceVehicle.Split(':');
                     if (parts.Length == 2)
                     {
                         orderRecord.PriceVehicleCode = PadOrTruncate(parts[0], 4); // Left side to SLFPVC
@@ -292,7 +301,7 @@ class RetailEventMapper
                     else
                     {
                         // If format is incorrect, pad the whole value to SLFPVC
-                        orderRecord.PriceVehicleCode = PadOrTruncate(item.Pricing.PriceVehicle, 4);
+                        orderRecord.PriceVehicleCode = PadOrTruncate(effectivePriceVehicle, 4);
                         orderRecord.PriceVehicleReference = PadOrTruncate("", 12);
                     }
                 }
@@ -386,7 +395,7 @@ class RetailEventMapper
                 // RRT0 = Return, POV0 = Price Override (OVD:OVR), IDS0 = Manual Discount, VOD0 = Post Voided
                 string reasonCode = "                "; // 16 blank spaces default
                 string transType = retailEvent.Transaction?.TransactionType ?? "";
-                string priceVehicle = item.Pricing?.PriceVehicle ?? "";
+                string priceVehicle = effectivePriceVehicle;
                 string pvCodeForRsn = orderRecord.PriceVehicleCode?.Trim() ?? "";
                 string overrideReason = item.Pricing?.PriceOverride?.Reason ?? "";
 
@@ -501,6 +510,13 @@ class RetailEventMapper
                     orderRecord.SellPriceNegativeSign = "";
                     orderRecord.ExtendedValue = FormatCurrency(eaTotal.ToString("F2"), 11);
                     orderRecord.ExtendedValueNegativeSign = "";
+
+                    // Forced REG:ORG means the line is a regular-price sale, so the override
+                    // price and the ad code that flagged it go with it. SLFADP is already zeroed
+                    // by the "PVCode is REG" rule above.
+                    orderRecord.AdCode = "0000";                      // SLFADC - regular price
+                    orderRecord.OverridePrice = "000000000";          // SLFOVR
+                    orderRecord.OverridePriceNegativeSign = "";
 
                     orderRecord.ChargedTax1 = "N";                    // SLFTX1-4 - EA line is untaxed
                     orderRecord.ChargedTax2 = "N";

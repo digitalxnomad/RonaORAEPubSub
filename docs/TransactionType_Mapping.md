@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.104 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.105 | RonaORAEPubSub | July 2026**
 
 ---
 
@@ -113,6 +113,8 @@ order as a single line carrying the web order total:
 | `SLFORG` / `SLFSEL` / `SLFEXT` | The absolute web order total, from `extendedPrice` (falling back to `unitPrice`). **Not** `originalUnitPrice`, which the sale capture sends as `0.00` |
 | `SLFTX1`–`SLFTX4` | `N` — an EA line is untaxed |
 | `SLFRFD` | 5-digit `storeId` + rightmost 10 digits of `sodaRef`. That is 15 characters in a 16-char field, so it is right-padded with one space |
+| `SLFPVC` / `SLFREF` | Forced `REG` / `ORG` — an EA order is always a regular-price sale, so whatever `priceVehicle` OREA sends is ignored |
+| `SLFADC` / `SLFADP` / `SLFOVR` | `0000` / 9 zeros / 9 zeros — all consequences of the forced `REG:ORG` |
 
 `SLFTTP` follows the transaction as usual (`01` sale, `11` refund), and the refund direction —
 `SLFQTN`, `SLFEXN`, `SLFRSN`, `TNFTTP`, `TNFAMN` — needs no Endless-Aisle-specific handling; the
