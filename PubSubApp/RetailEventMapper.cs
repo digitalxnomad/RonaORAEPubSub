@@ -502,10 +502,12 @@ class RetailEventMapper
                                                                       // refund payload sends 999999999
                     orderRecord.Quantity = "000000100";               // SLFQTY - always absolute qty 1
 
-                    // SLFORG / SLFSEL / SLFEXT all carry the same absolute web order total. The
-                    // signs stay blank here; on a refund the return block below pins SLFEXN to "-".
+                    // SLFORG / SLFORT / SLFSEL / SLFEXT all carry the same absolute web order total.
+                    // The signs stay blank here; on a refund the return block below pins SLFEXN to "-".
                     orderRecord.OriginalPrice = FormatCurrency(eaTotal.ToString("F2"), 9);
                     orderRecord.OriginalPriceNegativeSign = "";
+                    orderRecord.OriginalRetail = FormatCurrency(eaTotal.ToString("F2"), 9);   // SLFORT tracks SLFORG
+                    orderRecord.OriginalRetailNegativeSign = "";
                     orderRecord.ItemSellPrice = FormatCurrency(eaTotal.ToString("F2"), 9);
                     orderRecord.SellPriceNegativeSign = "";
                     orderRecord.ExtendedValue = FormatCurrency(eaTotal.ToString("F2"), 11);

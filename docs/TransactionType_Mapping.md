@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.106 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.107 | RonaORAEPubSub | July 2026**
 
 ---
 
@@ -110,7 +110,7 @@ order as a single line carrying the web order total:
 | `SLFLNT` | `42` |
 | `SLFSKU` | `000000000` — forced; the refund payload sends `999999999` |
 | `SLFQTY` | `000000100` — always absolute quantity 1 |
-| `SLFORG` / `SLFSEL` / `SLFEXT` | The absolute web order total, from `extendedPrice` (falling back to `unitPrice`). **Not** `originalUnitPrice`, which the sale capture sends as `0.00` |
+| `SLFORG` / `SLFORT` / `SLFSEL` / `SLFEXT` | The absolute web order total, from `extendedPrice` (falling back to `unitPrice`). **Not** `originalUnitPrice`, which the sale capture sends as `0.00` |
 | `SLFTX1`–`SLFTX4` | `N` — an EA line is untaxed |
 | `SLFRFD` | 5-digit `storeId` + rightmost 10 digits of `sodaRef`. That is 15 characters in a 16-char field, so it is right-padded with one space |
 | `SLFPVC` / `SLFREF` | Forced `REG` / `ORG` — an EA order is always a regular-price sale, so whatever `priceVehicle` OREA sends is ignored |
