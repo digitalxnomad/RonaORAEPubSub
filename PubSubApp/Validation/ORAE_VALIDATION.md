@@ -109,6 +109,8 @@ degrades the output rather than rejecting the message.
 | `transaction.items[n].return.reason` | `SLFRSN` — `RRT0`+reason on returns, `POV0`+reason on adjustments. Truncated to the 16-char field |
 | `transaction.items[n].parentLineId` | Two meanings: the covered SKU's line on an EPP coverage item, **and** the paired return leg on an `ADJUSTMENT` re-sale leg |
 | `references.originalEvent` | `storeId` / `businessDay` / `registerId` / `sequenceNumber` → the original-transaction fields on a with-receipt return |
+| `transaction.items[n].item.altIds` | Line-type detection. An entry with `type="sodaType"` selects the override branch by its `value`: `SODA` → `SLFLNT=30`, `ENDLESS_AISLE` → `SLFLNT=42`. An entry with `type="sodaRef"` supplies `SLFRFD` (raw on SODA; store + rightmost-10 on Endless Aisle) |
+| `transaction.items[n].lineBusiness.detailType` | **Read by nothing.** Endless Aisle payloads carry `"42"` here, but detection keys off `altIds sodaType` instead — see [Open_Questions.md](../../docs/Open_Questions.md) Resolved |
 
 #### 4.2 transaction.totals (Required Object)
 
