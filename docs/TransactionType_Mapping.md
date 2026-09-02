@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.107 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.108 | RonaORAEPubSub | July 2026**
 
 ---
 

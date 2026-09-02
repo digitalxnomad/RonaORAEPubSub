@@ -382,7 +382,12 @@ Log entries include:
 
 ## Version History
 
-### v1.0.107 (08/26/26) ✨ Current
+### v1.0.108 (08/26/26) ✨ Current
+**Version marker — no mapping changes.**
+- ℹ️ **No behaviour change.** Output is byte-for-byte identical to v1.0.107 for every sample; all 141 regression tests pass unchanged. This bump marks a build, it does not carry a fix.
+- 📄 Version strings aligned across `PubSubApp.csproj` and every `docs/` header stamp.
+
+### v1.0.107 (08/26/26)
 **`SLFORT` on Endless Aisle sale lines:**
 - 🔧 **`SLFORT` now carries the web order total on an EA sale** - It printed `000000000`. The field normally mirrors `SLFORG` from `originalUnitPrice`, and the EA sale capture sends `0.00` there — the same reason `SLFORG` itself needed overriding in v1.0.103. The EA block set `SLFORG`/`SLFSEL`/`SLFEXT` but not `SLFORT`; it now sets all four to the same absolute total.
 - ℹ️ **EA refunds were already correct by coincidence** - That capture sends `originalUnitPrice: -500.00`, so `SLFORT` happened to land on the right value. It is now set explicitly rather than inherited, and its baseline is byte-for-byte unchanged.
