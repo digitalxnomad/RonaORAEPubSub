@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.108 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.109 | RonaORAEPubSub | July 2026**
 
 ---
 
@@ -263,9 +263,56 @@ Unset flags print `N`, never blank. Notes:
 - **A zero tax amount is skipped; a negative one is not.** Return taxes are negative but *were*
   charged on the original sale, so they must still set their flag.
 - **`taxExempt = true` entries are skipped** entirely.
-- **First Nation partial exemption** overrides `SLFTX3` to `"O"` when
-  `transaction.qualifiers.isTaxExemptTransaction` is set and a tax entry carries `status="A"`.
-  Applied after the loop, so it wins over the jurisdiction routing.
+- **A manually exempted tax is marked with a letter on its own flag.** A tax carrying
+  `status="A"` was waived at the register. It arrives zeroed, so the loop above leaves its flag at
+  `N` — indistinguishable from a tax that never applied. The flag is therefore overwritten after
+  the loop, using the waived tax's own `jurisdiction.region` to pick it (`FED` → `SLFTX2`,
+  `PQ`/`BC`/`MB`/`SK` → `SLFTX1`):
+
+  | `taxExemption.program` | Marker |
+  |------------------------|--------|
+  | `FIRST_NATION`, `FIRST_NATION_PARTIAL` | `"O"` |
+  | anything else (`PST_ONLY`, `PROVINCIAL_GOVERNMENT`, …) | `"E"` |
+
+  Only a SKU with a waived tax is marked, so untaxed items on an exempt cart stay `N`. A waived tax
+  in an unrecognised bucket is left alone rather than guessed at.
+
+  | Capture | Programme | Waived | Result |
+  |---------|-----------|--------|--------|
+  | QC 2227 | `FIRST_NATION_PARTIAL` | QST | `SLFTX1="O"`, `SLFTX2="Y"` |
+  | BC 0234 | `PST_ONLY` | PST | `SLFTX1="E"`, `SLFTX2="Y"` |
+  | BC 0240 (mask) | `PST_ONLY` | PST | `SLFTX1="E"`, `SLFTX2="N"` |
+  | AB 344 | `PROVINCIAL_GOVERNMENT` | GST | `SLFTX1="N"`, `SLFTX2="E"` |
+  | BC *(synthetic)* | `FIRST_NATION` | GST + PST | `SLFTX1="O"`, `SLFTX2="O"` |
+
+- **The marker scheme applies to QC, BC, AB, MB and SK only.** Everywhere else — Ontario, the
+  Atlantic HST provinces, and any unrecognised `taxArea` — keeps `SLFTX3 = "O"`. Ontario shipped
+  first (MIM-10106) and records the exemption in `SLFTX3` whichever tax was waived; that output is
+  in production, so it is left exactly as it was, and the live 07/13 capture is committed as a
+  baseline so the two schemes cannot drift into each other. A province with no rule of its own
+  keeps `SLFTX3` for the same reason it is safer: the marker switch covers only the `FED` and
+  provincial-PST buckets, so an Atlantic HST exemption routed through it would set no flag at all
+  and the exemption would vanish.
+
+  ⚠️ MB and SK have no capture and are not named in MIM-10984. They are included on the grounds
+  that they are structurally identical to BC — an inference, not a requirement. See
+  [Open_Questions.md](Open_Questions.md).
+
+- **`SLFTE1`/`SLFTE2`/`SLFTEN` are sourced per province**, independently of the flags, on every
+  merchandise SKU line of an exempt transaction. A field with no role in a province is blanked
+  rather than filled from a source that happens to be present:
+
+  | Province | `SLFTE1` | `SLFTE2` | `SLFTEN` |
+  |----------|----------|----------|----------|
+  | ON | `taxExemption.certificateId` | `x-tax-exemption-band` | `x-tax-exemption-customerName` |
+  | QC, BC | `taxExemption.certificateId` | *(blank)* | *(blank)* |
+  | AB | *(blank)* | `x-tax-exemption-band` | *(blank)* |
+
+- **A return of an exempt sale carries no exemption at all.** The return payload repeats neither
+  `qualifiers.isTaxExemptTransaction` nor `taxExemption`, and its tax array contains only the taxes
+  actually charged. `SLFTX1-4` therefore print `Y`/`N` as on any return and the three `SLFTE` fields
+  are blank, while the surviving flags still match the original sale.
+
 - **Tax lines themselves always carry `SLFTX1-4 = N`** — the flags describe the SKU.
 
 ---

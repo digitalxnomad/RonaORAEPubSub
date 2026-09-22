@@ -1,0 +1,217 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventId": "7482490850416501473",
+	"occurredAt": "2026-07-13T17:48:01Z",
+	"ingestedAt": "2026-07-13T17:48:03Z",
+	"businessContext": {
+		"businessDay": "2026-07-13",
+		"channel": "STORE",
+		"fulfillment": "CARRYOUT",
+		"store": {
+			"currency": "CAD",
+			"storeId": "55010",
+			"taxArea": "ON"
+		},
+		"workstation": {
+			"registerId": "85",
+			"sequenceNumber": 4444,
+			"type": "POS"
+		}
+	},
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionSale",
+	"transaction": {
+		"transactionType": "SALE",
+		"items": [
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "PAINT MILK OCEAN BLUE 946ML",
+					"sku": "000443945"
+				},
+				"lineId": "17839648368517984292",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "74.99"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "74.99"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "74.99"
+					}
+				},
+				"quantity": {
+					"uom": "EA",
+					"value": 1
+				},
+				"taxes": [
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "3.75"
+						},
+						"jurisdiction": {
+							"region": "HON1"
+						},
+						"ratePercent": "5",
+						"taxCode": "HST"
+					},
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "0.00"
+						},
+						"jurisdiction": {
+							"region": "HON"
+						},
+						"ratePercent": "13",
+						"status": "A",
+						"taxCode": "HST"
+					}
+				]
+			},
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "WATER SPRING NATU.500MLX24PK",
+					"sku": "000500955"
+				},
+				"lineId": "17839648701617430861",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "4.99"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "4.99"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "4.99"
+					}
+				},
+				"quantity": {
+					"uom": "PK",
+					"value": 1
+				}
+			},
+			{
+				"attributes": {
+					"x-epp-coverage-identifier": "0"
+				},
+				"item": {
+					"description": "MASK DUST OV/N95",
+					"sku": "000147451"
+				},
+				"lineId": "1783964859808719890005",
+				"pricing": {
+					"extendedPrice": {
+						"currency": "CAD",
+						"value": "13.59"
+					},
+					"originalUnitPrice": {
+						"currency": "CAD",
+						"value": "13.59"
+					},
+					"priceVehicle": "REG:ORG",
+					"unitPrice": {
+						"currency": "CAD",
+						"value": "13.59"
+					}
+				},
+				"quantity": {
+					"uom": "EA",
+					"value": 1
+				},
+				"taxes": [
+					{
+						"amount": {
+							"currency": "CAD",
+							"value": "0.68"
+						},
+						"jurisdiction": {
+							"region": "HON1"
+						},
+						"ratePercent": "5",
+						"taxCode": "HST"
+					}
+				]
+			}
+		],
+		"tenders": [
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "100.00"
+				},
+				"card": {
+					"responseCode": "SETTLE"
+				},
+				"method": "CASH",
+				"tenderId": "CA"
+			}
+		],
+		"totals": {
+			"cashRounding": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"changeDue": {
+				"currency": "CAD",
+				"value": "2.00"
+			},
+			"discounts": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"gross": {
+				"currency": "CAD",
+				"value": "93.57"
+			},
+			"net": {
+				"currency": "CAD",
+				"value": "98.00"
+			},
+			"tax": {
+				"currency": "CAD",
+				"value": "4.43"
+			}
+		},
+		"qualifiers": {
+			"isTaxExemptTransaction": true
+		},
+		"taxExemption": {
+			"certificateId": "1334433434",
+			"reason": "HST ONTARIO",
+			"authority": "HON",
+			"program": "FIRST_NATION_PARTIAL"
+		}
+	},
+	"promotions": [],
+	"extensions": {
+		"x-tax-exemption-band": "334",
+		"x-tax-exemption-customerName": "test",
+		"x-tax-exemption-level": "T"
+	},
+	"actor": {
+		"cashier": {
+			"loginId": "2"
+		},
+		"customer": {
+			"customerIdToken": ""
+		}
+	}
+}

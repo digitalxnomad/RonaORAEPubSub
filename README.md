@@ -172,8 +172,9 @@ still report Quebec's taxes as Quebec's.
 | `HNB`, `HNF`, `HNS`, `HPE` | `SLFTX1=Y`, `SLFTX2=Y` | Atlantic HST (harmonized) |
 
 A tax carrying no recognised region falls back to the store province's historical heuristics
-(rate split in Ontario, tax-type switch elsewhere). A First Nation partial exemption overrides
-`SLFTX3` to `"O"` — see the v1.0.90 entry.
+(rate split in Ontario, tax-type switch elsewhere). A manually exempted tax marks its own flag —
+`"O"` for a First Nation programme, `"E"` otherwise — except in Ontario, which records it on
+`SLFTX3`. See the v1.0.109 and v1.0.90 entries.
 
 **Tax line items** carry `SLFTX1-4 = N`; the flags describe the SKU, not the tax record.
 
@@ -382,7 +383,29 @@ Log entries include:
 
 ## Version History
 
-### v1.0.108 (08/26/26) ✨ Current
+### v1.0.109 (09/22/26) ✨ Current
+**Tax exemptions outside Ontario now mark the waived tax, not `SLFTX3` (MIM-10984).**
+- ✨ **`SLFTX1`/`SLFTX2` carry the exemption marker in QC, AB and BC** - A tax flagged `status="A"` was waived at the register. It arrives zeroed, so the charged-tax loop left its flag at `N` and MMS could not tell a waived tax from one that never applied. The flag belonging to that tax is now overwritten with a letter instead:
+  - **`"O"`** when `transaction.taxExemption.program` is `FIRST_NATION` or `FIRST_NATION_PARTIAL`
+  - **`"E"`** for any other programme (`PST_ONLY`, `PROVINCIAL_GOVERNMENT`, …)
+  - The flag is chosen from the waived tax's own `jurisdiction.region` — `FED` → `SLFTX2`, `PQ`/`BC`/`MB`/`SK` → `SLFTX1`. A SKU with no waived tax keeps `N`, so untaxed items on an exempt cart are unaffected.
+- 🔧 **`SLFTX3` no longer prints `"O"` in QC, AB, BC, MB or SK** - The v1.0.90 rule was province-agnostic and set `SLFTX3="O"` everywhere. QC/AB/BC now print `SLFTX3="N"` and `SLFTX4="N"` in every case, as do MB and SK (see below). Ontario, the Atlantic HST provinces and any unrecognised `taxArea` are unchanged — the marker switch covers only the `FED` and provincial-PST buckets, so routing an Atlantic exemption through it would set no flag at all.
+  - ⚠️ **MB and SK are an inference.** They are not named in MIM-10984 and have no capture; they follow BC because they are structurally identical to it. Recorded in [docs/Open_Questions.md](docs/Open_Questions.md).
+  - ⚠️ **Ontario is deliberately untouched.** MIM-10106 is in production and encodes the same fact in `SLFTX3` regardless of which tax was waived. The live 07/13 capture still emits `SLFTX3="O"`, `SLFTX4="Y"` — it is now a committed baseline (`on_exempt_first_nation_partial`), so the two schemes cannot drift into each other.
+- ✨ **`SLFTE1`/`SLFTE2`/`SLFTEN` are sourced per province** - Previously all three were filled from whatever the payload carried. A field with no role in a province is now blanked rather than populated opportunistically:
+
+  | Province | `SLFTE1` | `SLFTE2` | `SLFTEN` |
+  |----------|----------|----------|----------|
+  | ON | `taxExemption.certificateId` | `x-tax-exemption-band` | `x-tax-exemption-customerName` |
+  | QC, BC | `taxExemption.certificateId` | *(blank)* | *(blank)* |
+  | AB | *(blank)* | `x-tax-exemption-band` | *(blank)* |
+
+  - 🔧 Quebec stopped emitting `SLFTEN`, which had been carrying the customer name. Ontario is unchanged.
+- ✅ **First regression coverage for tax exemptions** — 10 cases in `samples/Tax Exemptions/`, 141 → 171 tests. The `SLFTX3="O"` path had none before, in any province, including the shipped Ontario rule. Alberta had no coverage of any kind.
+  - Nine cases are real captures (QC/BC/AB/ON, plus QC and BC returns of an exempt sale and a non-exempt AB control). One is synthetic: `bc_exempt_first_nation_synthetic`, covering BC `FIRST_NATION` (`SLFTX1="O"` *and* `SLFTX2="O"`) — the only rule branch with no real payload.
+- ⚠️ **Two fields cannot be satisfied with the payloads supplied** — `SLFTE2` for AB and `SLFTE1` for BC are both specified as "cannot be blank", but no AB capture carries `x-tax-exemption-band` and no BC capture carries a `certificateId`. The mapping is in place and fills them the moment the source appears. See [docs/Open_Questions.md](docs/Open_Questions.md).
+
+### v1.0.108 (08/26/26)
 **Version marker — no mapping changes.**
 - ℹ️ **No behaviour change.** Output is byte-for-byte identical to v1.0.107 for every sample; all 141 regression tests pass unchanged. This bump marks a build, it does not carry a fix.
 - 📄 Version strings aligned across `PubSubApp.csproj` and every `docs/` header stamp.
@@ -424,7 +447,7 @@ Log entries include:
 - 🔧 **Tax lines no longer sign `SLFQTN`** - Every `X*` tax line on a `RETURN` printed `SLFQTN="-"`. A tax line has no quantity to sign — `SLFQTY` is the constant `000000100` — so the direction belongs on `SLFEXN` alone. Now blank, which is what `SALE` and `ADJUSTMENT` tax lines already did; this brings `RETURN` into line with them rather than introducing a new rule.
 - 🔧 **`SLFSLN` blank on return SKU lines** - The field is computed from the payload's `unitPrice` sign, and ORAE's conventions differ between captures: the no-receipt return sends a **negative** `unitPrice` where the with-receipt one sends positive. So the `-` leaked into `SLFSLN` on some returns and not others. Now pinned blank on every return line, matching the tax-line rule from v1.0.96.
 - ℹ️ The eco-fee `83` line is deliberately **unchanged** — it carries a real SKU rather than `000000000`, so it follows the SKU-line rule and keeps `SLFQTN="-"`.
-- ⚠️ Scope covers `transactionType = RETURN` and the return leg of an `ADJUSTMENT`. Five return baselines moved, by exactly these two fields and nothing else; no sale, adjustment or gift-card baseline shifted. **No fixture exists for a SODA return or a tax-exemption return** — the fix is transaction-wide so it applies to them, but neither shape has been captured.
+- ⚠️ Scope covers `transactionType = RETURN` and the return leg of an `ADJUSTMENT`. Five return baselines moved, by exactly these two fields and nothing else; no sale, adjustment or gift-card baseline shifted. **No fixture exists for a SODA return** — the fix is transaction-wide so it applies, but that shape has not been captured. *(Tax-exemption returns were captured later and are covered by `samples/Tax Exemptions/`.)*
 
 ### v1.0.101 (07/29/26)
 **`SLFTX1-4` charged-tax flags on cross-region returns:**

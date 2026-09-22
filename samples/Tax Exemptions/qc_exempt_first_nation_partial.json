@@ -1,0 +1,258 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7497664501639495931",
+    "occurredAt": "2026-08-24T14:50:31Z",
+    "ingestedAt": "2026-08-24T14:50:35Z",
+    "businessContext": {
+        "businessDay": "2026-08-24",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "41100",
+            "taxArea": "QC"
+        },
+        "workstation": {
+            "registerId": "85",
+            "sequenceNumber": 2227,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "SALE",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "MARTEAU PANNE FENDUE 20OZ BL",
+                    "sku": "000311510"
+                },
+                "lineId": "178758251713679286149",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "39.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "39.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "39.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "CH",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "2.00"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST"
+                    },
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.00"
+                        },
+                        "jurisdiction": {
+                            "region": "PQ"
+                        },
+                        "ratePercent": "9",
+                        "status": "A",
+                        "taxCode": "PST"
+                    }
+                ]
+            },
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "EAU SOURCE NATU.500MLX24PK",
+                    "sku": "000318605"
+                },
+                "lineId": "178758254575067538883",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "4.49"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "4.49"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "4.49"
+                    }
+                },
+                "quantity": {
+                    "uom": "PK",
+                    "value": 1
+                }
+            },
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "CONSIGNE CONTENANT 24X0.10$",
+                    "sku": "000297768"
+                },
+                "lineId": "17875825461048552953",
+                "parentLineId": "178758254575067538883",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "2.40"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "2.40"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "2.40"
+                    }
+                },
+                "quantity": {
+                    "uom": "CH",
+                    "value": 1
+                }
+            },
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "MASQUE JETABLE VALVE N95 2PK",
+                    "sku": "000321756"
+                },
+                "lineId": "17875829585257838307",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "8.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "8.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "8.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "CH",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.45"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST"
+                    },
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.00"
+                        },
+                        "jurisdiction": {
+                            "region": "PQ"
+                        },
+                        "ratePercent": "9",
+                        "status": "A",
+                        "taxCode": "PST"
+                    }
+                ]
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "58.40"
+                },
+                "card": {
+                    "responseCode": "SETTLE"
+                },
+                "method": "CASH",
+                "tenderId": "CA"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "-0.02"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.10"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "55.87"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "58.30"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "2.45"
+            }
+        },
+        "qualifiers": {
+            "isTaxExemptTransaction": true
+        },
+        "taxExemption": {
+            "certificateId": "1234567890",
+            "reason": "QUÉBEC",
+            "authority": "PQ",
+            "program": "FIRST_NATION_PARTIAL"
+        }
+    },
+    "promotions": [],
+    "extensions": {
+        "x-tax-exemption-customerName": "Nidhi",
+        "x-tax-exemption-level": "T"
+    },
+    "actor": {
+        "cashier": {
+            "loginId": "6005223"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}

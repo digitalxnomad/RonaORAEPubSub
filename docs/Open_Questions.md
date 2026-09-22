@@ -1,6 +1,6 @@
 # Open Questions for Rona
 
-**PubSubApp v1.0.108 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.109 | RonaORAEPubSub | July 2026**
 
 Decisions only Rona can make. Each entry states the evidence and what the answer would change, so
 it can be actioned without re-deriving any of it. Two kinds:
@@ -84,6 +84,57 @@ because it is less bad than discarding the transaction. No real capture has appr
 
 ---
 
+## 3. `SLFTE2` (AB) and `SLFTE1` (BC) are specified as mandatory, but no payload carries the source
+
+**Raised by:** MIM-10984 implementation, v1.0.109
+
+Two fields are specified "cannot be blank", and in both cases the source field is absent from every
+capture supplied with the ticket:
+
+| Field | Province | Specified source | In the captures |
+|-------|----------|------------------|-----------------|
+| `SLFTE2` | AB | `extensions.x-tax-exemption-band` | absent — AB 344 carries only `x-tax-exemption-level` |
+| `SLFTE1` | BC | `transaction.taxExemption.certificateId` | absent — BC 0234, 0240 and the wholesaler capture carry `reason`, `authority` and `program` only |
+
+The mapping is implemented and both fields fill the moment the source appears; today they emit
+blank. Test cases AB-03 and BC-07 therefore cannot pass on the supplied data.
+
+**BC-07 already anticipates this** — *"TE1 = `certificateId` if present; if Atreya confirms → else
+`FIN 490`"*. So there is a proposed constant fallback awaiting confirmation.
+
+**The questions:**
+
+- **(a)** Is `FIN 490` confirmed as the BC `SLFTE1` fallback when no `certificateId` is present, and
+  does it apply to QC as well? Nothing has been hard-coded, because a literal in a customer-facing
+  identifier field is not something to guess at.
+- **(b)** Is AB expected to start sending `x-tax-exemption-band`, or does `SLFTE2` need a fallback
+  too? AB is the only province where `SLFTE2` is the sole identifier, so a blank leaves the
+  exemption unattributed.
+
+---
+
+## 4. MB and SK have no tax-exemption specification
+
+**Raised by:** MIM-10984 implementation, v1.0.109
+
+MIM-10984 covers QC, AB and BC. Before v1.0.109 every non-Ontario province printed `SLFTX3="O"`;
+that rule is now Ontario-only, so MB and SK needed a behaviour.
+
+They follow the BC rule — a waived PST marks `SLFTX1` with `"O"` or `"E"` — **on the inference
+that they are structurally identical to BC** (GST + provincial PST, same `jurisdiction.region`
+shape). No capture exists and no ticket says so.
+
+The marker scheme was scoped to exactly QC/BC/AB/MB/SK rather than "everything except Ontario".
+The Atlantic HST provinces and any unrecognised `taxArea` keep `SLFTX3="O"`, because the marker
+switch covers only the `FED` and provincial-PST buckets — an Atlantic exemption routed through it
+would set no flag at all and the exemption would disappear from the record.
+
+**The question:** is that right, or do MB and SK have their own treatment? The alternative
+considered was to leave them on the old `SLFTX3="O"`, which was rejected as incoherent once their
+structural twin moved away from it.
+
+---
+
 # Part B — Blocking unstarted work
 
 *(none open — the Endless Aisle blockers were answered 08/12/26; see Resolved)*
@@ -99,3 +150,7 @@ because it is less bad than discarding the transaction. No real capture has appr
 | `SLFTX4` on a cross-region return — `N` or a literal blank? (*Tactill \| ACO \| ECO Fee*, receipts 2136 → 4839) | **`N`** — confirmed 07/31/26. `<BLANK>` in the ticket meant "not `Y`". No code change: unset charged-tax flags have always printed `N`, and the return already matched its original QC sale exactly. That ticket is fully satisfied by v1.0.101 | v1.0.101 (no change needed) |
 | Endless Aisle `SLFRFD` — 15-character value against a 16-character field (CR *RONA TSP Mapping Changes*, MIM-7509 / MIM-8070) | **15 digits + one trailing space**, i.e. `PadOrTruncate(storeId + rightmost-10 sodaRef, 16)`. Confirmed by Grace 08/12/26; the CR's length column was the error. Matches how the SODA branch already fills this field | v1.0.103 |
 | Endless Aisle line type — `altIds sodaType` or `lineBusiness.detailType`? | **`altIds` `sodaType == "ENDLESS_AISLE"`**, per the CR. Confirmed by Grace 08/12/26: keeps detection consistent with every other flow, and avoids depending on `detailType`, which was introduced for Endless Aisle only. `lineBusiness.detailType` is **deliberately ignored** — a `sodaType=ENDLESS_AISLE` line emits `SLFLNT=42` regardless of what `detailType` says | v1.0.103 |
+| MIM-10984 §1 — "SLFTX3 & SLFTX4 are always `N`" for QC/AB/BC, yet Ontario uses `SLFTX3="O"` for the same thing | **Both, by province.** Ontario keeps `SLFTX3="O"` (MIM-10106, in production); QC/AB/BC mark the waived tax on `SLFTX1`/`SLFTX2` and leave `SLFTX3`/`SLFTX4` at `N`. Confirmed by the MIM-10984 test cases (BC-08, QC-07, SH-01) | v1.0.109 |
+| MIM-10984 §3.3/§3.4/§3.5 — three province-specific flag tables; is each a separate rule? | **No, one rule.** The waived tax's own `jurisdiction.region` picks the flag; `taxExemption.program` picks the letter (`FIRST_NATION`/`FIRST_NATION_PARTIAL` → `"O"`, anything else → `"E"`). All five captures and all documented cases fall out of it | v1.0.109 |
+| MIM-10984 §2 — field named `isTaxExemptionTransaction` | **ORAE sends `isTaxExemptTransaction`** — confirmed again by all eight new captures. Third ticket carrying the wrong spelling; the model comment in `OraeModels.cs` records it | v1.0.109 (no change needed) |
+| MIM-10984 §3.2 vs §3.5 — `SLFTE1`/`SLFTE2` requirements contradict between QC/BC and AB | **Not a contradiction — the sourcing is per province.** QC/BC identify the exemption by certificate, AB by band, and neither reports the customer name. Implemented as a three-row table rather than filling all three fields from whatever the payload carries | v1.0.109 |

@@ -1,0 +1,145 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "9000000000000000005",
+    "occurredAt": "2026-09-17T17:17:39Z",
+    "ingestedAt": "2026-09-17T17:17:42Z",
+    "businessContext": {
+        "businessDay": "2026-09-17",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "61700",
+            "taxArea": "BC"
+        },
+        "workstation": {
+            "registerId": "85",
+            "sequenceNumber": 234,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "SALE",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "HAMMER 20OZ STEEL",
+                    "sku": "019062038"
+                },
+                "lineId": "17896654361735001657",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "55.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "55.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "55.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.00"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST",
+                        "status": "A"
+                    },
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.00"
+                        },
+                        "jurisdiction": {
+                            "region": "BC"
+                        },
+                        "ratePercent": "7",
+                        "status": "A",
+                        "taxCode": "PST"
+                    }
+                ]
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "55.99"
+                },
+                "card": {
+                    "responseCode": "SETTLE"
+                },
+                "method": "CASH",
+                "tenderId": "CA"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "55.99"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "55.99"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "0.00"
+            }
+        },
+        "qualifiers": {
+            "isTaxExemptTransaction": true
+        },
+        "taxExemption": {
+            "reason": "BRITISH COLUMBIA",
+            "authority": "BC",
+            "program": "FIRST_NATION",
+            "certificateId": "9988776655"
+        }
+    },
+    "promotions": [],
+    "extensions": {
+        "x-tax-exemption-level": "T"
+    },
+    "actor": {
+        "cashier": {
+            "loginId": "2"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}

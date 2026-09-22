@@ -1,0 +1,174 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7507790001319556664",
+    "occurredAt": "2026-09-21T13:17:49Z",
+    "ingestedAt": "2026-09-21T13:17:52Z",
+    "businessContext": {
+        "businessDay": "2026-09-21",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "61700",
+            "taxArea": "BC"
+        },
+        "workstation": {
+            "registerId": "85",
+            "sequenceNumber": 240,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "SALE",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "MASK DUST OV/N95",
+                    "sku": "051027312"
+                },
+                "lineId": "1789996630793865952320",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "13.59"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "13.59"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "13.59"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.00"
+                        },
+                        "jurisdiction": {
+                            "region": "BC"
+                        },
+                        "ratePercent": "7",
+                        "status": "A",
+                        "taxCode": "PST"
+                    }
+                ]
+            },
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "SEEDS VEGETABLES PACKET",
+                    "sku": "017002239"
+                },
+                "lineId": "178999662438988601999",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "4.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "4.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "4.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.25"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST"
+                    }
+                ]
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "18.85"
+                },
+                "card": {
+                    "responseCode": "SETTLE"
+                },
+                "method": "CASH",
+                "tenderId": "CA"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "0.02"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "18.58"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "18.85"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "0.25"
+            }
+        },
+        "qualifiers": {
+            "isTaxExemptTransaction": true
+        },
+        "taxExemption": {
+            "reason": "BRITISH COLUMBIA",
+            "authority": "BC",
+            "program": "PST_ONLY"
+        }
+    },
+    "promotions": [],
+    "extensions": {
+        "x-tax-exemption-level": "T"
+    },
+    "actor": {
+        "cashier": {
+            "loginId": "6005223"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}

@@ -1,0 +1,133 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7506401638054705581",
+    "occurredAt": "2026-09-17T17:20:47Z",
+    "ingestedAt": "2026-09-17T17:20:50Z",
+    "businessContext": {
+        "businessDay": "2026-09-17",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "61700",
+            "taxArea": "BC"
+        },
+        "workstation": {
+            "registerId": "85",
+            "sequenceNumber": 235,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "RETURN",
+        "subType": "RETURN_WITH_RECEIPT",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "HAMMER 20OZ STEEL",
+                    "sku": "019062038"
+                },
+                "lineId": "17896656252956054620",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "-55.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "-55.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "55.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": -1
+                },
+                "return": {
+                    "originalLineId": "1",
+                    "reason": "0204"
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "-2.80"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "taxCode": "GST"
+                    }
+                ]
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "-58.80"
+                },
+                "card": {
+                    "responseCode": "SETTLE"
+                },
+                "method": "CASH",
+                "tenderId": "CA"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "-0.01"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "-55.99"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "-58.80"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "-2.80"
+            }
+        }
+    },
+    "promotions": [],
+    "references": {
+        "originalEvent": {
+            "businessDay": "2026-09-17",
+            "registerId": "85",
+            "sequenceNumber": 234,
+            "storeId": "170"
+        },
+        "sourceTransactionId": "0235"
+    },
+    "actor": {
+        "cashier": {
+            "loginId": "2"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}

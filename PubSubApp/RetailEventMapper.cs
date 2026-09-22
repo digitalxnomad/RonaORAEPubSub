@@ -424,16 +424,26 @@ class RetailEventMapper
                 orderRecord.ReasonCode = PadOrTruncate(reasonCode, 16);
 
                 // Tax exemption fields - SLFTE1, SLFTE2, SLFTEN
-                // Populated on every SKU line when the transaction is a tax-exemption transaction
-                // (First Nation partial exemption); otherwise blank.
-                //   SLFTE1 <- transaction.taxExemption.certificateId
-                //   SLFTE2 <- extensions.x-tax-exemption-band
-                //   SLFTEN <- extensions.x-tax-exemption-customerName
+                // Populated on every SKU line when the transaction is a tax-exemption transaction;
+                // otherwise blank. Which of the three identifies the exemption is province-specific
+                // (MIM-10984), so a field with no role in a province is blanked rather than filled
+                // from a source that happens to be present:
+                //   ON      SLFTE1 <- taxExemption.certificateId, SLFTE2 <- band, SLFTEN <- name
+                //   QC, BC  SLFTE1 <- taxExemption.certificateId; SLFTE2 and SLFTEN blank
+                //   AB      SLFTE2 <- extensions.x-tax-exemption-band; SLFTE1 and SLFTEN blank
                 if (isTaxExemptTransaction)
                 {
-                    orderRecord.TaxExemptId1 = PadOrTruncate(retailEvent.Transaction?.TaxExemption?.CertificateId ?? "", 20);
-                    orderRecord.TaxExemptId2 = PadOrTruncate(GetExtension(retailEvent, "x-tax-exemption-band"), 20);
-                    orderRecord.TaxExemptionName = PadOrTruncate(GetExtension(retailEvent, "x-tax-exemption-customerName"), 35);
+                    string exemptProvince = GetProvince(retailEvent)?.ToUpperInvariant() ?? "";
+                    bool exemptIdFromCertificate = exemptProvince != "AB";
+                    bool exemptIdFromBand = exemptProvince is not ("QC" or "BC");
+                    bool reportsCustomerName = exemptProvince is not ("QC" or "BC" or "AB");
+
+                    orderRecord.TaxExemptId1 = PadOrTruncate(
+                        exemptIdFromCertificate ? retailEvent.Transaction?.TaxExemption?.CertificateId ?? "" : "", 20);
+                    orderRecord.TaxExemptId2 = PadOrTruncate(
+                        exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band") : "", 20);
+                    orderRecord.TaxExemptionName = PadOrTruncate(
+                        reportsCustomerName ? GetExtension(retailEvent, "x-tax-exemption-customerName") : "", 35);
                 }
                 else
                 {
@@ -2058,14 +2068,55 @@ class RetailEventMapper
             // SLFACD - TaxAuthCode should always be blank for order records
             orderRecord.TaxAuthCode = "";
 
-            // First Nation partial exemption (Scenario 3): a tax entry flagged status="A" means the
-            // provincial/HST portion was manually First-Nation-exempted at the register. Mark SLFTX3 = "O".
-            // The remaining federal 5% (HON1) already drives SLFTX4 = "Y" via the loop above.
+            // A tax entry flagged status="A" was manually exempted at the register. It arrives
+            // zeroed, so the loop above leaves its flag at "N" and MMS cannot tell an exempted tax
+            // from one that never applied. The flag is therefore overwritten with a letter.
+            //
+            // QC, AB and BC mark the flag belonging to the waived tax (MIM-10984), leaving
+            // SLFTX3/SLFTX4 at "N":
+            //   "O" - a First Nation exemption (FIRST_NATION, FIRST_NATION_PARTIAL)
+            //   "E" - any other programme (e.g. PST_ONLY, PROVINCIAL_GOVERNMENT)
+            // MB and SK are not in that ticket and have no capture; they are included because they
+            // are structurally identical to BC. Ontario (MIM-10106) is in production and records
+            // the exemption in SLFTX3 whichever tax was waived, so it is left exactly as it was —
+            // as is any province with no rule of its own, which keeps SLFTX3 rather than losing
+            // the exemption to a bucket the marker switch does not cover.
             bool isTaxExemptTransaction = retailEvent.Transaction?.Qualifiers?.IsTaxExemptTransaction == true;
-            if (isTaxExemptTransaction && item.Taxes != null &&
-                item.Taxes.Any(t => string.Equals(t.Status, "A", StringComparison.OrdinalIgnoreCase)))
+            if (isTaxExemptTransaction && item.Taxes != null)
             {
-                orderRecord.ChargedTax3 = "O";
+                List<TaxDetail> exemptedTaxes = item.Taxes
+                    .Where(t => string.Equals(t.Status, "A", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                bool marksWaivedTax = province?.ToUpperInvariant() is "QC" or "BC" or "AB" or "MB" or "SK";
+                if (!marksWaivedTax)
+                {
+                    if (exemptedTaxes.Count > 0)
+                        orderRecord.ChargedTax3 = "O";
+                }
+                else
+                {
+                    string program = retailEvent.Transaction?.TaxExemption?.Program?.Trim().ToUpperInvariant() ?? "";
+                    string marker = program is "FIRST_NATION" or "FIRST_NATION_PARTIAL" ? "O" : "E";
+
+                    foreach (TaxDetail exemptedTax in exemptedTaxes)
+                    {
+                        // Only the two buckets the specification covers are marked. An unrecognised
+                        // bucket keeps "N" rather than guessing which flag the exemption belongs to.
+                        switch (ClassifyTaxBucket(exemptedTax, province, isOntario, isGstOnlyProvince))
+                        {
+                            case "FED":
+                                orderRecord.ChargedTax2 = marker;
+                                break;
+                            case "PQ":
+                            case "BC":
+                            case "MB":
+                            case "SK":
+                                orderRecord.ChargedTax1 = marker;
+                                break;
+                        }
+                    }
+                }
             }
 
             return taxRateCodeForTaxRecords;

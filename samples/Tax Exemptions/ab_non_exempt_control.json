@@ -1,0 +1,162 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7497731374624227589",
+    "occurredAt": "2026-08-24T19:09:42Z",
+    "ingestedAt": "2026-08-24T19:09:46Z",
+    "businessContext": {
+        "businessDay": "2026-08-24",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "83706",
+            "taxArea": "AB"
+        },
+        "workstation": {
+            "registerId": "85",
+            "sequenceNumber": 343,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "SALE",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "HAMMER 16OZ",
+                    "sku": "019062027"
+                },
+                "lineId": "178759846088631321750",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "47.49"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "47.49"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "47.49"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "2.37"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST"
+                    }
+                ]
+            },
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "MASK DISPOSABLE VALVE N95 2PK",
+                    "sku": "051252564"
+                },
+                "lineId": "1787598479717099300970",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "8.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "8.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "8.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.45"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST"
+                    }
+                ]
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "59.30"
+                },
+                "card": {
+                    "responseCode": "SETTLE"
+                },
+                "method": "CASH",
+                "tenderId": "CA"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "56.48"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "59.30"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "2.82"
+            }
+        }
+    },
+    "promotions": [],
+    "actor": {
+        "cashier": {
+            "loginId": "6005223"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}

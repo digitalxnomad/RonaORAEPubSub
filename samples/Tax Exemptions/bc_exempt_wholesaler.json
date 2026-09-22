@@ -1,0 +1,143 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7506704247362581912",
+    "occurredAt": "2026-09-18T13:25:20Z",
+    "ingestedAt": "2026-09-18T13:25:23Z",
+    "businessContext": {
+        "businessDay": "2026-09-18",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "61700",
+            "taxArea": "BC"
+        },
+        "workstation": {
+            "registerId": "85",
+            "sequenceNumber": 237,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "SALE",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "description": "HAMMER 16OZ SOLID STEEL",
+                    "sku": "019062028"
+                },
+                "lineId": "178973776048456422633",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "62.99"
+                    },
+                    "originalUnitPrice": {
+                        "currency": "CAD",
+                        "value": "62.99"
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "62.99"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                },
+                "taxes": [
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "3.15"
+                        },
+                        "jurisdiction": {
+                            "region": "FED"
+                        },
+                        "ratePercent": "5",
+                        "taxCode": "GST"
+                    },
+                    {
+                        "amount": {
+                            "currency": "CAD",
+                            "value": "0.00"
+                        },
+                        "jurisdiction": {
+                            "region": "BC"
+                        },
+                        "ratePercent": "7",
+                        "status": "A",
+                        "taxCode": "PST"
+                    }
+                ]
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "66.15"
+                },
+                "card": {
+                    "responseCode": "SETTLE"
+                },
+                "method": "CASH",
+                "tenderId": "CA"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "0.01"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "62.99"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "66.15"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "3.15"
+            }
+        },
+        "qualifiers": {
+            "isTaxExemptTransaction": true
+        },
+        "taxExemption": {
+            "reason": "BRITISH COLUMBIA",
+            "authority": "BC",
+            "program": "PST_ONLY"
+        }
+    },
+    "promotions": [],
+    "extensions": {
+        "x-tax-exemption-level": "T"
+    },
+    "actor": {
+        "cashier": {
+            "loginId": "6005223"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}
