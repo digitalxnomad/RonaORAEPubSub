@@ -1,6 +1,6 @@
 # Open Questions for Rona
 
-**PubSubApp v1.0.109 | RonaORAEPubSub | July 2026**
+**PubSubApp v1.0.109 | RonaORAEPubSub | September 2026**
 
 Decisions only Rona can make. Each entry states the evidence and what the answer would change, so
 it can be actioned without re-deriving any of it. Two kinds:
@@ -99,6 +99,13 @@ capture supplied with the ticket:
 The mapping is implemented and both fields fill the moment the source appears; today they emit
 blank. Test cases AB-03 and BC-07 therefore cannot pass on the supplied data.
 
+`bc_exempt_first_nation_synthetic` carries an invented `certificateId` purely so the populated BC
+path is covered at all. Two rows of the per-province `SLFTE` table remain unexercised by any
+payload, because no QC, BC or AB capture carries `x-tax-exemption-band` — only the Ontario one
+does — so "AB takes the band" and "QC/BC blank the band" are both asserted by code and documented
+here, but proved by nothing. QC's blanking of `SLFTEN` *is* exercised: that capture carries a
+customer name and the baseline shows the field empty.
+
 **BC-07 already anticipates this** — *"TE1 = `certificateId` if present; if Atreya confirms → else
 `FIN 490`"*. So there is a proposed constant fallback awaiting confirmation.
 
@@ -117,8 +124,9 @@ blank. Test cases AB-03 and BC-07 therefore cannot pass on the supplied data.
 
 **Raised by:** MIM-10984 implementation, v1.0.109
 
-MIM-10984 covers QC, AB and BC. Before v1.0.109 every non-Ontario province printed `SLFTX3="O"`;
-that rule is now Ontario-only, so MB and SK needed a behaviour.
+MIM-10984 covers QC, AB and BC. Before v1.0.109 every non-Ontario province printed `SLFTX3="O"`.
+That rule now applies to Ontario, the Atlantic HST provinces and any unrecognised `taxArea`, so MB
+and SK had to land on one side or the other.
 
 They follow the BC rule — a waived PST marks `SLFTX1` with `"O"` or `"E"` — **on the inference
 that they are structurally identical to BC** (GST + provincial PST, same `jurisdiction.region`
@@ -128,6 +136,10 @@ The marker scheme was scoped to exactly QC/BC/AB/MB/SK rather than "everything e
 The Atlantic HST provinces and any unrecognised `taxArea` keep `SLFTX3="O"`, because the marker
 switch covers only the `FED` and provincial-PST buckets — an Atlantic exemption routed through it
 would set no flag at all and the exemption would disappear from the record.
+
+> ⚠️ **Unlike everything else in Part A, this behaviour is not test-covered.** No MB or SK
+> exemption capture exists, so no baseline pins it — the suite would not notice if it changed. It
+> is the one entry here that rests on reasoning alone.
 
 **The question:** is that right, or do MB and SK have their own treatment? The alternative
 considered was to leave them on the old `SLFTX3="O"`, which was rejected as incoherent once their
@@ -152,5 +164,5 @@ structural twin moved away from it.
 | Endless Aisle line type — `altIds sodaType` or `lineBusiness.detailType`? | **`altIds` `sodaType == "ENDLESS_AISLE"`**, per the CR. Confirmed by Grace 08/12/26: keeps detection consistent with every other flow, and avoids depending on `detailType`, which was introduced for Endless Aisle only. `lineBusiness.detailType` is **deliberately ignored** — a `sodaType=ENDLESS_AISLE` line emits `SLFLNT=42` regardless of what `detailType` says | v1.0.103 |
 | MIM-10984 §1 — "SLFTX3 & SLFTX4 are always `N`" for QC/AB/BC, yet Ontario uses `SLFTX3="O"` for the same thing | **Both, by province.** Ontario keeps `SLFTX3="O"` (MIM-10106, in production); QC/AB/BC mark the waived tax on `SLFTX1`/`SLFTX2` and leave `SLFTX3`/`SLFTX4` at `N`. Confirmed by the MIM-10984 test cases (BC-08, QC-07, SH-01) | v1.0.109 |
 | MIM-10984 §3.3/§3.4/§3.5 — three province-specific flag tables; is each a separate rule? | **No, one rule.** The waived tax's own `jurisdiction.region` picks the flag; `taxExemption.program` picks the letter (`FIRST_NATION`/`FIRST_NATION_PARTIAL` → `"O"`, anything else → `"E"`). All five captures and all documented cases fall out of it | v1.0.109 |
-| MIM-10984 §2 — field named `isTaxExemptionTransaction` | **ORAE sends `isTaxExemptTransaction`** — confirmed again by all eight new captures. Third ticket carrying the wrong spelling; the model comment in `OraeModels.cs` records it | v1.0.109 (no change needed) |
+| MIM-10984 §2 — field named `isTaxExemptionTransaction` | **ORAE sends `isTaxExemptTransaction`** — confirmed again by all seven new exempt captures (six real, one synthetic). Third ticket carrying the wrong spelling; the model comment in `OraeModels.cs` records it | v1.0.109 (no change needed) |
 | MIM-10984 §3.2 vs §3.5 — `SLFTE1`/`SLFTE2` requirements contradict between QC/BC and AB | **Not a contradiction — the sourcing is per province.** QC/BC identify the exemption by certificate, AB by band, and neither reports the customer name. Implemented as a three-row table rather than filling all three fields from whatever the payload carries | v1.0.109 |
