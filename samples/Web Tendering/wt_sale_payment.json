@@ -1,0 +1,131 @@
+{
+    "schemaVersion": "2.0.0",
+    "messageType": "RetailEvent",
+    "eventType": "ORIGINAL",
+    "eventId": "7503853319486254067",
+    "occurredAt": "2026-09-10T16:34:07Z",
+    "ingestedAt": "2026-09-10T16:34:09Z",
+    "businessContext": {
+        "businessDay": "2026-09-10",
+        "channel": "STORE",
+        "fulfillment": "CARRYOUT",
+        "store": {
+            "currency": "CAD",
+            "storeId": "55010"
+        },
+        "workstation": {
+            "registerId": "33",
+            "sequenceNumber": 148,
+            "type": "POS"
+        }
+    },
+    "eventCategory": "TRANSACTION",
+    "eventSubType": "transactionSale",
+    "transaction": {
+        "transactionType": "SALE",
+        "items": [
+            {
+                "attributes": {
+                    "x-epp-coverage-identifier": "0"
+                },
+                "item": {
+                    "altIds": [
+                        {
+                            "type": "sodaType",
+                            "value": "WEB_TENDERING"
+                        },
+                        {
+                            "type": "sodaRef",
+                            "value": "005010240353400"
+                        }
+                    ],
+                    "description": "WEB SODA Item",
+                    "sku": "000000000"
+                },
+                "lineBusiness": {
+                    "detailType": "30"
+                },
+                "lineId": "1",
+                "pricing": {
+                    "extendedPrice": {
+                        "currency": "CAD",
+                        "value": "7.55"
+                    },
+                    "priceOverride": {
+                        "overrideUnitPrice": {
+                            "currency": "CAD",
+                            "value": "7.55"
+                        }
+                    },
+                    "priceVehicle": "REG:ORG",
+                    "unitPrice": {
+                        "currency": "CAD",
+                        "value": "7.55"
+                    }
+                },
+                "quantity": {
+                    "uom": "EA",
+                    "value": 1
+                }
+            }
+        ],
+        "tenders": [
+            {
+                "amount": {
+                    "currency": "CAD",
+                    "value": "7.55"
+                },
+                "card": {
+                    "authCode": "100001",
+                    "emv": {
+                        "tags": {
+                            "invoiceNumber": "005010240353400",
+                            "magStrip": "W"
+                        }
+                    }
+                },
+                "method": "WEBTENDER",
+                "tenderId": "PL"
+            }
+        ],
+        "totals": {
+            "cashRounding": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "changeDue": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "discounts": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "gross": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "net": {
+                "currency": "CAD",
+                "value": "0.00"
+            },
+            "tax": {
+                "currency": "CAD",
+                "value": "0.00"
+            }
+        }
+    },
+    "promotions": [],
+    "extensions": {
+        "x-authorization-code": "100001",
+        "x-authorization-source": "SODA"
+    },
+    "actor": {
+        "cashier": {
+            "loginId": "2"
+        },
+        "customer": {
+            "customerIdToken": ""
+        }
+    }
+}

@@ -1,6 +1,6 @@
 # Open Questions for Rona
 
-**PubSubApp v1.0.109 | RonaORAEPubSub | September 2026**
+**PubSubApp v1.0.110 | RonaORAEPubSub | September 2026**
 
 Decisions only Rona can make. Each entry states the evidence and what the answer would change, so
 it can be actioned without re-deriving any of it. Two kinds:
@@ -144,6 +144,55 @@ would set no flag at all and the exemption would disappear from the record.
 **The question:** is that right, or do MB and SK have their own treatment? The alternative
 considered was to leave them on the old `SLFTX3="O"`, which was rejected as incoherent once their
 structural twin moved away from it.
+
+---
+
+## 5. Web Tendering — `SLFRFD` has two identical sources, and only one is specified
+
+**Raised by:** MIM-10971 implementation, v1.0.110
+
+`SLFRFD` is read from `transaction.tenders[0].card.emv.tags.invoiceNumber`, as the ticket specifies.
+But every Web Tendering item **also** carries the same 15 digits in `item.altIds` as `sodaRef`:
+
+| Capture | `sodaRef` | `invoiceNumber` |
+|---------|-----------|-----------------|
+| all 19 Web Tendering captures | *(15 digits)* | identical, in every one |
+| `soda_zeroship_refund` (SODA, not WT) | `005010240354401` | absent — SODA does not use the EMV tag |
+
+The two are indistinguishable on the supplied data, so the choice is untestable. It matters in one
+case: **a Web Tendering payload that omits the EMV tag would emit a blank `SLFRFD`** even though
+`sodaRef` was sitting on the item. The SODA branch already reads `sodaRef` for exactly this field,
+and the SODA capture proves the tag can be absent on a line type `30` record.
+
+No fallback was added — the ticket names one source, and inventing a second is the kind of guess
+that has been wrong before here.
+
+**The question:** should `SLFRFD` fall back to `altIds` `sodaRef` when the tender carries no
+`invoiceNumber`, or is the EMV tag guaranteed present on every Web Tendering transaction?
+
+---
+
+## 6. Web Tendering — three supplied fixture folders are empty, and no capture mixes line types
+
+**Raised by:** MIM-10971 implementation, v1.0.110
+
+**(a) Empty fixtures.** Three folders in `examples.zip` contain only 0-byte files:
+`scenario return-3`, `scenario return-5` and `scenario-9-WT-return`. Whatever they were meant to
+cover is unknown. `scenario-9-WT-return` in particular reads like a Web Tendering return variant not
+covered by `scenario return-1`, `-2` or `-4`, which are behaviourally identical to each other.
+
+**(b) No mixed cart.** All 20 runnable captures are a single Web Tendering item with a single `PL`
+tender. Nothing exercises a Web Tendering line alongside ordinary merchandise in one transaction.
+The branch is an `else if`, so a non-WT item in the same cart *should* keep its normal mapping, but
+nothing proves it.
+
+A synthetic was **not** built for (b), unlike the BC `FIRST_NATION` case in v1.0.109. The difference:
+there the behaviour was a named requirement with no payload, so the synthetic encoded a stated rule.
+Here nothing states that a mixed Web Tendering cart is even a real flow, and inventing one would
+freeze a guess about the business process as a baseline.
+
+**The questions:** can the three empty fixtures be re-exported, and can a Web Tendering transaction
+ever contain non-Web-Tendering merchandise lines?
 
 ---
 

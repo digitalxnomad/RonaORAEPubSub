@@ -383,7 +383,18 @@ Log entries include:
 
 ## Version History
 
-### v1.0.109 (09/22/26) ✨ Current
+### v1.0.110 (09/25/26) ✨ Current
+**Web Tendering payments and refunds now present as line type `30` (MIM-10971).**
+- ✨ **New `WEB_TENDERING` line type** - An in-store payment against, or refund of, a web order now emits `SLFLNT=30` so MMS/SODA see a web-tendered order rather than merchandise. Previously it fell through to plain merchandise and printed `SLFLNT=01` on a sale and `11` on a refund. Detected from `item.altIds` `type="sodaType"`, `value="WEB_TENDERING"` — the third sibling of the existing `SODA`→`30` and `ENDLESS_AISLE`→`42` branches, mutually exclusive with both.
+- ✨ **`SLFORG` carries the money due** - From `pricing.priceOverride.overrideUnitPrice`, always emitted: zeros when nothing is due, which is the normal case on a fulfilment. A refund is pinned to `000000000` as the ticket specifies, even though the payload carries a negative override price there.
+- ✨ **`SLFRFD` carries the SODA reference** - From `transaction.tenders[0].card.emv.tags.invoiceNumber`, which arrives as exactly the 15 digits the field wants (5-digit SODA store + 8-digit order + 2-digit sequence), so it pads to 16 with one trailing space rather than being composed from parts — the same shape as the Endless Aisle `SLFRFD`.
+  - 🔧 `EmvTags` previously modelled only `magStrip`, so `invoiceNumber` was silently discarded at parse time.
+- ℹ️ **Deliberately narrow.** The ticket scopes itself to those three RIMSLF fields and states everything else stays as it is, so unlike the SODA and Endless Aisle branches this one leaves SKU, quantity, tax flags, price vehicle and reason code on their normal merchandise mapping. `SLFTTP`/`TNFTTP` (`01` sale, `11` refund) and `TNFFCD`=`PL` already fell out of the standard handling and needed no new code.
+- ✅ **5 new cases in `samples/Web Tendering/`**, 171 → 186 tests: a payment with money due, a deposit, a fulfilment with nothing due, a refund, and a SODA zero-ship refund kept as a control so the shared `30` line type cannot blur the two branches together.
+  - ⚠️ **No existing baseline moved.** Nothing in the repo carried `WEB_TENDERING`, so the change is purely additive — which also means the defect had no test that could have caught it.
+- ⚠️ **Open items** — three of the supplied fixture folders are empty (0-byte files), no capture mixes a Web Tendering line with ordinary merchandise, and `sodaRef` duplicates `invoiceNumber` in every capture so the ticket's source choice is unverifiable. See [docs/Open_Questions.md](docs/Open_Questions.md).
+
+### v1.0.109 (09/22/26)
 **Tax exemptions outside Ontario now mark the waived tax, not `SLFTX3` (MIM-10984).**
 - ✨ **`SLFTX1`/`SLFTX2` carry the exemption marker in QC, AB and BC** - A tax flagged `status="A"` was waived at the register. It arrives zeroed, so the charged-tax loop left its flag at `N` and MMS could not tell a waived tax from one that never applied. The flag belonging to that tax is now overwritten with a letter instead:
   - **`"O"`** when `transaction.taxExemption.program` is `FIRST_NATION` or `FIRST_NATION_PARTIAL`

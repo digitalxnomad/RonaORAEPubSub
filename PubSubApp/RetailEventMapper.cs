@@ -120,10 +120,12 @@ class RetailEventMapper
         {
             foreach (var item in retailEvent.Transaction.Items)
             {
-                // Per-item SODA / Endless Aisle detection via item.altIds. Mutually exclusive:
-                // both read altIds sodaType, which is either "SODA" or "ENDLESS_AISLE".
+                // Per-item SODA / Endless Aisle / Web Tendering detection via item.altIds. Mutually
+                // exclusive: all three read altIds sodaType, which carries one of "SODA",
+                // "ENDLESS_AISLE" or "WEB_TENDERING".
                 bool isSodaItem = IsItemSoda(item);
                 bool isEndlessAisleItem = IsItemEndlessAisle(item);
+                bool isWebTenderingItem = IsItemWebTendering(item);
 
                 // An Endless Aisle order is always a regular-price sale: the price vehicle is forced
                 // to REG:ORG and whatever OREA passes is ignored. Everything keyed off the price
@@ -611,6 +613,42 @@ class RetailEventMapper
                         orderRecord.SellPriceNegativeSign = "";
                         orderRecord.ExtendedValue = "00000000000";
                         orderRecord.ExtendedValueNegativeSign = "";
+                    }
+                }
+
+                // Web Tendering item override (MIM-10971). An in-store Web Tendering payment or
+                // refund must present as line type 30 so MMS/SODA see a web-tendered order rather
+                // than merchandise. Scope is deliberately narrow — the ticket changes three RIMSLF
+                // fields and states everything else stays as it is, so unlike the SODA and Endless
+                // Aisle branches above this one does not touch SKU, tax flags, price vehicle or
+                // reason code. SLFTTP/TNFTTP (01 sale, 11 refund) and TNFFCD=PL already fall out of
+                // the standard handling.
+                else if (isWebTenderingItem)
+                {
+                    orderRecord.LineType = "30";                                  // SLFLNT
+
+                    // SLFRFD - the tender's invoiceNumber is already the 15-digit SODA reference
+                    // (5-digit store + 8-digit order + 2-digit sequence), so it pads to 16 with one
+                    // trailing space rather than being composed from parts.
+                    orderRecord.ReferenceDesc = PadOrTruncate(GetWebTenderingInvoiceNumber(retailEvent), 16);
+
+                    // SLFORG - money due on a payment; always emitted, zeros when nothing is due.
+                    // A refund is pinned to zeros by the ticket even though the payload carries a
+                    // negative override price.
+                    if (!isReturnLine &&
+                        item.Pricing?.PriceOverride?.OverrideUnitPrice?.Value != null &&
+                        decimal.TryParse(item.Pricing.PriceOverride.OverrideUnitPrice.Value, out decimal wtDue) &&
+                        wtDue != 0)
+                    {
+                        var (wtAmount, wtSign) = FormatCurrencyWithSign(
+                            item.Pricing.PriceOverride.OverrideUnitPrice.Value, 9);
+                        orderRecord.OriginalPrice = wtAmount;
+                        orderRecord.OriginalPriceNegativeSign = wtSign;
+                    }
+                    else
+                    {
+                        orderRecord.OriginalPrice = "000000000";
+                        orderRecord.OriginalPriceNegativeSign = "";
                     }
                 }
 
@@ -1451,6 +1489,23 @@ class RetailEventMapper
             return item.Item?.AltIds?.Any(a =>
                 string.Equals(a.Type, "sodaType", StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(a.Value, "ENDLESS_AISLE", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // Web Tendering detection: item.altIds[] contains type="sodaType" with value="WEB_TENDERING"
+        // (MIM-10971). Same shape as the SODA and Endless Aisle checks above; sodaType carries one
+        // value per item, so the three are mutually exclusive.
+        private bool IsItemWebTendering(TransactionItem item)
+        {
+            return item.Item?.AltIds?.Any(a =>
+                string.Equals(a.Type, "sodaType", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.Value, "WEB_TENDERING", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // The SODA reference on a Web Tendering transaction. Unlike SODA, which carries it in
+        // item.altIds as sodaRef, Web Tendering puts it on the first tender's EMV tags.
+        private string GetWebTenderingInvoiceNumber(RetailEvent retailEvent)
+        {
+            return retailEvent.Transaction?.Tenders?.FirstOrDefault()?.Card?.Emv?.Tags?.InvoiceNumber ?? "";
         }
 
         // The web order total on an Endless Aisle line, always positive. extendedPrice is the

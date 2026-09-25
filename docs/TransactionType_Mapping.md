@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.109 | RonaORAEPubSub | September 2026**
+**PubSubApp v1.0.110 | RonaORAEPubSub | September 2026**
 
 ---
 
@@ -91,16 +91,18 @@ The legs are paired on `parentLineId` — the re-sale leg's `parentLineId` is th
 
 ---
 
-## SODA and Endless Aisle Override (Item-Level)
+## SODA, Endless Aisle and Web Tendering Override (Item-Level)
 
-Both are detected from `item.altIds` — an entry with `type = "sodaType"` whose `value` is either
-`SODA` or `ENDLESS_AISLE`. They are mutually exclusive, and only the matching item is affected;
-other items in the same transaction keep their normal mapping.
+All three are detected from `item.altIds` — an entry with `type = "sodaType"` whose `value` is
+`SODA`, `ENDLESS_AISLE` or `WEB_TENDERING`. `sodaType` carries one value per item, so the three are
+mutually exclusive, and only the matching item is affected; other items in the same transaction keep
+their normal mapping.
 
 | `sodaType` | SLFLNT | Notes |
 |------------|--------|-------|
 | `SODA` | **30** | `SLFRFD` = the raw `sodaRef`, padded to 16 |
 | `ENDLESS_AISLE` | **42** | See below |
+| `WEB_TENDERING` | **30** | See below. Shares line type `30` with `SODA` but reaches it by a separate, much narrower branch |
 
 **Endless Aisle** (CR *RONA TSP Mapping Changes*, MIM-7509 / MIM-8070) presents an in-store web
 order as a single line carrying the web order total:
@@ -123,6 +125,30 @@ standard return mapping already produces it.
 > The payload also carries `lineBusiness.detailType = "42"` on EA items. It is **deliberately
 > ignored**: keying off `sodaType` keeps detection identical in shape to every other flow, whereas
 > `detailType` was introduced for Endless Aisle alone (confirmed with Rona 08/12/26).
+
+**Web Tendering** (MIM-10971) is an in-store payment against, or refund of, a web order. Unlike the
+two branches above it changes **only three fields** — the ticket scopes itself to those and states
+everything else stays as it is, so SKU, quantity, tax flags, price vehicle and reason code all keep
+their normal merchandise mapping:
+
+| Field | Sale | Refund |
+|-------|------|--------|
+| `SLFLNT` | `30` | `30` |
+| `SLFORG` | Money due, from `pricing.priceOverride.overrideUnitPrice`. Always emitted — zeros when nothing is due, which is the normal case on a fulfilment | `000000000`, pinned by the ticket even though the payload carries a negative override price |
+| `SLFRFD` | The tender's `invoiceNumber`, padded to 16 | Same as sale |
+
+`SLFTTP`/`TNFTTP` (`01` sale, `11` refund) and `TNFFCD` = `PL` already fall out of the standard
+handling and needed no Web-Tendering-specific code.
+
+`SLFRFD` comes from `transaction.tenders[0].card.emv.tags.invoiceNumber`, which arrives as exactly
+the 15 digits the field wants (5-digit SODA store + 8-digit order + 2-digit sequence, e.g.
+`005010240353400`), so it is padded to 16 with one trailing space rather than composed from parts —
+the same shape as the Endless Aisle `SLFRFD` above.
+
+> Web Tendering items **also** carry `altIds` `sodaRef` holding the identical value, and
+> `lineBusiness.detailType = "30"`. The ticket names the tender's `invoiceNumber`, so that is what is
+> read; the two agree in every capture supplied. See [Open_Questions.md](Open_Questions.md) for the
+> robustness question this leaves open.
 
 ---
 
@@ -358,6 +384,7 @@ pre-v1.0.98 logic, which matters only for a payload whose region and rate disagr
 | `GetEPPCoverageIdentifier()` | Item attribute `x-epp-coverage-identifier` = "9" | Both SLFTTP & SLFLNT → 21 per item |
 | `AdjustmentPairing.Build()` | ADJUSTMENT items linked by `parentLineId` sharing a SKU | Identifies each pair's return vs re-sale leg |
 | `IsReturnLine()` | Whole transaction is a RETURN, or this item is an adjustment return leg | Per-line return treatment (signs, pinned price fields) |
+| `IsItemWebTendering()` | Item `altIds` has `type="sodaType"`, `value="WEB_TENDERING"` | SLFLNT → 30, plus SLFORG and SLFRFD |
 
 ---
 

@@ -193,6 +193,11 @@ public class EmvTags
 {
     [JsonPropertyName("magStrip")]
     public string? MagStrip { get; set; }
+
+    // Web Tendering carries the SODA reference here rather than in item.altIds: 15 digits made up
+    // of a 5-digit SODA store, an 8-digit order number and a 2-digit sequence. Source for SLFRFD.
+    [JsonPropertyName("invoiceNumber")]
+    public string? InvoiceNumber { get; set; }
 }
 
 public class TransactionItem
