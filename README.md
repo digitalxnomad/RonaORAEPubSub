@@ -383,7 +383,25 @@ Log entries include:
 
 ## Version History
 
-### v1.0.110 (09/25/26) ✨ Current
+### v1.0.111 (09/28/26) ✨ Current
+**`SLFSPS` is the last 5 digits of the cashier's loginId — never the register (MIM-11158).**
+- 🔧 **The register no longer overrides the cashier** - `SLFSPS` was set to `Workstation.RegisterID` whenever the register id started with `8`, on the assumption that meant self-checkout. But an ACO transaction rings on register 85 too, so every register-85 sale and return printed the till instead of the person: loginId `2` on register 85 emitted `00085`.
+- 🔧 **A long loginId is truncated from the right, not the left** - `PadNumeric` truncates leading characters, so loginId `6006523` emitted `60065` where it should emit `06523`. The ticket calls this out explicitly ("do not use the first 5 digits"), and it was broken independently of the register bug — it affected register-06 and register-20 captures that the register heuristic never touched.
+- ℹ️ Scope is ACO-wide, not Web Tendering. It surfaced on WT labs but the mapping is the same for any sale or return.
+
+  | `registerId` | `loginId` | Before | After |
+  |--------------|-----------|--------|-------|
+  | 10 | `6005100` | `60051` | `05100` |
+  | 10 | `6006523` | `60065` | `06523` |
+  | 10 | `2` | `00002` | `00002` |
+  | 85 | `6005100` | `00085` | `05100` |
+  | 85 | `2` | `00085` | `00002` |
+  | 85 | `6008615` | `00085` | `08615` |
+
+- ⚠️ **41 baselines moved — the suite had been locking the defect in.** Every changed line across all 41 files is `SLFSPS` (272 lines; 136 records) and no other field moved anywhere, which is what confirms the blast radius. Roughly 30 are register-85 captures and 11 are register-06/20 captures carrying loginId `6006523`. Those baselines were wrong, which is why 186 passing tests never caught this.
+- ✅ Teeth-checked: restoring the register heuristic fails exactly those 41 cases. All six of the ticket's acceptance criteria verified against the built binary.
+
+### v1.0.110 (09/25/26)
 **Web Tendering payments and refunds now present as line type `30` (MIM-10971).**
 - ✨ **New `WEB_TENDERING` line type** - An in-store payment against, or refund of, a web order now emits `SLFLNT=30` so MMS/SODA see a web-tendered order rather than merchandise. Previously it fell through to plain merchandise and printed `SLFLNT=01` on a sale and `11` on a refund. Detected from `item.altIds` `type="sodaType"`, `value="WEB_TENDERING"` — the third sibling of the existing `SODA`→`30` and `ENDLESS_AISLE`→`42` branches, mutually exclusive with both.
 - ✨ **`SLFORG` carries the money due** - From `pricing.priceOverride.overrideUnitPrice`, always emitted: zeros when nothing is due, which is the normal case on a fulfilment. A refund is pinned to `000000000` as the ticket specifies, even though the payload carries a negative override price there.
@@ -694,6 +712,7 @@ v1.0.97–98 identified the two halves of a price-adjustment pair by SKU (for th
 - ✨ **SLFSPS (SalesPerson) Logic** - SCO vs ACO determination
   - **SCO** (Self-Checkout): Register starts with "8" → uses `Workstation.RegisterID` padded to 5 digits
   - **ACO** (Assisted Checkout): Register doesn't start with "8" → uses `actor.cashier.loginId` padded to 5 digits
+  - ⚠️ **Superseded in v1.0.111.** The register is never used, and a long `loginId` is truncated from the right. See that entry.
 - ✨ **SLFTCD (TaxRateCode)** - Blank for order records; maps from `taxes.taxCode` (first with jurisdiction) for tax records
 - ✨ **All Date/Time Fields** - Timezone adjustment applied consistently
   - `SLFTDT`, `SLFTTM`, `TNFTDT`, `TNFTTM` all use `ApplyTimezoneAdjustment()`

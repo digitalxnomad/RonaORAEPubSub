@@ -59,20 +59,15 @@ class RetailEventMapper
         int createDate = pollDate;
         int createTime = GetTimeAsInt(transactionDateTime);
 
-        // Calculate SLFSPS - SalesPerson ID: If register starts with 8 (SCO), use register ID; otherwise ACO uses "00000"
-        string? salesPersonId;
-        string registerId = retailEvent.BusinessContext?.Workstation?.RegisterId ?? "";
-        if (registerId.StartsWith("8"))
-        {
-            // SCO (Self-Checkout) - use Workstation.RegisterID padded with zeros to 5 digits
-            salesPersonId = PadNumeric(registerId, 5);
-        }
-        else
-        {
-            // ACO (Assisted Checkout) - use actor.cashier.loginId padded with zeros to 5 digits
-            string cashierLoginId = retailEvent.Actor?.Cashier?.LoginId ?? "";
-            salesPersonId = PadNumeric(cashierLoginId, 5);
-        }
+        // SLFSPS - SalesPerson: always the last 5 digits of actor.cashier.loginId, right-justified.
+        // The register is never used. It was, whenever the register id started with "8" on the
+        // assumption that meant self-checkout, but an ACO transaction rings on register 85 too —
+        // so that heuristic printed the register for a human cashier. Truncation takes the last 5,
+        // not the first: loginId 6005100 is salesperson 05100.
+        string cashierLoginId = retailEvent.Actor?.Cashier?.LoginId ?? "";
+        string? salesPersonId = cashierLoginId.Length > 5
+            ? cashierLoginId.Substring(cashierLoginId.Length - 5)
+            : PadNumeric(cashierLoginId, 5);
 
         // SLFOTS/SLFOTD/SLFOTR/SLFOTT — original-transaction reference, shared by every SKU and
         // tax record. Sales print zeros. Returns identify the original sale via
@@ -464,7 +459,7 @@ class RetailEventMapper
                     : "00000";
                 orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                 orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
-                orderRecord.SalesPerson = salesPersonId; // SLFSPS - SCO uses register ID, ACO uses "00000"
+                orderRecord.SalesPerson = salesPersonId; // SLFSPS
 
                 // Discount reasons - per CSV rules
                 orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
@@ -1181,7 +1176,7 @@ class RetailEventMapper
                                 OriginalStore = "00000", // SLFOST - Required
                                 GroupDiscAmount = "000000000", // SLFGDA - Required
                                 GroupDiscSign = "", // SLFGDS - Empty string
-                                SalesPerson = salesPersonId, // SLFSPS - SCO uses register ID, ACO uses "00000"
+                                SalesPerson = salesPersonId, // SLFSPS
                                 DiscountAmount = "000000000", // SLFDSA - Must be "000000000"
                                 DiscountType = "", // SLFDST - Empty string
                                 DiscountAmountNegativeSign = "", // SLFDSN - Empty string

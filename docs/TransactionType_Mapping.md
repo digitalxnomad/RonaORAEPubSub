@@ -1,6 +1,6 @@
 # Transaction Type Mapping Analysis
 
-**PubSubApp v1.0.110 | RonaORAEPubSub | September 2026**
+**PubSubApp v1.0.111 | RonaORAEPubSub | September 2026**
 
 ---
 
@@ -385,6 +385,29 @@ pre-v1.0.98 logic, which matters only for a payload whose region and rate disagr
 | `AdjustmentPairing.Build()` | ADJUSTMENT items linked by `parentLineId` sharing a SKU | Identifies each pair's return vs re-sale leg |
 | `IsReturnLine()` | Whole transaction is a RETURN, or this item is an adjustment return leg | Per-line return treatment (signs, pinned price fields) |
 | `IsItemWebTendering()` | Item `altIds` has `type="sodaType"`, `value="WEB_TENDERING"` | SLFLNT → 30, plus SLFORG and SLFRFD |
+
+---
+
+## SLFSPS — Salesperson (5 digits, right-justified)
+
+**Source:** the **last 5 digits** of `actor.cashier.loginId`, zero-padded when shorter.
+
+| `loginId` | `SLFSPS` |
+|-----------|----------|
+| `6005100` | `05100` |
+| `6006523` | `06523` |
+| `2` | `00002` |
+
+The register is **never** used, and truncation takes the last 5 characters, not the first. Both of
+those were wrong before v1.0.111 (MIM-11158):
+
+- `Workstation.RegisterID` was substituted whenever the register id started with `8`, on the
+  assumption that meant self-checkout. An ACO transaction rings on register 85 too, so every
+  register-85 transaction printed the till instead of the person.
+- `PadNumeric` truncates *leading* characters, so a 7-digit `loginId` lost its last two digits
+  rather than its first two. This was broken independently, on registers the heuristic never touched.
+
+This is ACO-wide — any sale or return, not a Web Tendering concern, though that is where it surfaced.
 
 ---
 
