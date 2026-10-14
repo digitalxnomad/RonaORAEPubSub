@@ -704,6 +704,14 @@ class RetailEventMapper
 
                         string feeAmountFormatted = Math.Abs(feeAmountDollars).ToString("F2");
 
+                        // fee.amount is the line total (qty 2 of SKU 241097 carries 9.00, not 4.50),
+                        // so SLFSEL is the per-unit fee and only SLFEXT keeps the total (MIM-10222).
+                        // A fee that doesn't divide evenly rounds the unit fee to the cent.
+                        decimal feeQuantity = Math.Abs(item.Quantity?.Value ?? 1m);
+                        string feeUnitFormatted = feeQuantity > 0
+                            ? Math.Round(Math.Abs(feeAmountDollars) / feeQuantity, 2, MidpointRounding.AwayFromZero).ToString("F2")
+                            : feeAmountFormatted;
+
                         string feeAuthority = fee.Authority ?? "";
                         string feeCode = fee.Code ?? "";
 
@@ -751,7 +759,7 @@ class RetailEventMapper
                             OverridePriceNegativeSign = "",
                             OriginalRetail = "000000000",
                             OriginalRetailNegativeSign = "",
-                            ItemSellPrice = FormatCurrency(feeAmountFormatted, 9),
+                            ItemSellPrice = FormatCurrency(feeUnitFormatted, 9),
                             SellPriceNegativeSign = "",
                             ExtendedValue = FormatCurrency(feeAmountFormatted, 11),
                             ExtendedValueNegativeSign = feeAmountDollars < 0 ? "-" : "",

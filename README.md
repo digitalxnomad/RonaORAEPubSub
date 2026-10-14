@@ -383,7 +383,19 @@ Log entries include:
 
 ## Version History
 
-### v1.0.111 (09/28/26) ✨ Current
+### v1.0.112 (10/14/26) ✨ Current
+**Eco fee line `SLFSEL` is the per-unit fee, not the line total, when quantity > 1 (MIM-10222).**
+- 🔧 **`SLFSEL` no longer repeats `SLFEXT`** - ORAE's `fee.amount` is the total for the line (qty 2 of SKU 241097 carries `9.00`), and the 83 line put that total into both `SLFSEL` and `SLFEXT`. `SLFSEL` is now `fee.amount ÷ |quantity|`; `SLFEXT` still carries the exact total.
+- ℹ️ A fee that doesn't divide evenly rounds the unit fee to the cent (`1.00` over qty 3 → `SLFSEL` `0.33`, `SLFEXT` `1.00`). Quantity-1 lines are unchanged.
+- ✨ New regression sample `samples/EcoFee Quantity/synthetic_sale_ecofee_qty.json` (qty 2 and qty 3 eco lines).
+
+  | Qty | `fee.amount` | `SLFSEL` before | `SLFSEL` after | `SLFEXT` |
+  |-----|--------------|-----------------|----------------|----------|
+  | 1 | 4.50 | 4.50 | 4.50 | 4.50 |
+  | 2 | 9.00 | 9.00 | 4.50 | 9.00 |
+  | 3 | 1.00 | 1.00 | 0.33 | 1.00 |
+
+### v1.0.111 (09/28/26)
 **`SLFSPS` is the last 5 digits of the cashier's loginId — never the register (MIM-11158).**
 - 🔧 **The register no longer overrides the cashier** - `SLFSPS` was set to `Workstation.RegisterID` whenever the register id started with `8`, on the assumption that meant self-checkout. But an ACO transaction rings on register 85 too, so every register-85 sale and return printed the till instead of the person: loginId `2` on register 85 emitted `00085`.
 - 🔧 **A long loginId is truncated from the right, not the left** - `PadNumeric` truncates leading characters, so loginId `6006523` emitted `60065` where it should emit `06523`. The ticket calls this out explicitly ("do not use the first 5 digits"), and it was broken independently of the register bug — it affected register-06 and register-20 captures that the register heuristic never touched.
