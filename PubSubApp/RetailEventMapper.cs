@@ -427,18 +427,25 @@ class RetailEventMapper
                 // from a source that happens to be present:
                 //   ON      SLFTE1 <- taxExemption.certificateId, SLFTE2 <- band, SLFTEN <- name
                 //   QC, BC  SLFTE1 <- taxExemption.certificateId; SLFTE2 and SLFTEN blank
+                //   BC FIRST_NATION  SLFTE1 <- certificateId, SLFTE2 <- x-tax-exemption-bandName,
+                //                    SLFTEN <- x-tax-exemption-customerName (MIM-11378)
                 //   AB      SLFTE2 <- extensions.x-tax-exemption-band; SLFTE1 and SLFTEN blank
                 if (isTaxExemptTransaction)
                 {
                     string exemptProvince = GetProvince(retailEvent)?.ToUpperInvariant() ?? "";
+                    bool isBcFirstNation = exemptProvince == "BC"
+                        && retailEvent.Transaction?.TaxExemption?.Program?.Trim().ToUpperInvariant() == "FIRST_NATION";
                     bool exemptIdFromCertificate = exemptProvince != "AB";
                     bool exemptIdFromBand = exemptProvince is not ("QC" or "BC");
-                    bool reportsCustomerName = exemptProvince is not ("QC" or "BC" or "AB");
+                    bool reportsCustomerName = isBcFirstNation || exemptProvince is not ("QC" or "BC" or "AB");
+
+                    string exemptId2 = isBcFirstNation ? GetExtension(retailEvent, "x-tax-exemption-bandName")
+                        : exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band")
+                        : "";
 
                     orderRecord.TaxExemptId1 = PadOrTruncate(
                         exemptIdFromCertificate ? retailEvent.Transaction?.TaxExemption?.CertificateId ?? "" : "", 20);
-                    orderRecord.TaxExemptId2 = PadOrTruncate(
-                        exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band") : "", 20);
+                    orderRecord.TaxExemptId2 = PadOrTruncate(exemptId2, 20);
                     orderRecord.TaxExemptionName = PadOrTruncate(
                         reportsCustomerName ? GetExtension(retailEvent, "x-tax-exemption-customerName") : "", 35);
                 }

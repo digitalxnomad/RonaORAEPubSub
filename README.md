@@ -383,7 +383,21 @@ Log entries include:
 
 ## Version History
 
-### v1.0.112 (10/14/26) ✨ Current
+### v1.0.113 (10/15/26) ✨ Current
+**BC First Nation (Purchase on Reserve) fills `SLFTE2` / `SLFTEN` (MIM-11378).**
+- ✨ **BC `FIRST_NATION` reports band name and customer name** - `SLFTE2` ← `extensions.x-tax-exemption-bandName`, `SLFTEN` ← `extensions.x-tax-exemption-customerName`. `SLFTE1` stays `taxExemption.certificateId` (Registration # or Band #). Previously BC blanked both.
+- ℹ️ `x-tax-exemption-bandName` is a new key being added upstream under MIM-11377; it is not the `x-tax-exemption-band` key ON/AB read. Until MIM-11377 ships, live payloads still put the band name in `x-tax-exemption-customerName`, so it lands in `SLFTEN`.
+- ℹ️ Other BC exemption programs (e.g. `PST_ONLY`) are unchanged: `SLFTE2` / `SLFTEN` stay blank even when the extensions are present. TX flags are untouched (MIM-10984).
+- ✨ New regression samples in `samples/Tax Exemptions/`: `bc_fn_{customer_name,band_name}_{registration,band_number}.json` and `bc_pst_only_with_names.json`.
+
+  | Entered | `SLFTE1` | `SLFTE2` | `SLFTEN` |
+  |---------|----------|----------|----------|
+  | Customer Name + Registration # | Registration # | blank | Customer Name |
+  | Customer Name + Band # | Band # | blank | Customer Name |
+  | Band Name + Registration # | Registration # | Band Name | blank |
+  | Band Name + Band # | Band # | Band Name | blank |
+
+### v1.0.112 (10/14/26)
 **Eco fee line `SLFSEL` is the per-unit fee, not the line total, when quantity > 1 (MIM-10222).**
 - 🔧 **`SLFSEL` no longer repeats `SLFEXT`** - ORAE's `fee.amount` is the total for the line (qty 2 of SKU 241097 carries `9.00`), and the 83 line put that total into both `SLFSEL` and `SLFEXT`. `SLFSEL` is now `fee.amount ÷ |quantity|`; `SLFEXT` still carries the exact total.
 - ℹ️ A fee that doesn't divide evenly rounds the unit fee to the cent (`1.00` over qty 3 → `SLFSEL` `0.33`, `SLFEXT` `1.00`). Quantity-1 lines are unchanged.
