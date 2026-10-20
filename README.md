@@ -383,7 +383,12 @@ Log entries include:
 
 ## Version History
 
-### v1.0.113 (10/15/26) ✨ Current
+### v1.0.114 (10/20/26) ✨ Current
+**Eco fee `SLFEXT` is always `SLFSEL` × quantity (MIM-10222 follow-up).**
+- 🔧 **`SLFEXT` is rebuilt from the unit fee** - MMS (Grace, 10/19) requires the extended eco fee to equal the unit eco fee times quantity. v1.0.112 copied `fee.amount` into `SLFEXT`, so a fee that didn't divide evenly left the two a cent apart. `SLFEXT` is now `round(SLFSEL × |quantity|)`.
+- ℹ️ Evenly divisible fees (the normal case) are unchanged. Only an uneven split moves: `1.00` over qty 3 → `SLFSEL` `0.33`, `SLFEXT` `0.99` (was `1.00`).
+
+### v1.0.113 (10/15/26)
 **BC First Nation (Purchase on Reserve) fills `SLFTE2` / `SLFTEN` (MIM-11378).**
 - ✨ **BC `FIRST_NATION` reports band name and customer name** - `SLFTE2` ← `extensions.x-tax-exemption-bandName`, `SLFTEN` ← `extensions.x-tax-exemption-customerName`. `SLFTE1` stays `taxExemption.certificateId` (Registration # or Band #). Previously BC blanked both.
 - ℹ️ `x-tax-exemption-bandName` is a new key being added upstream under MIM-11377; it is not the `x-tax-exemption-band` key ON/AB read. Until MIM-11377 ships, live payloads still put the band name in `x-tax-exemption-customerName`, so it lands in `SLFTEN`.

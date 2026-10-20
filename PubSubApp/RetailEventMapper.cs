@@ -709,15 +709,18 @@ class RetailEventMapper
                         // still print the 83 line (SLFTTP=11, positive amount, sign on SLFEXN).
                         if (fee.Amount == null || !decimal.TryParse(fee.Amount.Value, out decimal feeAmountDollars) || feeAmountDollars == 0) continue;
 
-                        string feeAmountFormatted = Math.Abs(feeAmountDollars).ToString("F2");
-
-                        // fee.amount is the line total (qty 2 of SKU 241097 carries 9.00, not 4.50),
-                        // so SLFSEL is the per-unit fee and only SLFEXT keeps the total (MIM-10222).
-                        // A fee that doesn't divide evenly rounds the unit fee to the cent.
+                        // fee.amount is the line total (qty 2 of SKU 241097 carries 9.00, not 4.50), so
+                        // SLFSEL is the per-unit fee. MMS requires SLFEXT = SLFSEL x quantity, so SLFEXT is
+                        // rebuilt from the rounded unit fee rather than copied from fee.amount (MIM-10222).
                         decimal feeQuantity = Math.Abs(item.Quantity?.Value ?? 1m);
-                        string feeUnitFormatted = feeQuantity > 0
-                            ? Math.Round(Math.Abs(feeAmountDollars) / feeQuantity, 2, MidpointRounding.AwayFromZero).ToString("F2")
-                            : feeAmountFormatted;
+                        decimal feeUnit = feeQuantity > 0
+                            ? Math.Round(Math.Abs(feeAmountDollars) / feeQuantity, 2, MidpointRounding.AwayFromZero)
+                            : Math.Abs(feeAmountDollars);
+                        decimal feeExtended = feeQuantity > 0
+                            ? Math.Round(feeUnit * feeQuantity, 2, MidpointRounding.AwayFromZero)
+                            : Math.Abs(feeAmountDollars);
+                        string feeUnitFormatted = feeUnit.ToString("F2");
+                        string feeAmountFormatted = feeExtended.ToString("F2");
 
                         string feeAuthority = fee.Authority ?? "";
                         string feeCode = fee.Code ?? "";
