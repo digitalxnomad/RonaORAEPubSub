@@ -383,7 +383,20 @@ Log entries include:
 
 ## Version History
 
-### v1.0.114 (10/20/26) ✨ Current
+### v1.0.115 (10/22/26) ✨ Current
+**First Nation exemptions identify the customer in `SLFTEN`: BC band name moves out of `SLFTE2` (MIM-11473), QC Kahnawake reports the customer name (MIM-11421).**
+- 🔧 **BC `FIRST_NATION`: `SLFTE2` is always blank, `SLFTEN` = customer name or band name** - sales audit (Grace, 10/20) keys First Nation exemptions off `SLFTEN`, so the band name v1.0.113 put in `SLFTE2` now goes to `SLFTEN` instead. `SLFTEN` ← `x-tax-exemption-customerName`, falling back to `x-tax-exemption-bandName` when no customer name was entered. `SLFTE1` is unchanged.
+- ✨ **QC `FIRST_NATION_PARTIAL` (Kahnawake): `SLFTEN` ← `x-tax-exemption-customerName`** - previously blank for every QC exemption. Other QC programs still leave it blank.
+- ✨ New regression sample `samples/Tax Exemptions/bc_fn_customer_and_band_name.json` (both names present → customer name wins).
+
+  | BC FIRST_NATION, cashier enters | `SLFTE1` | `SLFTE2` | `SLFTEN` |
+  |---------------------------------|----------|----------|----------|
+  | Customer Name + Band # | Band # | blank | Customer Name |
+  | Customer Name + Registration # | Registration # | blank | Customer Name |
+  | Band Name + Band # | Band # | blank (was Band Name) | Band Name (was blank) |
+  | Band Name + Registration # | Registration # | blank (was Band Name) | Band Name (was blank) |
+
+### v1.0.114 (10/20/26)
 **Eco fee `SLFEXT` is always `SLFSEL` × quantity (MIM-10222 follow-up).**
 - 🔧 **`SLFEXT` is rebuilt from the unit fee** - MMS (Grace, 10/19) requires the extended eco fee to equal the unit eco fee times quantity. v1.0.112 copied `fee.amount` into `SLFEXT`, so a fee that didn't divide evenly left the two a cent apart. `SLFEXT` is now `round(SLFSEL × |quantity|)`.
 - ℹ️ Evenly divisible fees (the normal case) are unchanged. Only an uneven split moves: `1.00` over qty 3 → `SLFSEL` `0.33`, `SLFEXT` `0.99` (was `1.00`).
