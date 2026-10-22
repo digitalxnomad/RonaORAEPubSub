@@ -383,7 +383,18 @@ Log entries include:
 
 ## Version History
 
-### v1.0.115 (10/22/26) ✨ Current
+### v1.0.116 (10/22/26) ✨ Current
+**MB/SK Provincial Government (GST only) reports the certificate in `SLFTE2`, not `SLFTE1` (MIM-11502).**
+- 🔧 **MB/SK `PROVINCIAL_GOVERNMENT`: `SLFTE2` ← `taxExemption.certificateId`, `SLFTE1` and `SLFTEN` blank** - Grace's updated rule distinguishes the GST-only exemption from the PST-only ones by which field carries the certificate. Previously (MIM-11162) every MB/SK exemption put it in `SLFTE1`.
+- 🔧 **MB/SK PST-only programs keep `SLFTE1` ← certificateId, and `SLFTE2` / `SLFTEN` are now always blank** - matching the ticket's summary table. Before, a payload that happened to carry `x-tax-exemption-band` / `x-tax-exemption-customerName` would have filled them through the default branch.
+- ✨ New regression samples in `samples/Tax Exemptions/`: `mb_exempt_provincial_government.json`, `sk_exempt_provincial_government.json`, `sk_exempt_pst_only.json`.
+
+  | MB / SK exemption type | `SLFTE1` | `SLFTE2` | `SLFTEN` |
+  |------------------------|----------|----------|----------|
+  | PST only (all PST types) | certificateId | blank | blank |
+  | GST only (`PROVINCIAL_GOVERNMENT`) | blank (was certificateId) | certificateId (was blank) | blank |
+
+### v1.0.115 (10/22/26)
 **First Nation exemptions identify the customer in `SLFTEN`: BC band name moves out of `SLFTE2` (MIM-11473), QC Kahnawake reports the customer name (MIM-11421).**
 - 🔧 **BC `FIRST_NATION`: `SLFTE2` is always blank, `SLFTEN` = customer name or band name** - sales audit (Grace, 10/20) keys First Nation exemptions off `SLFTEN`, so the band name v1.0.113 put in `SLFTE2` now goes to `SLFTEN` instead. `SLFTEN` ← `x-tax-exemption-customerName`, falling back to `x-tax-exemption-bandName` when no customer name was entered. `SLFTE1` is unchanged.
 - ✨ **QC `FIRST_NATION_PARTIAL` (Kahnawake): `SLFTEN` ← `x-tax-exemption-customerName`** - previously blank for every QC exemption. Other QC programs still leave it blank.

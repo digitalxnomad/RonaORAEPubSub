@@ -431,25 +431,32 @@ class RetailEventMapper
                 //                    else bandName - sales audit keys First Nation off SLFTEN (MIM-11473)
                 //   QC FIRST_NATION_PARTIAL  SLFTEN <- x-tax-exemption-customerName (MIM-11421)
                 //   AB      SLFTE2 <- extensions.x-tax-exemption-band; SLFTE1 and SLFTEN blank
+                //   MB, SK  PST only: SLFTE1 <- certificateId; SLFTE2 and SLFTEN blank
+                //           PROVINCIAL_GOVERNMENT (GST only): SLFTE2 <- certificateId; SLFTE1 and SLFTEN blank (MIM-11502)
                 if (isTaxExemptTransaction)
                 {
                     string exemptProvince = GetProvince(retailEvent)?.ToUpperInvariant() ?? "";
                     string exemptProgram = retailEvent.Transaction?.TaxExemption?.Program?.Trim().ToUpperInvariant() ?? "";
+                    string certificateId = retailEvent.Transaction?.TaxExemption?.CertificateId ?? "";
                     bool isBcFirstNation = exemptProvince == "BC" && exemptProgram == "FIRST_NATION";
                     bool isQcFirstNationPartial = exemptProvince == "QC" && exemptProgram == "FIRST_NATION_PARTIAL";
-                    bool exemptIdFromCertificate = exemptProvince != "AB";
-                    bool exemptIdFromBand = exemptProvince is not ("QC" or "BC");
+                    bool isMbOrSk = exemptProvince is "MB" or "SK";
+                    bool isMbSkProvincialGov = isMbOrSk && exemptProgram == "PROVINCIAL_GOVERNMENT";
+                    bool exemptIdFromCertificate = exemptProvince != "AB" && !isMbSkProvincialGov;
+                    bool exemptIdFromBand = exemptProvince is not ("QC" or "BC" or "MB" or "SK");
                     bool reportsCustomerName = isBcFirstNation || isQcFirstNationPartial
-                        || exemptProvince is not ("QC" or "BC" or "AB");
+                        || exemptProvince is not ("QC" or "BC" or "AB" or "MB" or "SK");
 
                     string exemptionName = reportsCustomerName ? GetExtension(retailEvent, "x-tax-exemption-customerName") : "";
                     if (isBcFirstNation && string.IsNullOrWhiteSpace(exemptionName))
                         exemptionName = GetExtension(retailEvent, "x-tax-exemption-bandName");
 
-                    orderRecord.TaxExemptId1 = PadOrTruncate(
-                        exemptIdFromCertificate ? retailEvent.Transaction?.TaxExemption?.CertificateId ?? "" : "", 20);
-                    orderRecord.TaxExemptId2 = PadOrTruncate(
-                        exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band") : "", 20);
+                    string exemptId2 = isMbSkProvincialGov ? certificateId
+                        : exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band")
+                        : "";
+
+                    orderRecord.TaxExemptId1 = PadOrTruncate(exemptIdFromCertificate ? certificateId : "", 20);
+                    orderRecord.TaxExemptId2 = PadOrTruncate(exemptId2, 20);
                     orderRecord.TaxExemptionName = PadOrTruncate(exemptionName, 35);
                 }
                 else
