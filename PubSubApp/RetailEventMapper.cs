@@ -432,7 +432,8 @@ class RetailEventMapper
                 //   QC FIRST_NATION_PARTIAL  SLFTEN <- x-tax-exemption-customerName (MIM-11421)
                 //   AB      SLFTE2 <- extensions.x-tax-exemption-band; SLFTE1 and SLFTEN blank
                 //   MB, SK  PST only: SLFTE1 <- certificateId; SLFTE2 and SLFTEN blank
-                //           PROVINCIAL_GOVERNMENT (GST only): SLFTE2 <- certificateId; SLFTE1 and SLFTEN blank (MIM-11502)
+                //   MB, SK, AB PROVINCIAL_GOVERNMENT (GST only): SLFTE2 <- certificateId; SLFTE1 and SLFTEN
+                //           blank (MIM-11502; AB MIM-11517, where Order Service sends certificateId "GST exempt")
                 if (isTaxExemptTransaction)
                 {
                     string exemptProvince = GetProvince(retailEvent)?.ToUpperInvariant() ?? "";
@@ -441,8 +442,8 @@ class RetailEventMapper
                     bool isBcFirstNation = exemptProvince == "BC" && exemptProgram == "FIRST_NATION";
                     bool isQcFirstNationPartial = exemptProvince == "QC" && exemptProgram == "FIRST_NATION_PARTIAL";
                     bool isMbOrSk = exemptProvince is "MB" or "SK";
-                    bool isMbSkProvincialGov = isMbOrSk && exemptProgram == "PROVINCIAL_GOVERNMENT";
-                    bool exemptIdFromCertificate = exemptProvince != "AB" && !isMbSkProvincialGov;
+                    bool isGstOnlyProvincialGov = (isMbOrSk || exemptProvince == "AB") && exemptProgram == "PROVINCIAL_GOVERNMENT";
+                    bool exemptIdFromCertificate = exemptProvince != "AB" && !isGstOnlyProvincialGov;
                     bool exemptIdFromBand = exemptProvince is not ("QC" or "BC" or "MB" or "SK");
                     bool reportsCustomerName = isBcFirstNation || isQcFirstNationPartial
                         || exemptProvince is not ("QC" or "BC" or "AB" or "MB" or "SK");
@@ -451,7 +452,7 @@ class RetailEventMapper
                     if (isBcFirstNation && string.IsNullOrWhiteSpace(exemptionName))
                         exemptionName = GetExtension(retailEvent, "x-tax-exemption-bandName");
 
-                    string exemptId2 = isMbSkProvincialGov ? certificateId
+                    string exemptId2 = isGstOnlyProvincialGov ? certificateId
                         : exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band")
                         : "";
 

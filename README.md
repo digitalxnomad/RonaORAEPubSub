@@ -383,7 +383,13 @@ Log entries include:
 
 ## Version History
 
-### v1.0.116 (10/22/26) ✨ Current
+### v1.0.117 (10/23/26) ✨ Current
+**AB Provincial Government (GST only) reports the certificate in `SLFTE2` (MIM-11517).**
+- ✨ **AB `PROVINCIAL_GOVERNMENT`: `SLFTE2` ← `taxExemption.certificateId`** - Order Service will send `certificateId = "GST exempt"` for these sales (MIM-11513), and it follows the same GST-only rule as MB/SK (MIM-11502). `SLFTE1` and `SLFTEN` stay blank. Previously AB filled `SLFTE2` from `x-tax-exemption-band`, which other AB programs still do.
+- ℹ️ Detection is province + program only (`taxArea = AB`, `program = PROVINCIAL_GOVERNMENT`), matching MB/SK; `authority` is not checked.
+- ✨ New regression sample `samples/Tax Exemptions/ab_exempt_provincial_government_gst_exempt.json`. The existing `ab_exempt_provincial_government.json` (no certificateId) is unchanged.
+
+### v1.0.116 (10/22/26)
 **MB/SK Provincial Government (GST only) reports the certificate in `SLFTE2`, not `SLFTE1` (MIM-11502).**
 - 🔧 **MB/SK `PROVINCIAL_GOVERNMENT`: `SLFTE2` ← `taxExemption.certificateId`, `SLFTE1` and `SLFTEN` blank** - Grace's updated rule distinguishes the GST-only exemption from the PST-only ones by which field carries the certificate. Previously (MIM-11162) every MB/SK exemption put it in `SLFTE1`.
 - 🔧 **MB/SK PST-only programs keep `SLFTE1` ← certificateId, and `SLFTE2` / `SLFTEN` are now always blank** - matching the ticket's summary table. Before, a payload that happened to carry `x-tax-exemption-band` / `x-tax-exemption-customerName` would have filled them through the default branch.
