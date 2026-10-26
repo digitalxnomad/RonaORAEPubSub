@@ -383,7 +383,18 @@ Log entries include:
 
 ## Version History
 
-### v1.0.117 (10/23/26) ✨ Current
+### v1.0.118 (10/26/26) ✨ Current
+**First Nation outside Ontario marks the waived tax `D`, not `O` (MIM-11551).**
+- 🔧 **`O` is Ontario-only** - BC `FIRST_NATION` and QC `FIRST_NATION_PARTIAL` (and First Nation in any other province on the waived-tax path: AB, MB, SK) now print `D` on the flag of the exempted tax. MIM-10984 had them print `O`.
+- ℹ️ Unchanged: Ontario First Nation (`SLFTX3 = O`, MIM-10106), PST-only / GST-only (`E`), `SLFTX3`/`SLFTX4` = `N` for these provinces, TE1/TE2/TEN, and RIMTNF.
+
+  | Scenario | SLFTX1 | SLFTX2 | SLFTX3 | SLFTX4 |
+  |----------|--------|--------|--------|--------|
+  | BC First Nation (GST + PST off) | D (was O) | D (was O) | N | N |
+  | QC Kahnawake (QST off, GST on) | D (was O) | Y | N | N |
+  | ON First Nation | N | N | O | Y |
+
+### v1.0.117 (10/23/26)
 **AB Provincial Government (GST only) reports the certificate in `SLFTE2` (MIM-11517).**
 - ✨ **AB `PROVINCIAL_GOVERNMENT`: `SLFTE2` ← `taxExemption.certificateId`** - Order Service will send `certificateId = "GST exempt"` for these sales (MIM-11513), and it follows the same GST-only rule as MB/SK (MIM-11502). `SLFTE1` and `SLFTEN` stay blank. Previously AB filled `SLFTE2` from `x-tax-exemption-band`, which other AB programs still do.
 - ℹ️ Detection is province + program only (`taxArea = AB`, `program = PROVINCIAL_GOVERNMENT`), matching MB/SK; `authority` is not checked.

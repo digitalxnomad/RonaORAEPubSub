@@ -2153,7 +2153,8 @@ class RetailEventMapper
             //
             // QC, AB and BC mark the flag belonging to the waived tax (MIM-10984), leaving
             // SLFTX3/SLFTX4 at "N":
-            //   "O" - a First Nation exemption (FIRST_NATION, FIRST_NATION_PARTIAL)
+            //   "D" - a First Nation exemption (FIRST_NATION, FIRST_NATION_PARTIAL). "O" is
+            //         Ontario-only, so First Nation outside Ontario prints "D" (MIM-11551)
             //   "E" - any other programme (e.g. PST_ONLY, PROVINCIAL_GOVERNMENT)
             // MB and SK are not in that ticket and have no capture; they are included because they
             // are structurally identical to BC. Ontario (MIM-10106) is in production and records
@@ -2176,7 +2177,7 @@ class RetailEventMapper
                 else
                 {
                     string program = retailEvent.Transaction?.TaxExemption?.Program?.Trim().ToUpperInvariant() ?? "";
-                    string marker = program is "FIRST_NATION" or "FIRST_NATION_PARTIAL" ? "O" : "E";
+                    string marker = program is "FIRST_NATION" or "FIRST_NATION_PARTIAL" ? "D" : "E";
 
                     foreach (TaxDetail exemptedTax in exemptedTaxes)
                     {
