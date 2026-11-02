@@ -25,7 +25,8 @@ class RetailEventMapper
         bool isPaymentOnAccount = IsPaymentOnAccount(retailEvent);
 
         // Tax-exemption transaction (Ontario First Nation partial exemption): when true, every SKU line
-        // gets SLFTE1/2/N populated, and the SKU whose taxes[].status == "A" gets SLFTX3 = "O".
+        // gets SLFTE1/2/N populated (outside Ontario SLFTE1/2 only where that SKU's tax is exempted),
+        // and the SKU whose taxes[].status == "A" gets SLFTX3 = "O".
         bool isTaxExemptTransaction = retailEvent.Transaction?.Qualifiers?.IsTaxExemptTransaction == true;
 
         // Check for gift card tender
@@ -434,6 +435,9 @@ class RetailEventMapper
                 //   MB, SK  PST only: SLFTE1 <- certificateId; SLFTE2 and SLFTEN blank
                 //   MB, SK, AB PROVINCIAL_GOVERNMENT (GST only): SLFTE2 <- certificateId; SLFTE1 and SLFTEN
                 //           blank (MIM-11502; AB MIM-11517, where Order Service sends certificateId "GST exempt")
+                // Outside Ontario the IDs follow the SKU's own exempted tax (MIM-11567): SLFTE1 only when
+                // the SKU has a provincial (PST/QST) tax with status "A", SLFTE2 only when it has a GST
+                // one - the same taxes that set SLFTX1/SLFTX2. Ontario keeps both on every SKU line.
                 if (isTaxExemptTransaction)
                 {
                     string exemptProvince = GetProvince(retailEvent)?.ToUpperInvariant() ?? "";
@@ -456,7 +460,22 @@ class RetailEventMapper
                         : exemptIdFromBand ? GetExtension(retailEvent, "x-tax-exemption-band")
                         : "";
 
-                    orderRecord.TaxExemptId1 = PadOrTruncate(exemptIdFromCertificate ? certificateId : "", 20);
+                    string exemptId1 = exemptIdFromCertificate ? certificateId : "";
+
+                    if (exemptProvince is "QC" or "BC" or "AB" or "MB" or "SK")
+                    {
+                        var exemptedBuckets = (item.Taxes ?? [])
+                            .Where(t => string.Equals(t.Status, "A", StringComparison.OrdinalIgnoreCase))
+                            .Select(t => ClassifyTaxBucket(t, exemptProvince, false, exemptProvince == "AB"))
+                            .ToHashSet();
+
+                        if (!exemptedBuckets.Overlaps(["PQ", "BC", "MB", "SK"]))
+                            exemptId1 = "";
+                        if (!exemptedBuckets.Contains("FED"))
+                            exemptId2 = "";
+                    }
+
+                    orderRecord.TaxExemptId1 = PadOrTruncate(exemptId1, 20);
                     orderRecord.TaxExemptId2 = PadOrTruncate(exemptId2, 20);
                     orderRecord.TaxExemptionName = PadOrTruncate(exemptionName, 35);
                 }

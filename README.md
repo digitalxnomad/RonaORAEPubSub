@@ -383,7 +383,19 @@ Log entries include:
 
 ## Version History
 
-### v1.0.118 (10/26/26) ✨ Current
+### v1.0.119 (10/27/26) ✨ Current
+**`SLFTE1` / `SLFTE2` only on SKUs whose matching tax is exempted (MIM-11567).**
+- 🔧 **Exemption IDs follow each SKU's own tax** - outside Ontario (QC, BC, AB, MB, SK), `SLFTE1` (PST/QST ID) is sent only when that SKU has a provincial tax with `status = A`, and `SLFTE2` (GST ID) only when it has a GST tax with `status = A`. These are the same taxes that set `SLFTX1`/`SLFTX2`. Previously both were copied onto every SKU line of the transaction.
+- ℹ️ Unchanged: Ontario (TE1/TE2 on every SKU line), `SLFTEN`, the TX flags, non-SKU lines, and RIMTNF.
+
+  | Scenario | SKU | Exempted tax | TE1 | TE2 |
+  |----------|-----|--------------|-----|-----|
+  | BC PST-only (`FIN 456`) | mask, hammer | PST | FIN 456 | blank |
+  | BC PST-only | other SKUs | none | blank (was FIN 456) | blank |
+  | MB GST-only (`GST exempt`) | hammer, water | GST | blank | GST exempt |
+  | MB GST-only | mask (no GST line) | none | blank | blank (was GST exempt) |
+
+### v1.0.118 (10/26/26)
 **First Nation outside Ontario marks the waived tax `D`, not `O` (MIM-11551).**
 - 🔧 **`O` is Ontario-only** - BC `FIRST_NATION` and QC `FIRST_NATION_PARTIAL` (and First Nation in any other province on the waived-tax path: AB, MB, SK) now print `D` on the flag of the exempted tax. MIM-10984 had them print `O`.
 - ℹ️ Unchanged: Ontario First Nation (`SLFTX3 = O`, MIM-10106), PST-only / GST-only (`E`), `SLFTX3`/`SLFTX4` = `N` for these provinces, TE1/TE2/TEN, and RIMTNF.
