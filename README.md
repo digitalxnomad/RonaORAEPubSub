@@ -383,7 +383,13 @@ Log entries include:
 
 ## Version History
 
-### v1.0.119 (10/27/26) ✨ Current
+### v1.0.120 (11/03/26) ✨ Current
+**First Nation keeps `SLFTE1` / `SLFTE2` / `SLFTEN` on every SKU line (MIM-11645).**
+- 🔧 **The v1.0.119 per-SKU rule no longer applies to `FIRST_NATION` / `FIRST_NATION_PARTIAL`** - sales audit expects a First Nation transaction's exemption IDs on all of its SKU lines, the same as `SLFTEN`, including lines whose `SLFTX1`/`SLFTX2` is `N`. Blank IDs on those lines could raise TTX 00412. BC First Nation and QC Kahnawake are back to their v1.0.118 output.
+- ℹ️ Unchanged: other programs outside Ontario keep the MIM-11567 per-SKU rule (PST-only, GST-only, Provincial Government). Ontario and the TX flags are unchanged.
+- ✨ New regression sample `samples/Tax Exemptions/bc_fn_te_every_sku_line.json` (a BC First Nation SKU with no tax lines still carries TE1 and TEN).
+
+### v1.0.119 (10/27/26)
 **`SLFTE1` / `SLFTE2` only on SKUs whose matching tax is exempted (MIM-11567).**
 - 🔧 **Exemption IDs follow each SKU's own tax** - outside Ontario (QC, BC, AB, MB, SK), `SLFTE1` (PST/QST ID) is sent only when that SKU has a provincial tax with `status = A`, and `SLFTE2` (GST ID) only when it has a GST tax with `status = A`. These are the same taxes that set `SLFTX1`/`SLFTX2`. Previously both were copied onto every SKU line of the transaction.
 - ℹ️ Unchanged: Ontario (TE1/TE2 on every SKU line), `SLFTEN`, the TX flags, non-SKU lines, and RIMTNF.

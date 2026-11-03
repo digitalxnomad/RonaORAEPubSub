@@ -437,7 +437,9 @@ class RetailEventMapper
                 //           blank (MIM-11502; AB MIM-11517, where Order Service sends certificateId "GST exempt")
                 // Outside Ontario the IDs follow the SKU's own exempted tax (MIM-11567): SLFTE1 only when
                 // the SKU has a provincial (PST/QST) tax with status "A", SLFTE2 only when it has a GST
-                // one - the same taxes that set SLFTX1/SLFTX2. Ontario keeps both on every SKU line.
+                // one - the same taxes that set SLFTX1/SLFTX2. Ontario keeps both on every SKU line, and so
+                // do FIRST_NATION / FIRST_NATION_PARTIAL in any province (MIM-11645): sales audit expects a
+                // First Nation transaction's IDs on all its SKU lines, like SLFTEN.
                 if (isTaxExemptTransaction)
                 {
                     string exemptProvince = GetProvince(retailEvent)?.ToUpperInvariant() ?? "";
@@ -462,7 +464,8 @@ class RetailEventMapper
 
                     string exemptId1 = exemptIdFromCertificate ? certificateId : "";
 
-                    if (exemptProvince is "QC" or "BC" or "AB" or "MB" or "SK")
+                    bool isFirstNationProgram = exemptProgram is "FIRST_NATION" or "FIRST_NATION_PARTIAL";
+                    if (exemptProvince is "QC" or "BC" or "AB" or "MB" or "SK" && !isFirstNationProgram)
                     {
                         var exemptedBuckets = (item.Taxes ?? [])
                             .Where(t => string.Equals(t.Status, "A", StringComparison.OrdinalIgnoreCase))

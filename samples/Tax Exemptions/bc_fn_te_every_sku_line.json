@@ -1,0 +1,180 @@
+{
+    "schemaVersion":  "2.0.0",
+    "messageType":  "RetailEvent",
+    "eventType":  "ORIGINAL",
+    "eventId":  "9000000000000011645",
+    "occurredAt":  "2026-09-17T17:17:39Z",
+    "ingestedAt":  "2026-09-17T17:17:42Z",
+    "businessContext":  {
+                            "businessDay":  "2026-09-17",
+                            "channel":  "STORE",
+                            "fulfillment":  "CARRYOUT",
+                            "store":  {
+                                          "currency":  "CAD",
+                                          "storeId":  "61700",
+                                          "taxArea":  "BC"
+                                      },
+                            "workstation":  {
+                                                "registerId":  "85",
+                                                "sequenceNumber":  412,
+                                                "type":  "POS"
+                                            }
+                        },
+    "eventCategory":  "TRANSACTION",
+    "eventSubType":  "transactionSale",
+    "transaction":  {
+                        "transactionType":  "SALE",
+                        "items":  [
+                                      {
+                                          "attributes":  {
+                                                             "x-epp-coverage-identifier":  "0"
+                                                         },
+                                          "item":  {
+                                                       "description":  "HAMMER",
+                                                       "sku":  "019062028"
+                                                   },
+                                          "lineId":  "17896654361735000004",
+                                          "pricing":  {
+                                                          "extendedPrice":  {
+                                                                                "currency":  "CAD",
+                                                                                "value":  "30.00"
+                                                                            },
+                                                          "originalUnitPrice":  {
+                                                                                    "currency":  "CAD",
+                                                                                    "value":  "30.00"
+                                                                                },
+                                                          "priceVehicle":  "REG:ORG",
+                                                          "unitPrice":  {
+                                                                            "currency":  "CAD",
+                                                                            "value":  "30.00"
+                                                                        }
+                                                      },
+                                          "quantity":  {
+                                                           "uom":  "EA",
+                                                           "value":  1
+                                                       },
+                                          "taxes":  [
+                                                        {
+                                                            "amount":  {
+                                                                           "currency":  "CAD",
+                                                                           "value":  "0.00"
+                                                                       },
+                                                            "jurisdiction":  {
+                                                                                 "region":  "FED"
+                                                                             },
+                                                            "ratePercent":  "5",
+                                                            "taxCode":  "GST",
+                                                            "status":  "A"
+                                                        },
+                                                        {
+                                                            "amount":  {
+                                                                           "currency":  "CAD",
+                                                                           "value":  "0.00"
+                                                                       },
+                                                            "jurisdiction":  {
+                                                                                 "region":  "BC"
+                                                                             },
+                                                            "ratePercent":  "7",
+                                                            "taxCode":  "PST",
+                                                            "status":  "A"
+                                                        }
+                                                    ]
+                                      },
+                                      {
+                                          "attributes":  {
+                                                             "x-epp-coverage-identifier":  "0"
+                                                         },
+                                          "item":  {
+                                                       "description":  "SKU 040010186",
+                                                       "sku":  "040010186"
+                                                   },
+                                          "lineId":  "17896654361735000001",
+                                          "pricing":  {
+                                                          "extendedPrice":  {
+                                                                                "currency":  "CAD",
+                                                                                "value":  "10.00"
+                                                                            },
+                                                          "originalUnitPrice":  {
+                                                                                    "currency":  "CAD",
+                                                                                    "value":  "10.00"
+                                                                                },
+                                                          "priceVehicle":  "REG:ORG",
+                                                          "unitPrice":  {
+                                                                            "currency":  "CAD",
+                                                                            "value":  "10.00"
+                                                                        }
+                                                      },
+                                          "quantity":  {
+                                                           "uom":  "EA",
+                                                           "value":  1
+                                                       },
+                                          "taxes":  [
+
+                                                    ]
+                                      }
+                                  ],
+                        "tenders":  [
+                                        {
+                                            "amount":  {
+                                                           "currency":  "CAD",
+                                                           "value":  "40.00"
+                                                       },
+                                            "card":  {
+                                                         "responseCode":  "SETTLE"
+                                                     },
+                                            "method":  "CASH",
+                                            "tenderId":  "CA"
+                                        }
+                                    ],
+                        "totals":  {
+                                       "cashRounding":  {
+                                                            "currency":  "CAD",
+                                                            "value":  "0.00"
+                                                        },
+                                       "changeDue":  {
+                                                         "currency":  "CAD",
+                                                         "value":  "0.00"
+                                                     },
+                                       "discounts":  {
+                                                         "currency":  "CAD",
+                                                         "value":  "0.00"
+                                                     },
+                                       "gross":  {
+                                                     "currency":  "CAD",
+                                                     "value":  "40.00"
+                                                 },
+                                       "net":  {
+                                                   "currency":  "CAD",
+                                                   "value":  "40.00"
+                                               },
+                                       "tax":  {
+                                                   "currency":  "CAD",
+                                                   "value":  "0.00"
+                                               }
+                                   },
+                        "qualifiers":  {
+                                           "isTaxExemptTransaction":  true
+                                       },
+                        "taxExemption":  {
+                                             "reason":  "BC",
+                                             "authority":  "BC",
+                                             "program":  "FIRST_NATION",
+                                             "certificateId":  "REG 1234567"
+                                         }
+                    },
+    "promotions":  [
+
+                   ],
+    "extensions":  {
+                       "x-tax-exemption-level":  "T",
+                       "x-tax-exemption-customerName":  "Test Customer"
+                   },
+    "actor":  {
+                  "cashier":  {
+                                  "loginId":  "2"
+                              },
+                  "customer":  {
+                                   "customerIdToken":  ""
+                               }
+              }
+}
