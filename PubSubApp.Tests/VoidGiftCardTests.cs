@@ -26,13 +26,16 @@ public class VoidGiftCardTests
         return mapper.MapRetailEventToRecordSet(mapper.ReadRecordSetFromString(json));
     }
 
+    private static List<TenderRecord> Tenders(RecordSet result) =>
+        result.TenderRecords ?? throw new InvalidOperationException("Mapper returned a RecordSet without TenderRecords.");
+
     [Fact]
     public void MapRetailEventToRecordSet_VoidGiftCard_BothTenderLinesAreType11()
     {
         RecordSet result = Map();
 
-        result.TenderRecords.Should().HaveCount(2);
-        result.TenderRecords.Select(t => t.TransactionType).Should().OnlyContain(t => t == "11");
+        Tenders(result).Should().HaveCount(2);
+        Tenders(result).Select(t => t.TransactionType).Should().OnlyContain(t => t == "11");
     }
 
     [Fact]
@@ -40,8 +43,8 @@ public class VoidGiftCardTests
     {
         RecordSet result = Map();
 
-        result.TenderRecords.Should().OnlyContain(t => t.Amount == "00000004500" && t.AuthNumber == "004500");
-        result.TenderRecords.Select(t => t.AmountNegativeSign).Should().Equal("-", "");
+        Tenders(result).Should().OnlyContain(t => t.Amount == "00000004500" && t.AuthNumber == "004500");
+        Tenders(result).Select(t => t.AmountNegativeSign).Should().Equal("-", "");
     }
 
     [Fact]
@@ -50,7 +53,7 @@ public class VoidGiftCardTests
         // The sample's credit line carries authCode 000000; TNFAUT must still be 004500.
         RecordSet result = Map();
 
-        TenderRecord credit = result.TenderRecords.Single(t => t.AmountNegativeSign == "");
+        TenderRecord credit = Tenders(result).Single(t => t.AmountNegativeSign == "");
         credit.AuthNumber.Should().Be("004500");
         credit.TransactionType.Should().Be("11");
     }
@@ -61,7 +64,7 @@ public class VoidGiftCardTests
         RecordSet result = Map();
 
         result.OrderRecords.Should().BeEmpty();
-        result.TenderRecords.Should().OnlyContain(t => t.FundCode == "PG");
+        Tenders(result).Should().OnlyContain(t => t.FundCode == "PG");
     }
 
     [Fact]
@@ -75,8 +78,8 @@ public class VoidGiftCardTests
     {
         RecordSet result = Map(e => e.Remove("order"));
 
-        result.TenderRecords.Select(t => t.TransactionType).Should().NotContain("11");
-        result.TenderRecords.Select(t => t.AuthNumber).Should().Equal("812345", "000000");
+        Tenders(result).Select(t => t.TransactionType).Should().NotContain("11");
+        Tenders(result).Select(t => t.AuthNumber).Should().Equal("812345", "000000");
     }
 
     [Fact]
@@ -84,7 +87,7 @@ public class VoidGiftCardTests
     {
         RecordSet result = Map(e => e.Replace("VOID_GC_ORDER", "void_gc_order"));
 
-        result.TenderRecords.Should().OnlyContain(t => t.TransactionType == "11");
+        Tenders(result).Should().OnlyContain(t => t.TransactionType == "11");
     }
 
     [Fact]
@@ -92,8 +95,8 @@ public class VoidGiftCardTests
     {
         RecordSet result = Map(e => e.Replace("\"-45.00\"", "\"-10000.00\"").Replace("\"45.00\"", "\"10000.00\""));
 
-        result.TenderRecords.Select(t => t.Amount).Should().OnlyContain(a => a == "00001000000");
-        result.TenderRecords.Select(t => t.AuthNumber).Should().OnlyContain(a => a == "999999");
+        Tenders(result).Select(t => t.Amount).Should().OnlyContain(a => a == "00001000000");
+        Tenders(result).Select(t => t.AuthNumber).Should().OnlyContain(a => a == "999999");
     }
 
     /// Tiny text-level editor so each test varies the one sample without a second file.
