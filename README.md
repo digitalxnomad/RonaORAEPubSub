@@ -383,7 +383,15 @@ Log entries include:
 
 ## Version History
 
-### v1.0.120 (11/03/26) ✨ Current
+### v1.0.121 (11/16/26) ✨ Current
+**Void gift card writes `TNFTTP` 11 and `TNFAUT` = the tender amount on both tender lines (MIM-11789).**
+- ✨ **New detection** - `order.externalIds[]` containing system `TACTILL` with id `VOID_GC_ORDER` marks a void gift card (one transaction that debits a gift card and credits the same amount back; no SKU lines).
+- ✨ **Both RIMTNF lines** get `TNFTTP` = `11`, and `TNFAUT` = that line's own amount as 6 digits (sign stays in `TNFAMN`). For the sample (store 41100, register 36, sequence 20) the credit line, whose auth code is `000000`, is written with `TNFAUT` `004500` and `TNFTTP` `11`.
+- ℹ️ Unchanged: RIMSLF (no sales lines), `TNFFCD` and the rest of the gift-card tender layout, and every other transaction type.
+- ℹ️ A tender of $10,000.00 or more cannot fit the 6-digit `TNFAUT`; it is clamped to `999999` and logged at Error level (same rule as gift card activation).
+- ✨ New regression sample `samples/Void GC/void_gc_order.json` and tests in `PubSubApp.Tests/VoidGiftCardTests.cs`.
+
+### v1.0.120 (11/03/26)
 **First Nation keeps `SLFTE1` / `SLFTE2` / `SLFTEN` on every SKU line (MIM-11645).**
 - 🔧 **The v1.0.119 per-SKU rule no longer applies to `FIRST_NATION` / `FIRST_NATION_PARTIAL`** - sales audit expects a First Nation transaction's exemption IDs on all of its SKU lines, the same as `SLFTEN`, including lines whose `SLFTX1`/`SLFTX2` is `N`. Blank IDs on those lines could raise TTX 00412. BC First Nation and QC Kahnawake are back to their v1.0.118 output.
 - ℹ️ Unchanged: other programs outside Ontario keep the MIM-11567 per-SKU rule (PST-only, GST-only, Provincial Government). Ontario and the TX flags are unchanged.

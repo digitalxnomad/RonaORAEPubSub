@@ -24,6 +24,10 @@ class RetailEventMapper
         // When true, specific SLF fields are overridden per the POA mapping spec (tender file unaffected).
         bool isPaymentOnAccount = IsPaymentOnAccount(retailEvent);
 
+        // Void gift card (MIM-11789): order.externalIds contains TACTILL / VOID_GC_ORDER. Both RIMTNF
+        // tender lines get TNFTTP = "11" and TNFAUT = the line's own TNFAMT as 6 digits.
+        bool isVoidGiftCard = IsVoidGiftCard(retailEvent);
+
         // Tax-exemption transaction (Ontario First Nation partial exemption): when true, every SKU line
         // gets SLFTE1/2/N populated (outside Ontario SLFTE1/2 only where that SKU's tax is exempted),
         // and the SKU whose taxes[].status == "A" gets SLFTX3 = "O".
@@ -1320,6 +1324,12 @@ class RetailEventMapper
                         tenderRecord.MagStripeFlag = PadOrTruncate(tender.Card.Emv?.Tags?.MagStrip ?? " ", 1);
                     }
 
+                    if (isVoidGiftCard)
+                    {
+                        tenderRecord.TransactionType = "11";
+                        tenderRecord.AuthNumber = AuthNumberFromAmount(tenderRecord.Amount);
+                    }
+
                     recordSet.TenderRecords.Add(tenderRecord);
 
                     // For CASH tenders: create additional CA (changeDue) and PR (cashRounding) records
@@ -1515,6 +1525,35 @@ class RetailEventMapper
             return retailEvent.Order?.ExternalIds?.Any(e =>
                 string.Equals(e.System, "TACTILL", StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(e.Id, "PAYMENT_ON_ACCOUNT_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // Check if transaction is a void gift card:
+        // order.externalIds[] contains system "TACTILL" with id "VOID_GC_ORDER".
+        private bool IsVoidGiftCard(RetailEvent retailEvent)
+        {
+            return retailEvent.Order?.ExternalIds?.Any(e =>
+                string.Equals(e.System, "TACTILL", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.Id, "VOID_GC_ORDER", StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        // TNFAUT = the line's TNFAMT (11-digit implied-cents amount, sign carried separately in TNFAMN)
+        // as the 6-digit field. TNFAUT is a fixed 6 digits, so an amount of $10,000.00 or more cannot be
+        // represented; it is clamped (an over-long value fails validation and the subscriber ACKs and
+        // DROPS the message) and logged at Error level because the emitted value is deliberately wrong.
+        private string? AuthNumberFromAmount(string? amount)
+        {
+            string digits = (amount ?? "").Trim();
+            if (digits.Length == 0 || !digits.All(char.IsDigit))
+                return PadOrTruncate("", 6);
+
+            digits = digits.TrimStart('0');
+            if (digits.Length > 6)
+            {
+                SimpleLogger.LogError(
+                    $"✗ TNFAUT overflow: void gift card tender amount {amount} exceeds the 6-digit field; clamping to 9999.99");
+                return "999999";
+            }
+            return digits.PadLeft(6, '0');
         }
 
         // SODA item detection: item.altIds[] contains type="sodaType" with value="SODA".

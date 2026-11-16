@@ -1,0 +1,113 @@
+{
+	"schemaVersion": "2.0.0",
+	"messageType": "RetailEvent",
+	"eventType": "ORIGINAL",
+	"eventId": "7526311635166138539",
+	"occurredAt": "2026-11-11T16:30:00Z",
+	"ingestedAt": "2026-11-11T16:30:02Z",
+	"businessContext": {
+		"businessDay": "2026-11-11",
+		"channel": "STORE",
+		"fulfillment": "CARRYOUT",
+		"store": {
+			"currency": "CAD",
+			"storeId": "41100",
+			"taxArea": "ON"
+		},
+		"workstation": {
+			"registerId": "36",
+			"sequenceNumber": 20,
+			"type": "POS"
+		}
+	},
+	"eventCategory": "TRANSACTION",
+	"eventSubType": "transactionSale",
+	"order": {
+		"externalIds": [
+			{
+				"system": "TACTILL",
+				"id": "VOID_GC_ORDER"
+			}
+		]
+	},
+	"transaction": {
+		"transactionType": "VOID",
+		"items": [],
+		"tenders": [
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "-45.00"
+				},
+				"card": {
+					"authCode": "812345",
+					"emv": {
+						"tags": {
+							"magStrip": "S"
+						}
+					},
+					"entryMode": "SWIPED",
+					"last4": "9904",
+					"responseCode": "1[49]",
+					"scheme": "GC"
+				},
+				"entryMethod": "SWIPED",
+				"giftCard": {
+					"cardToken": "6006497092249904902"
+				},
+				"method": "GIFTCARD",
+				"requestedAmount": {
+					"currency": "CAD",
+					"value": "-45.00"
+				},
+				"tenderId": "PG"
+			},
+			{
+				"amount": {
+					"currency": "CAD",
+					"value": "45.00"
+				},
+				"card": {
+					"authCode": "000000",
+					"emv": {
+						"tags": {
+							"magStrip": "S"
+						}
+					},
+					"entryMode": "SWIPED",
+					"last4": "9904",
+					"responseCode": "1[49]",
+					"scheme": "GC"
+				},
+				"entryMethod": "SWIPED",
+				"giftCard": {
+					"cardToken": "6006497092249904902"
+				},
+				"method": "GIFTCARD",
+				"requestedAmount": {
+					"currency": "CAD",
+					"value": "45.00"
+				},
+				"tenderId": "PG"
+			}
+		],
+		"totals": {
+			"discounts": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"gross": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"net": {
+				"currency": "CAD",
+				"value": "0.00"
+			},
+			"tax": {
+				"currency": "CAD",
+				"value": "0.00"
+			}
+		}
+	}
+}
