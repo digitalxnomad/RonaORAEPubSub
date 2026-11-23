@@ -383,7 +383,19 @@ Log entries include:
 
 ## Version History
 
-### v1.0.121 (11/16/26) ✨ Current
+### v1.0.122 (11/23/26) ✨ Current
+**Price adjustment: the return leg uses return reason `RRT02010` and the sale leg maps as a price override (TACO-75).**
+- 🔧 **Return leg (`SLFLNT` 11) `SLFRSN` = `RRT02010`** on every price adjustment. It used to be `POV0` + `return.reason`, but that reason is a price-override code (e.g. 1502 Price Match), which is not valid on a return line. WDRTRC 2010 = "Price".
+- 🔧 **Sale leg (`SLFLNT` 01) maps like a price override:**
+  - `SLFPVC`/`SLFREF` = `OVD`/`OVR` (the payload sends `REG:ORG`).
+  - `SLFORG`/`SLFORT` = the price returned on the partner leg; `SLFOVR` = the adjusted price.
+  - `SLFADC` = `####` and `SLFADP` = the adjusted price.
+  - `SLFRSN` stays `POV0` + reason.
+  - The original-transaction fields `SLFOST`/`SLFOTS`/`SLFOTD`/`SLFOTR`/`SLFOTT` are zeros.
+- ℹ️ Unchanged: `SLFTTP` 11 on both legs, `SLFSEL`/`SLFEXT`, the return leg's original-transaction reference, eco fee and tax lines, RIMTNF.
+- ✨ Updated the 7 adjustment baselines; new tests in `PubSubApp.Tests/PriceAdjustmentTests.cs`.
+
+### v1.0.121 (11/16/26)
 **Void gift card writes `TNFTTP` 11 and `TNFAUT` = the tender amount on both tender lines (MIM-11789).**
 - ✨ **New detection** - `order.externalIds[]` containing system `TACTILL` with id `VOID_GC_ORDER` marks a void gift card (one transaction that debits a gift card and credits the same amount back; no SKU lines).
 - ✨ **Both RIMTNF lines** get `TNFTTP` = `11`, and `TNFAUT` = that line's own amount as 6 digits (sign stays in `TNFAMN`). For the sample (store 41100, register 36, sequence 20) the credit line, whose auth code is `000000`, is written with `TNFAUT` `004500` and `TNFTTP` `11`.

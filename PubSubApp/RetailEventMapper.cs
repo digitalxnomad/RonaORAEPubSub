@@ -176,10 +176,17 @@ class RetailEventMapper
                 bool isReturnLine = IsReturnLine(retailEvent, item, adjustmentPairing);
 
                 // Price adjustment sale leg: SLFLNT drops to the sale line type while SLFTTP stays 11.
-                if (retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && !isReturnLine &&
-                    orderRecord.LineType == mappedTransactionTypeSLFLNT)
+                bool isAdjustmentSaleLeg = retailEvent.Transaction?.TransactionType == "ADJUSTMENT" && !isReturnLine;
+                if (isAdjustmentSaleLeg && orderRecord.LineType == mappedTransactionTypeSLFLNT)
                 {
                     orderRecord.LineType = "01";
+                }
+
+                // TACO-75: MMS reads the sale leg as a price override of the returned price, so it
+                // carries OVD:OVR whatever vehicle the payload sends (REG:ORG in every capture).
+                if (isAdjustmentSaleLeg)
+                {
+                    effectivePriceVehicle = "OVD:OVR";
                 }
 
                 // Quantity - 9-digits without decimal (multiply by 100)
@@ -403,11 +410,12 @@ class RetailEventMapper
 
                 if (transType == "RETURN")
                     reasonCode = "RRT0" + (item.Return?.Reason ?? ""); // RRT0 + return.reason (e.g. "RRT00204"), same shape as POV0 below
+                else if (transType == "ADJUSTMENT" && isReturnLine)
+                    reasonCode = "RRT02010"; // TACO-75: return.reason is a PRPORS price-override code (e.g. 1502), not a return reason; 2010 = "Price"
                 else if (transType == "ADJUSTMENT")
                 {
-                    // Price adjustment: POV0 + return.reason on BOTH legs of the pair (AC1/AC2).
-                    // A leg that carries no reason of its own takes its partner's, so the two
-                    // halves always agree.
+                    // Sale leg: POV0 + return.reason, as on any price override. A leg that carries
+                    // no reason of its own takes its partner's.
                     string adjReason = item.Return?.Reason
                         ?? adjustmentPairing.PairOf(item)?.Return?.Reason
                         ?? "";
@@ -504,6 +512,32 @@ class RetailEventMapper
                 orderRecord.GroupDiscAmount = "000000000"; // SLFGDA - Required, must be "000000000"
                 orderRecord.GroupDiscSign = ""; // SLFGDS - Must be empty string
                 orderRecord.SalesPerson = salesPersonId; // SLFSPS
+
+                // TACO-75: the adjustment sale leg presents like a price override. SLFORG/SLFORT is the
+                // price being returned on the partner leg, SLFOVR the adjusted price (SLFSEL/SLFEXT
+                // already carry it), and it references no original transaction.
+                if (isAdjustmentSaleLeg)
+                {
+                    TransactionItem? returnLeg = adjustmentPairing.PairOf(item);
+                    if (decimal.TryParse(returnLeg?.Pricing?.UnitPrice?.Value, out decimal returnedPrice) &&
+                        decimal.TryParse(item.Pricing?.UnitPrice?.Value, out decimal adjustedPrice))
+                    {
+                        string returned = FormatCurrency(Math.Abs(returnedPrice).ToString("F2"), 9);
+                        orderRecord.OriginalPrice = returned;
+                        orderRecord.OriginalPriceNegativeSign = "";
+                        orderRecord.OriginalRetail = returned;
+                        orderRecord.OriginalRetailNegativeSign = "";
+                        orderRecord.OverridePrice = FormatCurrency(Math.Abs(adjustedPrice).ToString("F2"), 9);
+                        orderRecord.OverridePriceNegativeSign = "";
+                        orderRecord.AdCode = Math.Abs(returnedPrice) == Math.Abs(adjustedPrice) ? "0000" : "####";
+                    }
+
+                    orderRecord.OriginalStore = "00000";
+                    orderRecord.OriginalTxStore = "00000";
+                    orderRecord.OriginalTxDate = "000000";
+                    orderRecord.OriginalTxRegister = "000";
+                    orderRecord.OriginalTxNumber = "00000";
+                }
 
                 // Discount reasons - per CSV rules
                 orderRecord.GroupDiscReason = "00"; // SLFGDR - Always '00'
